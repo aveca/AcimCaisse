@@ -285,6 +285,8 @@ function _broadcastNew(item,total){
 
   function _pollCart(){
     if(!_overlay)return;
+    // Skip rebuild if dialog open (inline edit, quick add, etc) — preserves user's editing
+    if(_dialogOpen()){clearTimeout(_pollTimer);_pollTimer=setTimeout(_pollCart,500);return;}
     var info=_cartInfo();
     // Show background only when cart has items
     if(!_mob){
