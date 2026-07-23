@@ -222,26 +222,15 @@
 
   function _addToCart(name,priceCents,barcode,categoryId){
     if(!name){_toast("\u274C Nom manquant");return false;}
-    // v23: ALWAYS create separate line in _myCart
+    // v24: ALWAYS separate line, NO Dart sync (Dart sync crashes Flutter)
     var myId="M"+Date.now()+Math.floor(Math.random()*9999);
     _myCart.push({
       myId:myId,name:name,priceCents:priceCents||0,
       bc:barcode||"",cat:categoryId||"autre",dartProd:null
     });
-    // Sauver le vrai barcode
     _realBcMap[myId]=barcode||"";
-    // Essayer de sync Dart (best effort — Dart peut fusionner, _myCart reste correct)
-    try{var n=_find();if(n){
-      var dartBc=barcode?barcode+"#"+myId:null;
-      var prod=_makeProduct(name,priceCents,dartBc,categoryId);
-      if(prod){
-        _myCart[_myCart.length-1].dartProd=prod;
-        var nl=_newArr();var ls=_lines();
-        for(var j=0;j<ls.length;j++)nl.push(ls[j]);
-        nl.push(new A.oV(prod,1,null));
-        try{_update(nl);}catch(e){_err('dart sync add',e);}
-      }
-    }}catch(e){_err('dart add',e);}
+    // Save to local catalogue
+    _dbPut({barcode:barcode||myId,name:name,sale_price_cents:priceCents||0,category:categoryId||"autre",source:"add",last_updated:Date.now()});
     _pollCart();_broadcastCart();return true;}
 
   function _cartInfo(){
@@ -351,14 +340,30 @@
           priceSpan.textContent="✏️";
           ln.appendChild(priceSpan);
         }
+        // Bouton dupliquer (ajouter même produit en 2ème ligne)
+        var dupBtn=document.createElement("span");
+        dupBtn.textContent="⟳";
+        dupBtn.title="Ajouter encore une fois";
+        dupBtn.style.cssText="font-size:12px;cursor:pointer;margin-left:4px;color:#1a1a2e;opacity:0.5;";
+        dupBtn.onmouseenter=function(){this.style.opacity="1";};
+        dupBtn.onmouseleave=function(){this.style.opacity="0.5";};
       }
       ln.onmouseenter=function(){this.style.background=_mob?"rgba(230,81,0,0.08)":"rgba(230,81,0,0.06)";this.style.borderRadius="4px";};
       ln.onmouseleave=function(){this.style.background=_mob?"#fff":"transparent";this.style.borderRadius="0";};
-      (function(idx){
+      (function(idx,item){
+        // Click on line → edit
         ln.addEventListener("click",function(e){
+          // Si click sur dupBtn → dupliquer, pas éditer
+          if(e.target===dupBtn){
+            e.stopPropagation();
+            _addToCart(item.name,item.price,item.bc,item.cat);
+            _toast("✅ "+item.name+" ajouté");
+            return;
+          }
           e.stopPropagation();
           _inlineEdit(idx,e.clientX,e.clientY);
         });
+        if(dupBtn)ln.appendChild(dupBtn);
       })(i);
       _overlay.appendChild(ln);
       _linesEls.push(ln);
@@ -582,23 +587,6 @@
       _myCart[idx].name=nn;
       _myCart[idx].priceCents=pc;
       _myCart[idx].cat=selCat;
-      // Update realBcMap
-      if(nn&&_realBcMap[_myCart[idx].myId])_realBcMap[_myCart[idx].myId]=_myCart[idx].bc;
-      // Try to sync Dart product fields
-      if(_myCart[idx].dartProd){
-        try{
-          var cp=_clone(_myCart[idx].dartProd,{name:nn,salePriceCents:pc,categoryId:selCat});
-          if(cp){
-            var ls=_lines(),nl=_newArr();
-            for(var di=0;di<ls.length;di++){
-              if(ls[di].a&&ls[di].a.a===_myCart[idx].dartProd.a){
-                nl.push(new A.oV(cp,1,null));
-              }else nl.push(ls[di]);
-            }
-            _update(nl);
-          }
-        }catch(e){_err('dart edit',e);}
-      }
       // Update catalogue
       _dbPut({barcode:_myCart[idx].bc||_myCart[idx].myId,name:nn,sale_price_cents:pc,category:selCat,source:"edit",last_updated:Date.now()});
       card.remove();
@@ -1218,8 +1206,6 @@
     _broadcastClear();
     _myCart=[];
     _realBcMap={};
-    // Try to clear Dart
-    try{var n=_find();if(n){var nl=_newArr();_update(nl);}}catch(e){}
     _pollCart();
     _toast("\u2705 Encaiss\u00E9 ! "+(total/100).toFixed(2)+"\u20ac");
   }
