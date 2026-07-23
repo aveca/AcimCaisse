@@ -721,6 +721,8 @@
       if(pv>0){nn=nn+" "+pv+u;}
       if(!nn){ni.style.borderColor="#c62828";ni.focus();return;}
       var pc=isNaN(np)?0:Math.round(np*100);
+      // IMPORTANT: close dialog BEFORE _addToCart so _pollCart can render
+      ov.remove();
       var added=_addToCart(nn,pc,autoBc,selCat);
       if(!added){
         _toast("⏳ Réessayons…");
@@ -728,11 +730,11 @@
           var added2=_addToCart(nn,pc,autoBc,selCat);
           if(!added2){_toast("❌ Impossible d'ajouter — réessayez");return;}
           _dbPut({barcode:autoBc,name:nn,sale_price_cents:pc,category:selCat,source:"manual",last_updated:Date.now()});
-          ov.remove();_toastWithPrint(nn,pc,autoBc);_pollCart();
+          _toastWithPrint(nn,pc,autoBc);_pollCart();
         },500);return;
       }
       _dbPut({barcode:autoBc,name:nn,sale_price_cents:pc,category:selCat,source:"manual",last_updated:Date.now()});
-      ov.remove();_toastWithPrint(nn,pc,autoBc);_pollCart();
+      _toastWithPrint(nn,pc,autoBc);
     };
     br.appendChild(bCancel);br.appendChild(bOk);card.appendChild(br);
 
