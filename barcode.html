@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>AcimCaisse - Codes-barres</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:Segoe UI,Arial,sans-serif;background:#f5f5f5;color:#333;padding:20px}
+h1{color:#e65100;margin-bottom:10px;font-size:1.4em}
+.sous-titre{color:#666;margin-bottom:20px;font-size:0.9em}
+.section{background:#fff;border-radius:8px;padding:16px;margin-bottom:16px;box-shadow:0 1px 3px rgba(0,0,0,0.1)}
+.section h2{font-size:1em;margin-bottom:10px;color:#333}
+.form-row{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap}
+.form-row label{font-size:0.85em;display:block;margin-bottom:3px;color:#555}
+.form-row input,.form-row select{padding:6px 10px;border:1px solid #ccc;border-radius:4px;font-size:0.9em}
+.form-row input[type=text]{width:200px}
+.form-row input[type=number]{width:80px}
+.btn{padding:7px 16px;border:none;border-radius:4px;cursor:pointer;font-size:0.9em;font-weight:500}
+.btn-primary{background:#e65100;color:#fff}
+.btn-primary:hover{background:#bf360c}
+.btn-secondary{background:#f5f5f5;color:#333;border:1px solid #ccc}
+.btn-secondary:hover{background:#eee}
+.btn-danger{background:#c62828;color:#fff}
+.btn-danger:hover{background:#b71c1c}
+.actions{display:flex;gap:8px;margin-top:10px}
+table{width:100%;border-collapse:collapse;font-size:0.85em}
+th{background:#f5f5f5;text-align:left;padding:6px 8px;border-bottom:2px solid #ddd}
+td{padding:5px 8px;border-bottom:1px solid #eee}
+td input{width:100%;padding:3px 6px;border:1px solid #ddd;border-radius:3px;font-size:0.9em}
+.btn-del{background:none;border:none;color:#c62828;cursor:pointer;font-size:1.1em;padding:2px 6px}
+.btn-del:hover{background:#ffebee;border-radius:3px}
+.apercu{margin-top:10px}
+.pages-info{font-size:0.85em;color:#666;margin-bottom:8px}
+
+/* Impression */
+@media print{
+  body{background:#fff;padding:0}
+  .no-print{display:none!important}
+  .section{box-shadow:none;padding:0}
+  .page-print{page-break-after:always;margin:0;padding:8mm}
+  .page-print:last-child{page-break-after:auto}
+  .barcode-grid{display:grid!important;grid-template-columns:repeat(3,1fr);gap:3mm}
+  .barcode-item{border:0.5pt solid #ccc;padding:2mm;text-align:center;break-inside:avoid}
+  .barcode-item canvas{max-width:100%}
+  .barcode-item .bc-text{font-size:8pt;font-family:monospace}
+  .barcode-item .bc-name{font-size:7pt;color:#333;margin-top:1mm}
+}
+</style>
+</head>
+<body>
+
+<div class="no-print">
+  <h1>&#128293; G&#233;n&#233;rateur de codes-barres</h1>
+  <p class="sous-titre">Cr&#233;ez des &#233;tiquettes code-barres pour vos produits sans code ou illisibles.</p>
+
+  <div class="section">
+    <h2>Ajouter des produits</h2>
+    <div class="form-row">
+      <div><label>Nom du produit</label><input type="text" id="inpNom" placeholder="Ex: Jus de mangue"></div>
+      <div><label>Code-barres</label><input type="text" id="inpCode" placeholder="Ex: 3760001000019"></div>
+      <div><label>Quantit&#233;</label><input type="number" id="inpQte" value="1" min="1" max="100"></div>
+      <button class="btn btn-primary" onclick="ajouter()">+ Ajouter</button>
+    </div>
+    <div class="form-row" style="margin-top:10px">
+      <div><label>G&#233;n&#233;rer codes s&#233;quentiels</label><input type="text" id="inpPrefix" placeholder="Pr&#233;fixe" style="width:100px" value="3000"></div>
+      <div><label>D&#233;but</label><input type="number" id="inpDebut" value="1" min="0"></div>
+      <div><label>Fin</label><input type="number" id="inpFin" value="30" min="1"></div>
+      <button class="btn btn-secondary" onclick="genererSeq()">G&#233;n&#233;rer s&#233;rie</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Liste des &#233;tiquettes <span id="countLabel">(0)</span></h2>
+    <table id="tableListe">
+      <thead><tr><th style="width:40px">N&#176;</th><th>Nom</th><th>Code-barres</th><th style="width:40px">Qt&#233;</th><th style="width:30px"></th></tr></thead>
+      <tbody id="tbody"></tbody>
+    </table>
+    <div class="actions">
+      <button class="btn btn-primary" onclick="imprimer()">&#128424;&#65039; Imprimer</button>
+      <button class="btn btn-danger" onclick="toutSupprimer()">Tout supprimer</button>
+    </div>
+  </div>
+</div>
+
+<div class="apercu" id="apercu"></div>
+
+<script>
+// ═══════════════════════════════════════════════════
+//  Code128B - Générateur de codes-barres
+// ═══════════════════════════════════════════════════
+const PATTERNS = [
+  "212222","222122","222221","121223","121322","131222","122213","122312",
+  "132212","221213","221312","231212","112232","122132","122231","113222",
+  "123122","123221","223211","221132","221231","213212","223112","312131",
+  "311222","321122","321221","312212","322112","322211","212123","212321",
+  "232121","111323","131123","131321","112313","132113","132311","211313",
+  "231113","231311","112133","112331","132131","113123","113321","133121",
+  "313121","211331","231131","213113","213311","213131","311123","311321",
+  "331121","312113","312311","332111","314111","221411","431111","111224",
+  "111422","121124","121421","141122","141221","112214","112412","122114",
+  "122411","142112","142211","241211","221114","413111","241112","134111",
+  "111242","121142","121241","114212","124112","124211","411212","421112",
+  "421211","212141","214121","412121","111143","111341","131141","114113",
+  "114311","411113","411311","113141","114131","311141","411131","211412",
+  "211214","211232","2331112"
+];
+
+function encode128B(text) {
+  if (!text) return null;
+  const vals = [104]; // Start B
+  let cs = 104;
+  for (let i = 0; i < text.length; i++) {
+    const c = text.charCodeAt(i);
+    if (c < 32 || c > 127) continue;
+    const v = c - 32;
+    vals.push(v);
+    cs += v * (i + 1);
+  }
+  vals.push(cs % 103);
+  vals.push(106); // Stop
+  let bars = "";
+  for (const v of vals) bars += PATTERNS[v];
+  return bars;
+}
+
+function drawBarcode(canvas, code, name) {
+  const bars = encode128B(code);
+  if (!bars) { canvas.width = 0; canvas.height = 0; return; }
+  const modW = 1.2;
+  const barH = 45;
+  const padX = 8;
+  const padY = 4;
+
+  canvas.width = Math.ceil(bars.length * modW) + padX * 2;
+  canvas.height = barH + padY * 2 + 22;
+
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.fillStyle = "#000";
+  let x = padX;
+  let isBar = true;
+  for (const ch of bars) {
+    const w = parseInt(ch) * modW;
+    if (isBar) ctx.fillRect(x, padY, w, barH);
+    x += w;
+    isBar = !isBar;
+  }
+
+  // Texte du code
+  ctx.font = "bold 9px monospace";
+  ctx.textAlign = "center";
+  ctx.fillText(code, canvas.width / 2, padY + barH + 12);
+
+  // Nom du produit
+  if (name) {
+    ctx.font = "8px sans-serif";
+    ctx.fillStyle = "#333";
+    const displayName = name.length > 25 ? name.slice(0, 25) + "\u2026" : name;
+    ctx.fillText(displayName, canvas.width / 2, padY + barH + 21);
+  }
+}
+
+// ═══════════════════════════════════════════════════
+//  Gestion de la liste
+// ═══════════════════════════════════════════════════
+let produits = [];
+let nextId = 1;
+
+function ajouter() {
+  const nom = document.getElementById("inpNom").value.trim();
+  const code = document.getElementById("inpCode").value.trim();
+  const qte = parseInt(document.getElementById("inpQte").value) || 1;
+  if (!code) { alert("Entrez un code-barres."); return; }
+  produits.push({ id: nextId++, nom: nom || code, code, qte });
+  document.getElementById("inpNom").value = "";
+  document.getElementById("inpCode").value = "";
+  document.getElementById("inpNom").focus();
+  rafraichir();
+}
+
+function genererSeq() {
+  const prefix = document.getElementById("inpPrefix").value.trim() || "3000";
+  const debut = parseInt(document.getElementById("inpDebut").value) || 1;
+  const fin = parseInt(document.getElementById("inpFin").value) || 30;
+  if (fin < debut) { alert("La fin doit \u00eatre >= au d\u00e9but."); return; }
+  for (let i = debut; i <= fin; i++) {
+    const code = prefix + String(i).padStart(3, "0");
+    produits.push({ id: nextId++, nom: "Produit " + i, code, qte: 1 });
+  }
+  rafraichir();
+}
+
+function supprimer(id) {
+  produits = produits.filter(p => p.id !== id);
+  rafraichir();
+}
+
+function toutSupprimer() {
+  if (!produits.length) return;
+  if (confirm("Supprimer toutes les \u00e9tiquettes ?")) { produits = []; rafraichir(); }
+}
+
+function modifierQte(id, val) {
+  const p = produits.find(p => p.id === id);
+  if (p) p.qte = Math.max(1, parseInt(val) || 1);
+  rafraichir();
+}
+
+function modifierNom(id, val) {
+  const p = produits.find(p => p.id === id);
+  if (p) p.nom = val;
+}
+
+function modifierCode(id, val) {
+  const p = produits.find(p => p.id === id);
+  if (p) p.code = val;
+}
+
+function rafraichir() {
+  const tbody = document.getElementById("tbody");
+  tbody.innerHTML = "";
+  let n = 1;
+  for (const p of produits) {
+    for (let q = 0; q < p.qte; q++) {
+      const tr = document.createElement("tr");
+      tr.innerHTML =
+        "<td>" + n + "</td>" +
+        "<td><input value=\"" + esc(p.nom) + "\" onchange=\"modifierNom(" + p.id + ",this.value)\"></td>" +
+        "<td><input value=\"" + esc(p.code) + "\" onchange=\"modifierCode(" + p.id + ",this.value)\" style=\"font-family:monospace\"></td>" +
+        "<td>" + (q === 0 ? "<input type=number value=" + p.qte + " min=1 max=100 style=width:50px onchange=\"modifierQte(" + p.id + ",this.value)\">" : "") + "</td>" +
+        "<td>" + (q === 0 ? "<button class=btn-del onclick=\"supprimer(" + p.id + ")\" title=\"Supprimer\">\u2715</button>" : "") + "</td>";
+      tbody.appendChild(tr);
+      n++;
+    }
+  }
+  document.getElementById("countLabel").textContent = "(" + (n - 1) + " \u00e9tiquettes)";
+  genererApercu();
+}
+
+function esc(s) { return s.replace(/"/g, "&quot;").replace(/</g, "&lt;"); }
+
+// ═══════════════════════════════════════════════════
+//  Aperçu et impression
+// ═══════════════════════════════════════════════════
+const PAR_PAGE = 30; // 3 colonnes x 10 lignes
+const COLS = 3;
+
+function genererApercu() {
+  const div = document.getElementById("apercu");
+  div.innerHTML = "";
+
+  const items = [];
+  for (const p of produits) {
+    for (let q = 0; q < p.qte; q++) items.push({ nom: p.nom, code: p.code });
+  }
+
+  if (!items.length) {
+    div.innerHTML = '<div class="section no-print" style="text-align:center;color:#999;padding:40px">Ajoutez des produits ci-dessus pour voir l\'aper\u00e7u.</div>';
+    return;
+  }
+
+  const pages = Math.ceil(items.length / PAR_PAGE);
+  const pagesInfo = document.createElement("div");
+  pagesInfo.className = "pages-info no-print";
+  pagesInfo.textContent = items.length + " \u00e9tiquette(s) sur " + pages + " page(s)";
+  div.appendChild(pagesInfo);
+
+  for (let pg = 0; pg < pages; pg++) {
+    const pageDiv = document.createElement("div");
+    pageDiv.className = "page-print";
+    pageDiv.style.cssText = "background:#fff;margin-bottom:10px;padding:8mm;border:1px solid #ddd;border-radius:4px;";
+
+    const grid = document.createElement("div");
+    grid.className = "barcode-grid";
+    grid.style.cssText = "display:grid;grid-template-columns:repeat(3,1fr);gap:3mm;";
+
+    const start = pg * PAR_PAGE;
+    const end = Math.min(start + PAR_PAGE, items.length);
+
+    for (let i = start; i < end; i++) {
+      const item = items[i];
+      const itemDiv = document.createElement("div");
+      itemDiv.className = "barcode-item";
+      itemDiv.style.cssText = "border:0.5px solid #ccc;padding:2mm;text-align:center;";
+
+      const canvas = document.createElement("canvas");
+      canvas.style.cssText = "max-width:100%;";
+      drawBarcode(canvas, item.code, item.nom);
+      itemDiv.appendChild(canvas);
+
+      grid.appendChild(itemDiv);
+    }
+
+    pageDiv.appendChild(grid);
+    div.appendChild(pageDiv);
+  }
+}
+
+function imprimer() {
+  const items = [];
+  for (const p of produits) {
+    for (let q = 0; q < p.qte; q++) items.push({ nom: p.nom, code: p.code });
+  }
+  if (!items.length) { alert("Aucune \u00e9tiquette \u00e0 imprimer."); return; }
+  window.print();
+}
+
+// Raccourci Entrée
+document.getElementById("inpCode").addEventListener("keydown", e => { if (e.key === "Enter") ajouter(); });
+document.getElementById("inpNom").addEventListener("keydown", e => { if (e.key === "Enter") document.getElementById("inpCode").focus(); });
+
+// ═══════════════════════════════════════════════════
+//  Lecture des paramètres URL (depuis la caisse)
+// ═══════════════════════════════════════════════════
+(function() {
+  var params = new URLSearchParams(window.location.search);
+  var nom = params.get('nom');
+  var code = params.get('code');
+  if (nom) document.getElementById('inpNom').value = nom;
+  if (code) document.getElementById('inpCode').value = code;
+  // Auto-ajouter si nom et code sont fournis
+  if (nom && code) {
+    ajouter();
+  }
+})();
+</script>
+</body>
+</html>
