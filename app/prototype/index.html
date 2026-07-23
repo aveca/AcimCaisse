@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#19725b" />
+    <link rel="manifest" href="manifest.json" />
+    <title>AcimCaisse — Smart Inventory AI</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div id="loginScreen" class="login-overlay">
+      <div class="login-card">
+        <span class="brand-mark">AC</span>
+        <h1>AcimCaisse</h1>
+        <p class="eyebrow">Saisis ton PIN pour ouvrir la caisse</p>
+        <form id="loginForm">
+          <input id="pinInput" type="password" inputmode="numeric" maxlength="8" placeholder="PIN" autocomplete="off" />
+          <button class="tool-button primary" type="submit">Ouvrir</button>
+        </form>
+        <p id="loginError" class="login-error"></p>
+      </div>
+    </div>
+
+    <main class="shell" id="appShell" style="display: none;">
+      <aside class="rail" aria-label="Modes">
+        <div class="brand">
+          <span class="brand-mark">AC</span>
+          <span>
+            <strong>AcimCaisse</strong>
+            <small id="storeId">MAG-000-001</small>
+          </span>
+        </div>
+        <nav class="mode-list" id="modeList" aria-label="Mode actif"></nav>
+      </aside>
+
+      <section class="workspace" aria-label="Assistant magasin">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Contexte</p>
+            <h1 id="modeTitle">Vente</h1>
+          </div>
+          <div class="topbar-actions">
+            <div class="status-pill" id="syncStatus" title="Sync">
+              <span class="pulse" id="syncDot"></span>
+              <span id="syncText">En ligne</span>
+            </div>
+            <div class="status-pill">
+              <span class="pulse"></span>
+              <span id="sessionStatus">Ticket ouvert</span>
+            </div>
+            <button class="icon-button" id="captureBtn" type="button" title="Capturer image">IMG</button>
+            <button class="icon-button" id="recordAudioBtn" type="button" title="Enregistrer audio">MIC</button>
+            <button class="icon-button" id="recordVideoBtn" type="button" title="Enregistrer video">VID</button>
+            <button class="icon-button" id="detectBtn" type="button" title="Detection objet">AI</button>
+            <button class="icon-button" id="exportBtn" type="button" title="Exporter la session">EX</button>
+            <button class="icon-button" id="resetBtn" type="button" title="Reinitialiser la session">RS</button>
+          </div>
+        </header>
+
+        <section class="main-grid">
+          <article class="camera-panel" aria-label="Camera et media">
+            <div class="camera-frame">
+              <video id="cameraFeed" class="camera-feed" autoplay playsinline muted></video>
+              <canvas id="detectionCanvas" class="detection-canvas"></canvas>
+              <div class="scan-line"></div>
+              <div class="camera-caption" id="cameraCaption">Camera prete</div>
+            </div>
+
+            <div class="toolbar" aria-label="Actions camera">
+              <button class="tool-button primary" id="startCameraBtn" type="button">
+                <span class="button-icon">O</span>
+                Camera
+              </button>
+              <button class="tool-button" id="rotateBtn" type="button">
+                <span class="button-icon">rt</span>
+                Tourner
+              </button>
+              <button class="tool-button" id="voiceBtn" type="button">
+                <span class="button-icon">mi</span>
+                Parler
+              </button>
+              <button class="tool-button" id="unknownBtn" type="button">
+                <span class="button-icon">?</span>
+                Inconnu
+              </button>
+            </div>
+
+            <div class="media-preview" id="mediaPreview">
+              <img id="capturedImage" alt="Apercu" />
+              <audio id="audioPlayback" controls></audio>
+              <video id="videoPlayback" controls></video>
+            </div>
+          </article>
+
+          <article class="assistant-panel" aria-label="Assistant">
+            <div class="assistant-header">
+              <div>
+                <p class="eyebrow">Assistant</p>
+                <h2>Prochaine action</h2>
+              </div>
+              <span class="confidence" id="confidence">86%</span>
+            </div>
+            <ol class="conversation" id="conversation"></ol>
+            <form class="quick-entry" id="quickEntry">
+              <input id="quickInput" name="quickInput" autocomplete="off" placeholder="Prix, quantite, nom produit ou commande" />
+              <button class="tool-button primary" type="submit">
+                <span class="button-icon">+</span>
+                OK
+              </button>
+            </form>
+
+            <section class="scrape-section" id="scrapeSection">
+              <p class="eyebrow">Scraping fournisseur</p>
+              <form class="scrape-form" id="scrapeForm">
+                <input id="scrapeUrl" type="url" placeholder="https://fournisseur.com/catalogue" />
+                <button class="tool-button" type="submit">Scraper</button>
+              </form>
+              <ul class="scrape-results" id="scrapeResults"></ul>
+            </section>
+          </article>
+
+          <aside class="side-panel" aria-label="Session">
+            <section class="summary">
+              <p class="eyebrow" id="summaryLabel">Ticket</p>
+              <div class="total" id="totalValue">0,00 EUR</div>
+            </section>
+            <section>
+              <div class="section-title">
+                <h2 id="listTitle">Lignes</h2>
+                <span id="itemCount">0</span>
+              </div>
+              <ul class="item-list" id="itemList"></ul>
+            </section>
+            <section class="catalog-card">
+              <div class="section-title">
+                <h2>Produit courant</h2>
+                <span id="productState">A confirmer</span>
+              </div>
+              <dl class="product-meta">
+                <div>
+                  <dt>Image</dt>
+                  <dd id="productImage"><em>Aucune</em></dd>
+                </div>
+                <div>
+                  <dt>Nom</dt>
+                  <dd id="productName">Yaourt X nature 4x125g</dd>
+                </div>
+                <div>
+                  <dt>Code</dt>
+                  <dd id="productCode">Non trouve</dd>
+                </div>
+                <div>
+                  <dt>Prix</dt>
+                  <dd id="productPrice">Inconnu</dd>
+                </div>
+                <div>
+                  <dt>Stock</dt>
+                  <dd id="productStock">0</dd>
+                </div>
+              </dl>
+            </section>
+          </aside>
+        </section>
+      </section>
+    </main>
+
+    <script src="core.js?v=7"></script>
+    <script src="api.js?v=7"></script>
+    <script src="camera.js?v=7"></script>
+    <script src="detection.js?v=7"></script>
+    <script src="app.js?v=7"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js').catch(console.error);
+      }
+    </script>
+  </body>
+</html>

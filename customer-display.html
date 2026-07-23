@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AcimCaisse - Écran Client</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;font-family:'Segoe UI',Arial,sans-serif;background:#1a1a2e;color:#fff}
+.screen{display:flex;flex-direction:column;height:100vh;padding:20px 30px}
+
+/* Header: nom du magasin */
+.header{text-align:center;padding:10px 0;border-bottom:2px solid #e65100;margin-bottom:15px}
+.store-name{font-size:28px;font-weight:700;color:#fff;letter-spacing:1px}
+.store-sub{font-size:12px;color:#e65100;margin-top:2px}
+
+/* Zone articles */
+.items{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:4px;padding:5px 0;min-height:0}
+.items::-webkit-scrollbar{width:3px}
+.items::-webkit-scrollbar-thumb{background:#444;border-radius:3px}
+
+.item{display:flex;align-items:center;justify-content:space-between;padding:8px 14px;border-radius:6px;background:#2a2a3e;animation:slideIn 0.3s ease}
+.item.new{background:#fff3e0;color:#1a1a2e;animation:popIn 0.4s ease}
+.item-name{font-size:16px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.item-price{font-size:16px;font-weight:700;color:#e65100;text-align:right;min-width:80px}
+.item.new .item-price{color:#bf360c}
+
+/* Total */
+.total-zone{border-top:3px solid #e65100;padding:15px 0;margin-top:10px;display:flex;align-items:center;justify-content:space-between}
+.total-label{font-size:22px;font-weight:700;color:#e65100}
+.total-value{font-size:36px;font-weight:900;color:#fff}
+
+/* État vide */
+.empty{flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;color:#666}
+.empty-icon{font-size:64px;margin-bottom:10px;opacity:0.3}
+.empty-text{font-size:18px;opacity:0.5}
+
+/* Message paiement */
+.payment-msg{text-align:center;padding:40px;font-size:24px;font-weight:700;color:#e65100;animation:popIn 0.5s ease}
+
+/* Animations */
+@keyframes slideIn{from{opacity:0;transform:translateX(30px)}to{opacity:1;transform:translateX(0)}}
+@keyframes popIn{from{opacity:0;transform:scale(0.9)}to{opacity:1;transform:scale(1)}}
+@keyframes fadeOut{from{opacity:1}to{opacity:0}}
+
+/* Attente (pas de données) */
+.waiting{flex:1;display:flex;align-items:center;justify-content:center}
+.waiting-dots{font-size:40px;color:#e65100}
+.waiting-dots span{animation:blink 1.4s infinite both}
+.waiting-dots span:nth-child(2){animation-delay:0.2s}
+.waiting-dots span:nth-child(3){animation-delay:0.4s}
+@keyframes blink{0%,80%,100%{opacity:0}40%{opacity:1}}
+</style>
+</head>
+<body>
+<div class="screen">
+  <div class="header">
+    <div class="store-name">🏪 AcimCaisse</div>
+    <div class="store-sub">Merci pour votre visite</div>
+  </div>
+  <div id="content">
+    <div class="waiting">
+      <div class="waiting-dots"><span>●</span><span>●</span><span>●</span></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── Écran Client — Ultra-light (5KB, pas de Flutter) ───
+// Réception des données via BroadcastChannel (sync avec la caisse principale)
+var bc = new BroadcastChannel("acim-customer-display");
+var lastData = null;
+
+function render(data) {
+  if (!data || !data.items || data.items.length === 0) {
+    // Panier vide → attente
+    document.getElementById("content").innerHTML =
+      '<div class="waiting"><div class="waiting-dots"><span>●</span><span>●</span><span>●</span></div></div>';
+    return;
+  }
+
+  var html = '<div class="items">';
+  var newestIdx = data.newestIdx || -1;
+  for (var i = 0; i < data.items.length; i++) {
+    var item = data.items[i];
+    var isNew = (i === newestIdx);
+    var priceStr = item.price > 0 ? (item.price / 100).toFixed(2) + "€" : "—";
+    html += '<div class="item' + (isNew ? ' new' : '') + '">' +
+      '<span class="item-name">' + escapeHtml(item.name) + '</span>' +
+      '<span class="item-price">' + priceStr + '</span>' +
+      '</div>';
+  }
+  html += '</div>';
+
+  // Total
+  html += '<div class="total-zone">' +
+    '<span class="total-label">TOTAL</span>' +
+    '<span class="total-value">' + (data.total / 100).toFixed(2) + "€</span>" +
+    '</div>';
+
+  document.getElementById("content").innerHTML = html;
+}
+
+function escapeHtml(s) {
+  if (!s) return "";
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+}
+
+bc.onmessage = function(event) {
+  var msg = event.data;
+  if (msg.type === "cart-update") {
+    render(msg.data);
+    lastData = msg.data;
+  } else if (msg.type === "cart-clear") {
+    // Panier vidé → paiement terminé
+    var total = lastData ? lastData.total : 0;
+    document.getElementById("content").innerHTML =
+      '<div class="payment-msg">✅ Merci !<br>Total : ' + (total / 100).toFixed(2) + "€</div>";
+    setTimeout(function() {
+      document.getElementById("content").innerHTML =
+        '<div class="waiting"><div class="waiting-dots"><span>●</span><span>●</span><span>●</span></div></div>';
+      lastData = null;
+    }, 5000);
+  } else if (msg.type === "item-new") {
+    // Nouveau item → flash animé
+    if (lastData) {
+      lastData.items.push(msg.item);
+      lastData.total = msg.total || lastData.total + msg.item.price;
+      lastData.newestIdx = lastData.items.length - 1;
+      render(lastData);
+    }
+  } else if (msg.type === "item-edit") {
+    // Item modifié
+    if (lastData && msg.idx >= 0 && msg.idx < lastData.items.length) {
+      lastData.items[msg.idx] = msg.item;
+      lastData.total = msg.total || lastData.total;
+      render(lastData);
+    }
+  } else if (msg.type === "item-remove") {
+    // Item supprimé
+    if (lastData && msg.idx >= 0 && msg.idx < lastData.items.length) {
+      lastData.items.splice(msg.idx, 1);
+      lastData.total = msg.total || lastData.total;
+      lastData.newestIdx = -1;
+      render(lastData);
+    }
+  }
+};
+
+// Ping initial pour signaler que l'écran client est prêt
+bc.postMessage({ type: "customer-display-ready" });
+
+// Si pas de données après 10s → afficher accueil
+setTimeout(function() {
+  if (!lastData) {
+    document.getElementById("content").innerHTML =
+      '<div class="empty"><div class="empty-icon">🏪</div><div class="empty-text">En attente de scan…</div></div>';
+  }
+}, 10000);
+</script>
+</body>
+</html>

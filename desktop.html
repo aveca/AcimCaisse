@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AcimCaisse - Version Bureau</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:Segoe UI,Arial,sans-serif;background:#f8f8f8;color:#333;min-height:100vh;display:flex;align-items:center;justify-content:center}
+.card{background:#fff;border-radius:16px;padding:40px;max-width:560px;width:90%;box-shadow:0 4px 24px rgba(0,0,0,0.1);text-align:center}
+.logo{font-size:3em;margin-bottom:8px}
+h1{color:#e65100;font-size:1.5em;margin-bottom:4px}
+.sous{color:#888;font-size:0.9em;margin-bottom:24px}
+.step{text-align:left;background:#f5f5f5;border-radius:8px;padding:14px 16px;margin-bottom:12px;font-size:0.88em;line-height:1.5}
+.step b{color:#e65100}
+.step-num{display:inline-block;background:#e65100;color:#fff;border-radius:50%;width:22px;height:22px;text-align:center;line-height:22px;font-size:0.75em;margin-right:6px;vertical-align:middle}
+.dl-btn{display:inline-block;background:#e65100;color:#fff;padding:14px 32px;border-radius:8px;text-decoration:none;font-size:1em;font-weight:600;margin:8px;cursor:pointer;border:none;transition:background .2s}
+.dl-btn:hover{background:#bf360c}
+.dl-btn:active{transform:scale(0.98)}
+.dl-btn.secondary{background:#555}
+.dl-btn.secondary:hover{background:#333}
+.note{font-size:0.8em;color:#999;margin-top:16px}
+.divider{border:none;border-top:1px solid #eee;margin:20px 0}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">🖥️</div>
+  <h1>AcimCaisse Bureau</h1>
+  <p class="sous">Version hors-ligne pour Windows</p>
+
+  <div class="step"><span class="step-num">1</span> <b>Installez Node.js</b><br>Téléchargez la version LTS sur <a href="https://nodejs.org/" target="_blank">nodejs.org</a></div>
+  <div class="step"><span class="step-num">2</span> <b>Téléchargez les 2 fichiers</b><br>Cliquez les boutons ci-dessous, mettez-les dans le <b>même dossier</b></div>
+  <div class="step"><span class="step-num">3</span> <b>Lancez l'installation</b><br>Double-cliquez <code>INSTALL-AcimCaisse.bat</code></div>
+
+  <div>
+    <button class="dl-btn" onclick="dlSetup()">📦 Télécharger setup.js</button>
+    <button class="dl-btn secondary" onclick="dlBat()">📄 Télécharger INSTALL-AcimCaisse.bat</button>
+  </div>
+
+  <hr class="divider">
+  <p style="font-size:0.85em;color:#666">Installe dans <code>Desktop\AcimCaisse\</code><br>Pas besoin d'administrateur</p>
+  <p class="note">Identifiants : admin / 1234</p>
+</div>
+
+<script>
+// ═══════════════════════════════════════════
+//  setup.js contenu
+// ═══════════════════════════════════════════
+const SETUP_JS = `const { execSync } = require("child_process");
+const fs = require("fs");
+const path = require("path");
+const os = require("os");
+const https = require("https");
+
+const WORK = path.join(os.homedir(), "AcimCaisse-build");
+const INST = path.join(os.homedir(), "Desktop", "AcimCaisse");
+const DATA = INST;
+
+console.log("");
+console.log("  =============================================");
+console.log("    AcimCaisse v1.0.0 - Installation");
+console.log("  =============================================");
+console.log("");
+
+try {
+  const nv = execSync("node --version", { encoding: "utf8" }).trim();
+  console.log("  Node.js : " + nv);
+} catch {
+  console.error("  [ERREUR] Node.js n'est pas installe !");
+  console.error("  Telechargez : https://nodejs.org/ (version LTS)");
+  process.exit(1);
+}
+
+console.log("  Dossier  : " + INST);
+console.log("");
+
+run();
+
+async function run() {
+  try {
+    await step1_download();
+    step2_patch();
+    step3_electronFiles();
+    await step4_npm();
+    await step5_build();
+    step6_install();
+    step7_shortcuts();
+
+    console.log("");
+    console.log("  =============================================");
+    console.log("    Installation terminee !");
+    console.log("  =============================================");
+    console.log("");
+    console.log("  Bureau > dossier AcimCaisse > AcimCaisse.exe");
+    console.log("  Identifiants : admin / 1234");
+    console.log("  Sauvegarde   : Ctrl+S");
+    console.log("");
+  } catch (e) {
+    console.error("");
+    console.error("  [ERREUR] " + e.message);
+    console.error("");
+  }
+}
+
+function exec(cmd, opts = {}) {
+  console.log("  > " + cmd.slice(0, 100));
+  return execSync(cmd, { stdio: "pipe", windowsHide: true, ...opts });
+}
+
+function download(url, dest) {
+  return new Promise((resolve, reject) => {
+    const file = fs.createWriteStream(dest);
+    const follow = (u) => {
+      https.get(u, { headers: { "User-Agent": "node" } }, (res) => {
+        if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+          follow(res.headers.location);
+        } else if (res.statusCode === 200) {
+          res.pipe(file);
+          file.on("finish", () => { file.close(); resolve(); });
+        } else {
+          reject(new Error("HTTP " + res.statusCode));
+        }
+      }).on("error", reject);
+    };
+    follow(url);
+  });
+}
+
+function cpDir(src, dest) {
+  if (!fs.existsSync(dest)) fs.mkdirSync(dest, { recursive: true });
+  for (const f of fs.readdirSync(src)) {
+    const s = path.join(src, f), d = path.join(dest, f);
+    fs.statSync(s).isDirectory() ? cpDir(s, d) : fs.copyFileSync(s, d);
+  }
+}
+
+function rmDir(p) {
+  if (fs.existsSync(p)) fs.rmSync(p, { recursive: true, force: true });
+}
+
+// ─── Etape 1 ────────────────────────────────────
+async function step1_download() {
+  console.log("  [1/7] Telechargement...");
+  rmDir(WORK);
+  fs.mkdirSync(WORK, { recursive: true });
+
+  const zipPath = path.join(WORK, "gh-pages.zip");
+  await download("https://github.com/aveca/AcimCaisse/archive/refs/heads/gh-pages.zip", zipPath);
+
+  const psCmd = "Expand-Archive -Path '" + zipPath + "' -DestinationPath '" + WORK + "' -Force";
+  exec("powershell -Command " + JSON.stringify(psCmd));
+  fs.unlinkSync(zipPath);
+
+  const srcDir = path.join(WORK, "AcimCaisse-gh-pages");
+  if (!fs.existsSync(srcDir)) throw new Error("Fichiers non trouves");
+
+  fs.mkdirSync(path.join(WORK, "app", "www"), { recursive: true });
+  cpDir(srcDir, path.join(WORK, "app", "www"));
+  console.log("  [1/7] OK");
+}
+
+// ─── Etape 2 : Patches ─────────────────────────
+function step2_patch() {
+  console.log("  [2/7] Patches...");
+
+  // index.html
+  const idx = path.join(WORK, "app", "www", "index.html");
+  let h = fs.readFileSync(idx, "utf8");
+  h = h.replace('/AcimCaisse/"', '"/"');
+  h = h.replace('href="/AcimCaisse/"', 'href="/"');
+  h = h.replace('<script src="coi-serviceworker.js"></script>', "<!-- coi off -->");
+  h = h.replace("<title>acim_caisse</title>", "<title>AcimCaisse</title>");
+  h = h.replace('content="acim_caisse">', 'content="AcimCaisse">');
+  fs.writeFileSync(idx, h);
+
+  // main.dart.js — PATCH CAMERA EN FIN DE FICHIER (pas au debut !)
+  const dart = path.join(WORK, "app", "www", "main.dart.js");
+  let js = fs.readFileSync(dart, "utf8");
+
+  // Labels
+  const labels = [
+    ["Scanner un produit", "Rechercher un produit"],
+    ["Scanner le QR", "Saisir le code"],
+    ["Camera indisponible \\\\u2014 utilisez la recherche ci-dessous", "Recherchez un produit"],
+    ["Camera indisponible", "Saisie manuelle"],
+    ["Autorisez la camera ou saisissez le code-barres manuellement.\\\\n(", "Saisissez le code-barres manuellement. ("],
+    ["Scannez ou recherchez un produit", "Recherchez un produit"],
+    ["Scannez le QR du client ou collez son code.", "Collez le code du client."],
+    ['"dev.steenbakker.mobile_scanner/scanner/method"', '"__off__"'],
+    ['"dev.steenbakker.mobile_scanner/scanner/event"', '"__off_e__"'],
+  ];
+  for (const [old, rep] of labels) js = js.replace(old, rep);
+
+  // Camera patch — AJOUTE A LA FIN, pas au debut !
+  // Ca ne peut pas casser le code existant
+  const camPatch = "\\n;(function(){if(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia){navigator.mediaDevices.getUserMedia=function(){return Promise.reject(new DOMException('Camera disabled','NotAllowedError'))};navigator.mediaDevices.enumerateDevices=function(){return Promise.resolve([])};}window.__acimNorm=function(b){return b?String(b).trim().toUpperCase().replace(/[\\\\s\\\\-\\\\.]/g,''):b};})();\\n";
+  js = js + camPatch;
+
+  fs.writeFileSync(dart, js);
+
+  const coi = path.join(WORK, "app", "www", "coi-serviceworker.js");
+  if (fs.existsSync(coi)) fs.unlinkSync(coi);
+
+  console.log("  [2/7] OK");
+}
+
+// ─── Etape 3 ────────────────────────────────────
+function step3_electronFiles() {
+  console.log("  [3/7] Fichiers Electron...");
+
+  const appDir = path.join(WORK, "app");
+
+  const iconSrc = path.join(appDir, "www", "icons", "Icon-512.png");
+  if (fs.existsSync(iconSrc)) fs.copyFileSync(iconSrc, path.join(appDir, "icon.png"));
+
+  // Lire main.js depuis le projet AcimCaisse-App si dispo
+  const srcMain = path.join(__dirname, "AcimCaisse-App", "main.js");
+  const srcPreload = path.join(__dirname, "AcimCaisse-App", "preload.js");
+
+  if (fs.existsSync(srcMain)) {
+    fs.copyFileSync(srcMain, path.join(appDir, "main.js"));
+  } else {
+    fs.writeFileSync(path.join(appDir, "main.js"), MAIN_JS);
+  }
+
+  if (fs.existsSync(srcPreload)) {
+    fs.copyFileSync(srcPreload, path.join(appDir, "preload.js"));
+  } else {
+    fs.writeFileSync(path.join(appDir, "preload.js"), PRELOAD_JS);
+  }
+
+  // Copier barcode.html depuis AcimCaisse-App/www/ si dispo
+  const barcodeSrc = path.join(__dirname, "AcimCaisse-App", "www", "barcode.html");
+  if (fs.existsSync(barcodeSrc)) {
+    fs.copyFileSync(barcodeSrc, path.join(appDir, "www", "barcode.html"));
+  }
+
+  const pkg = {
+    name: "acimcaisse",
+    version: "1.0.0",
+    description: "AcimCaisse - Caisse hors-ligne",
+    main: "main.js",
+    scripts: { start: "electron ." },
+    build: {
+      appId: "com.acimcaisse.app",
+      productName: "AcimCaisse",
+      directories: { output: "dist" },
+      files: ["main.js", "preload.js", "icon.png", "www/**/*"],
+      win: {
+        target: [{ target: "dir", arch: ["x64"] }],
+        icon: "icon.png"
+      },
+      asar: false
+    },
+    devDependencies: {
+      electron: "^28.3.3",
+      "electron-builder": "^26.15.3"
+    }
+  };
+  fs.writeFileSync(path.join(appDir, "package.json"), JSON.stringify(pkg, null, 2));
+
+  console.log("  [3/7] OK");
+}
+
+// ─── Etape 4 ────────────────────────────────────
+async function step4_npm() {
+  console.log("  [4/7] npm install (2-5 min)...");
+  const appDir = path.join(WORK, "app");
+  try {
+    exec("npm install", { cwd: appDir, timeout: 600000 });
+  } catch {
+    console.log("  Retry...");
+    exec("npm cache clean --force", { cwd: appDir, timeout: 60000 });
+    exec("npm install", { cwd: appDir, timeout: 600000 });
+  }
+  console.log("  [4/7] OK");
+}
+
+// ─── Etape 5 ────────────────────────────────────
+async function step5_build() {
+  console.log("  [5/7] Build AcimCaisse (2-5 min)...");
+  const appDir = path.join(WORK, "app");
+  try {
+    exec("npx electron-builder --win dir --x64", { cwd: appDir, timeout: 600000 });
+  } catch (e) {
+    throw new Error("Build echoue : " + (e.message || ""));
+  }
+  console.log("  [5/7] OK");
+}
+
+// ─── Etape 6 ────────────────────────────────────
+function step6_install() {
+  console.log("  [6/7] Installation...");
+  const appDir = path.join(WORK, "app");
+  const distDir = path.join(appDir, "dist");
+
+  const unpackedDir = path.join(distDir, "win-unpacked");
+  if (!fs.existsSync(unpackedDir)) {
+    throw new Error("Dossier win-unpacked introuvable dans " + distDir);
+  }
+
+  // Copier vers Desktop/AcimCaisse/
+  rmDir(INST);
+  cpDir(unpackedDir, INST);
+  console.log("    -> Dossier copie vers " + INST);
+
+  // Verifier l'exe
+  const exePath = path.join(INST, "AcimCaisse.exe");
+  if (!fs.existsSync(exePath)) {
+    throw new Error("AcimCaisse.exe introuvable");
+  }
+  console.log("    -> AcimCaisse.exe OK");
+
+  // Verifier www/ (peut etre dans resources/app/www/)
+  const w1 = path.join(INST, "resources", "app", "www", "index.html");
+  const w2 = path.join(INST, "www", "index.html");
+  if (fs.existsSync(w1)) {
+    console.log("    -> resources/app/www/index.html OK");
+  } else if (fs.existsSync(w2)) {
+    console.log("    -> www/index.html OK");
+  } else {
+    console.log("    ! www non trouve (installation continue quand meme)");
+  }
+
+  // Dossiers de donnees
+  if (!fs.existsSync(path.join(DATA, "sauvegardes"))) fs.mkdirSync(path.join(DATA, "sauvegardes"), { recursive: true });
+  if (!fs.existsSync(path.join(DATA, ".appdata"))) fs.mkdirSync(path.join(DATA, ".appdata"), { recursive: true });
+
+  global.exePath = exePath;
+  console.log("  [6/7] OK");
+}
+
+// ─── Etape 7 ────────────────────────────────────
+function step7_shortcuts() {
+  console.log("  [7/7] Raccourci...");
+  const exe = global.exePath;
+  if (!exe) { console.log("  [7/7] OK"); return; }
+
+  const deskLnk = path.join(os.homedir(), "Desktop", "AcimCaisse.lnk");
+  const ps1 = "\$ws=New-Object -ComObject WScript.Shell;\$s=\$ws.CreateShortcut('" + deskLnk + "');\$s.TargetPath='" + exe + "';\$s.WorkingDirectory='" + path.dirname(exe) + "';\$s.Description='AcimCaisse';\$s.Save()";
+  try { exec("powershell -Command " + JSON.stringify(ps1)); console.log("    -> Raccourci Bureau"); } catch {}
+
+  const menuLnk = path.join(process.env.APPDATA || "", "Microsoft", "Windows", "Start Menu", "Programs", "AcimCaisse.lnk");
+  const ps2 = "\$ws=New-Object -ComObject WScript.Shell;\$s=\$ws.CreateShortcut('" + menuLnk + "');\$s.TargetPath='" + exe + "';\$s.WorkingDirectory='" + path.dirname(exe) + "';\$s.Save()";
+  try { exec("powershell -Command " + JSON.stringify(ps2)); } catch {}
+
+  try { rmDir(WORK); console.log("    -> Temp nettoye"); } catch {}
+  console.log("  [7/7] OK");
+}
+
+// ═══════════════════════════════════════════════════
+//  FICHIERS EMBARQUES (fallback)
+// ═══════════════════════════════════════════════════
+
+const PRELOAD_JS = \`const{contextBridge}=require("electron");contextBridge.exposeInMainWorld("acimDesktop",{isDesktop:true});\`;
+
+const MAIN_JS = \`const{app,BrowserWindow,Menu,dialog,screen:eScreen,shell}=require("electron");const path=require("path"),fs=require("fs"),http=require("http"),os=require("os"),{execSync}=require("child_process");const PORT=8000;const DATA=path.join(os.homedir(),"Desktop","AcimCaisse");const BACKUP=path.join(DATA,"sauvegardes");if(!fs.existsSync(DATA))fs.mkdirSync(DATA,{recursive:true});if(!fs.existsSync(BACKUP))fs.mkdirSync(BACKUP,{recursive:true});app.setPath("userData",path.join(DATA,".appdata"));const LOG_FILE=path.join(DATA,"log.txt");const logStream=fs.createWriteStream(LOG_FILE,{flags:"w"});function log(msg){const line=new Date().toLocaleTimeString()+" | "+msg;console.log(line);logStream.write(line+"\\\\n")}log("=== AcimCaisse ===");log("__dirname : "+__dirname);log("resourcesPath : "+(process.resourcesPath||"N/A"));let WWW=path.join(__dirname,"www");log("Cherche www : "+WWW+" existe="+fs.existsSync(path.join(WWW,"index.html")));if(!fs.existsSync(path.join(WWW,"index.html"))){const alt=__dirname.replace("app.asar","app");log("Essai alt : "+alt+" existe="+fs.existsSync(path.join(alt,"www","index.html")));if(fs.existsSync(path.join(alt,"www","index.html"))){WWW=path.join(alt,"www");log("TROUVE alt")}else if(process.resourcesPath){const r1=path.join(process.resourcesPath,"app","www");log("Essai rp1 : "+r1+" existe="+fs.existsSync(path.join(r1,"index.html")));if(fs.existsSync(path.join(r1,"index.html"))){WWW=r1;log("TROUVE rp1")}else{const r2=path.join(process.resourcesPath,"app.asar.unpacked","www");log("Essai rp2 : "+r2+" existe="+fs.existsSync(path.join(r2,"index.html")));if(fs.existsSync(path.join(r2,"index.html"))){WWW=r2;log("TROUVE rp2")}}}}if(!fs.existsSync(path.join(WWW,"index.html"))){log("!!! www INTROUVABLE !!!");try{log("Contenu __dirname : "+fs.readdirSync(__dirname).join(", "))}catch(e){log("Err: "+e.message)}if(process.resourcesPath){try{log("Contenu resources : "+fs.readdirSync(process.resourcesPath).join(", "))}catch(e){}}app.whenReady().then(()=>{dialog.showErrorBox("Erreur","www introuvable. Voir log.txt dans "+DATA);app.quit()});return}log("WWW : "+WWW);try{log("www/ : "+fs.readdirSync(WWW).join(", "))}catch(e){}const MIME={".html":"text/html; charset=utf-8",".js":"application/javascript; charset=utf-8",".mjs":"application/javascript; charset=utf-8",".css":"text/css; charset=utf-8",".json":"application/json; charset=utf-8",".wasm":"application/wasm",".png":"image/png",".jpg":"image/jpeg",".jpeg":"image/jpeg",".svg":"image/svg+xml",".ico":"image/x-icon",".woff2":"font/woff2",".ttf":"font/ttf",".otf":"font/otf",".frag":"text/plain",".map":"application/json",".pak":"application/octet-stream",".dll":"application/octet-stream",".dat":"application/octet-stream",".bin":"application/octet-stream"};function startServer(){return new Promise((resolve,reject)=>{const s=http.createServer((req,res)=>{res.setHeader("Cross-Origin-Opener-Policy","same-origin");res.setHeader("Cross-Origin-Embedder-Policy","credentialless");res.setHeader("Cross-Origin-Resource-Policy","cross-origin");let u=req.url.split("?")[0];if(u==="/")u="/index.html";const fp=path.join(WWW,u),rs=path.resolve(fp);if(!rs.startsWith(WWW)){res.writeHead(403);res.end();return}if(fs.existsSync(rs)&&fs.statSync(rs).isFile()){const ct=MIME[path.extname(rs).toLowerCase()]||"application/octet-stream";res.writeHead(200,{"Content-Type":ct});fs.createReadStream(rs).pipe(res)}else{res.writeHead(200,{"Content-Type":"text/html; charset=utf-8"});fs.createReadStream(path.join(WWW,"index.html")).pipe(res)}});s.listen(PORT,"127.0.0.1",()=>{log("Serveur OK :"+PORT);resolve(s)});s.on("error",(e)=>{log("Err serveur : "+e.message);reject(e)})})}let mainWin=null,custWin=null,srv=null;function createMain(){mainWin=new BrowserWindow({width:1280,height:800,title:"AcimCaisse",autoHideMenuBar:false,show:false,icon:path.join(__dirname,"icon.png"),webPreferences:{nodeIntegration:false,contextIsolation:true,preload:path.join(__dirname,"preload.js")}});mainWin.loadURL("http://127.0.0.1:"+PORT);mainWin.webContents.on("console-message",(ev,level,msg,line,src)=>{log((level===3?"!!! ERREUR":"  JS"+level)+" : "+msg+" ("+src+":"+line+")")});mainWin.webContents.on("did-fail-load",(ec,ed)=>{log("!!! chargement echoue : "+ed)});mainWin.once("ready-to-show",()=>{mainWin.show();log("Fenetre affichee")});mainWin.on("closed",()=>{mainWin=null})}function createCustomer(){const ds=eScreen.getAllDisplays();const ext=ds.find(d=>d.bounds.x!==0||d.bounds.y!==0);if(!ext){dialog.showMessageBox(mainWin,{type:"info",title:"Ecran client",message:"Aucun second ecran.",buttons:["OK"]});return}const{x,y,width:w,height:h}=ext.bounds;custWin=new BrowserWindow({x,y,width:w,height:h,title:"AcimCaisse - Ecran Client",autoHideMenuBar:true,show:false,icon:path.join(__dirname,"icon.png"),webPreferences:{nodeIntegration:false,contextIsolation:true}});custWin.loadURL("http://127.0.0.1:"+PORT+"#/customer-display");custWin.once("ready-to-show",()=>custWin.show());custWin.on("closed",()=>{custWin=null})}function doExport(){const ts=new Date().toISOString().replace(/[:.]/g,"-").slice(0,19);dialog.showSaveDialog(mainWin,{title:"Sauvegarder",defaultPath:path.join(BACKUP,"AcimCaisse-"+ts+".zip"),filters:[{name:"Sauvegarde",extensions:["zip"]}]}).then(async({filePath})=>{if(!filePath)return;try{const ad=path.join(DATA,".appdata");if(!fs.existsSync(ad)){dialog.showErrorBox("Erreur","Aucune donnee.");return}const cmd="Compress-Archive -Path '"+ad+"\\\\\\\\*' -DestinationPath '"+filePath+"' -Force";execSync("powershell -Command "+JSON.stringify(cmd),{windowsHide:true});dialog.showMessageBox(mainWin,{type:"info",title:"OK",message:"Sauvegarde dans :\\\\n"+filePath})}catch(e){dialog.showErrorBox("Erreur",e.message)}})}function doImport(){dialog.showOpenDialog(mainWin,{title:"Restaurer",defaultPath:BACKUP,filters:[{name:"Sauvegarde",extensions:["zip"]}],properties:["openFile"]}).then(async({filePaths})=>{if(!filePaths||!filePaths.length)return;const ad=path.join(DATA,".appdata");const{response}=await dialog.showMessageBox(mainWin,{type:"warning",title:"Confirmer",message:"Remplacer les donnees ?",buttons:["Annuler","Oui"],defaultId:0});if(response===0)return;try{if(fs.existsSync(ad)){fs.cpSync(ad,path.join(BACKUP,"avant-"+Date.now()),{recursive:true})}const cmd="Expand-Archive -Path '"+filePaths[0]+"' -DestinationPath '"+ad+"' -Force";execSync("powershell -Command "+JSON.stringify(cmd),{windowsHide:true});await dialog.showMessageBox(mainWin,{type:"info",title:"OK",message:"Redemarrage..."});app.relaunch();app.exit(0)}catch(e){dialog.showErrorBox("Erreur",e.message)}})}function buildMenu(){return Menu.buildFromTemplate([{label:"Fichier",submenu:[{label:"Sauvegarder",accelerator:"Ctrl+S",click:doExport},{label:"Restaurer",accelerator:"Ctrl+O",click:doImport},{type:"separator"},{label:"Ecran client",click:()=>{if(custWin)custWin.focus();else createCustomer()}},{type:"separator"},{role:"quit",label:"Quitter"}]},{label:"Aide",submenu:[{label:"Dossier : "+DATA,enabled:false},{label:"Ouvrir le dossier",click:()=>shell.openPath(DATA)},{label:"Ouvrir log.txt",click:()=>shell.openPath(LOG_FILE)},{type:"separator"},{label:"DevTools",accelerator:"F12",click:()=>{if(mainWin)mainWin.webContents.toggleDevTools()}}]}])}app.whenReady().then(async()=>{try{srv=await startServer()}catch(e){log("!!! Serveur echoue : "+e.message);dialog.showErrorBox("Erreur","Serveur echoue. Voir "+LOG_FILE);app.quit();return}Menu.setApplicationMenu(buildMenu());createMain();setTimeout(()=>{if(eScreen.getAllDisplays().length>1)createCustomer()},2000);app.on("activate",()=>{if(BrowserWindow.getAllWindows().length===0)createMain()})});app.on("window-all-closed",()=>{log("Fermeture");logStream.end();if(srv)srv.close();app.quit()});\`;
+`;
+
+// ═══════════════════════════════════════════
+//  INSTALL-AcimCaisse.bat contenu
+// ═══════════════════════════════════════════
+const BAT_CONTENT = `@echo off
+chcp 65001 >nul 2>&1
+title AcimCaisse - Installation
+echo.
+echo   =============================================
+echo     AcimCaisse - Installation
+echo   =============================================
+echo.
+echo   Prerequis : Node.js LTS
+echo   https://nodejs.org/
+echo.
+echo   Tout sera dans un seul dossier :
+echo   C:\\Users\\%USERNAME%\\Desktop\\AcimCaisse
+echo.
+pause
+echo.
+node "%~dp0setup.js"
+if %errorlevel% neq 0 (
+    echo.
+    echo   Erreur. Copiez le message ci-dessus.
+)
+echo.
+pause
+`;
+
+function dlSetup(){
+  downloadFile("setup.js", SETUP_JS);
+}
+function dlBat(){
+  downloadFile("INSTALL-AcimCaisse.bat", BAT_CONTENT);
+}
+function downloadFile(name, content){
+  const blob = new Blob([content], {type: "text/plain;charset=utf-8"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+</script>
+</body>
+</html>
