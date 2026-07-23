@@ -18,6 +18,10 @@
   var _log=function(m){console.log("[Acim] "+m);};
   var _err=function(m,e){console.error("[Acim] "+m,e);};
 
+  // Auto-barcode generator: ACIM-XXXX format
+  var _bcSeq=1000;
+  function _nextBarcode(){return "ACIM-"+(_bcSeq++);}
+
   // ═══════════════════════════════════════════════════════
   //  RESPONSIVE — Mobile vs Desktop layout
   // ═══════════════════════════════════════════════════════
@@ -248,7 +252,18 @@
     }
     return info;}
 
-function _broadcastNew(item,total){
+  // BroadcastChannel for customer display (écran client)
+  var _custBc=null;
+  try{_custBc=new BroadcastChannel("acim-customer-display");}catch(e){}
+
+  function _broadcastCart(){
+    if(!_custBc)return;
+    var info=_cartInfo();var total=0;
+    for(var i=0;i<info.length;i++)total+=info[i].price;
+    _custBc.postMessage({type:"cart-update",lines:info,total:total});
+  }
+
+  function _broadcastNew(item,total){
     if(!_custBc)return;
     _custBc.postMessage({type:"item-new",item:item,total:total});
   }
