@@ -14,8 +14,16 @@
   <link rel="icon" type="image/png" href="favicon.png"/>
   <title>AcimCaisse</title>
   <link rel="manifest" href="manifest.json">
+  <!-- Tracker UX pour analyse des parcours utilisateurs -->
+  <script src="tracker.js"></script>
 </head>
 <body>
   <script src="flutter_bootstrap.js?v=30" async></script>
+  <!-- Initialisation du tracker après Flutter -->
+  <script>
+    // Le tracker s'initialise automatiquement
+    // Pour activer le bouton debug: ajouter ?debug=tracker à l'URL
+    // Ex: https://aveca.github.io/AcimCaisse/?debug=tracker
+  </script>
 </body>
 </html>

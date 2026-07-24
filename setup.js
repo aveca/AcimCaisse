@@ -137,6 +137,10 @@ function step2_patch() {
   if (!h.includes('acim-shell.js')) {
     h = h.replace('</head>', '  <script src="acim-shell.js"></script>\n</head>');
   }
+  // Ajouter le tracker UX pour analyse des parcours utilisateurs
+  if (!h.includes('tracker.js')) {
+    h = h.replace('</head>', '  <script src="tracker.js"></script>\n</head>');
+  }
   fs.writeFileSync(idx, h);
 
   // main.dart.js — patch camera + modifier prix
@@ -202,6 +206,14 @@ function step2_patch() {
   // product_catalog.js SUPPRIME - panier unique (fix v29)
   fs.writeFileSync(path.join(WORK, "app", "www", "acim-shell.js"), ""/* merged into EMBED_ACIM_CAISSE */);
   console.log("    -> acim-shell.js ecrit");
+  
+  // Copier tracker.js pour le tracking UX
+  const trackerSrc = path.join(__dirname, "tracker.js");
+  const trackerDest = path.join(WORK, "app", "www", "tracker.js");
+  if (fs.existsSync(trackerSrc)) {
+    fs.copyFileSync(trackerSrc, trackerDest);
+    console.log("    -> tracker.js copié");
+  }
 
   console.log("    -> barcode.html ecrit");
 
