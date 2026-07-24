@@ -215,7 +215,10 @@
     _posSearch=document.createElement("input");_posSearch.id="acim-pos-search";
     _posSearch.type="text";_posSearch.placeholder="Rechercher un produit (nom ou code-barres)...";
     _posSearch.style.cssText="flex:1;padding:8px 14px;border:none;border-radius:8px;font-size:14px;outline:none;background:#2a2a4e;color:#fff;min-width:0;";
-    _posSearch.addEventListener("input",function(){_filterProducts();});
+    _posSearch.addEventListener("input",function(){
+      if(_allProducts.length===0){_refreshAndFilter();return;}
+      _filterProducts();
+    });
     _posSearch.addEventListener("keydown",function(e){
       if(e.key==="Enter"){var v=this.value.trim();if(v.length>=2){_processBarcode(v);this.value="";this.focus();}}
       if(e.key==="Escape"){this.value="";_filterProducts();this.blur();}
@@ -332,6 +335,14 @@
     });
     _filteredProducts.sort(function(a,b){return(a.name||"").localeCompare(b.name||"");});
     _renderGrid();
+  }
+
+  function _refreshAndFilter(){
+    _dbGetAll().then(function(all){
+      _allProducts=all||[];
+      _log("Refresh DB: "+_allProducts.length+" produits");
+      _filterProducts();
+    });
   }
 
   function _renderGrid(){
@@ -642,14 +653,19 @@
   function init(){
     if(!_acquireTabLock()){_toast("⚠ Caisse déjà ouverte dans un autre onglet");return;}
     _loadBcSeq().then(function(){
-      _log("v32 — POS UI complète");
-      // Sequential: import FIRST, THEN read DB, THEN build UI
+      _log("v32.2 — POS UI + robust search");
       _importBackupFromEmbedded().then(function(imported){
         if(imported)_toast("✅ Catalogue importé (38 produits)");
         return _dbGetAll();
       }).then(function(all){
         _allProducts=all||[];
         _log("Produits chargés: "+_allProducts.length);
+        if(_allProducts.length===0)_log("⚠ Aucun produit trouvé en DB — vérifier acim-catalog");
+        _createPOS();
+        _renderPOS();
+      }).catch(function(e){
+        _err("Init error:",e);
+        _allProducts=[];
         _createPOS();
         _renderPOS();
       });
