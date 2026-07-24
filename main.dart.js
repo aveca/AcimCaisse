@@ -144829,7 +144829,7 @@ if(typeof dartMainRunner==="function"){dartMainRunner(s,[])}else{s([])}})
     if(total<=0){_toast("Total à 0€");return;}
     var old=document.getElementById("acim-payment");if(old)old.remove();
     var ov=document.createElement("div");ov.id="acim-payment";
-    ov.style.cssText="position:fixed;top:0;left:0;right:0;0;bottom:0;background:rgba(0,0,0,0.6);z-index:10000001;display:flex;align-items:center;justify-content:center;";
+    ov.style.cssText="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:10000001;display:flex;align-items:center;justify-content:center;";
     var card=document.createElement("div");
     card.style.cssText="background:#fff;border-radius:14px;padding:20px;width:380px;max-width:95vw;box-shadow:0 8px 24px rgba(0,0,0,0.3);font-family:Segoe UI,Arial,sans-serif;";
 
@@ -145578,6 +145578,7 @@ if(typeof dartMainRunner==="function"){dartMainRunner(s,[])}else{s([])}})
   window._acimWeighProduct=_weighProduct;
 })();
 // ─── FIN AcimCaisse v34 ───
+
 
 
 
