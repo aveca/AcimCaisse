@@ -94,3 +94,34 @@ flutter-view {
     flex-direction: column !important;
   }
 }
+
+/* ── Print: hide everything except receipt ── */
+@media print {
+  body > *:not(#acim-receipt):not(#acim-receipt *) {
+    display: none !important;
+  }
+  #acim-receipt {
+    position: static !important;
+    background: #fff !important;
+    box-shadow: none !important;
+    width: 100% !important;
+    max-width: 80mm !important;
+    margin: 0 auto !important;
+    padding: 5mm !important;
+    font-family: 'Courier New', monospace !important;
+    font-size: 12pt !important;
+  }
+  #acim-receipt > div {
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+  }
+  #acim-receipt button {
+    display: none !important;
+  }
+  #acim-receipt hr {
+    border-top: 1px dashed #000 !important;
+  }
+}
