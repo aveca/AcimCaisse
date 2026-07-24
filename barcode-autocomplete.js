@@ -150,10 +150,17 @@
   function selectSuggestion(item) {
     var bcInput = document.getElementById('acim-bc-input');
     if (!bcInput) return;
-    bcInput.value = item.dataset.barcode || '';
-    bcInput.dispatchEvent(new CustomEvent('barcodeScanned', { detail: { barcode: item.dataset.barcode } }));
+    var barcode = item.dataset.barcode || '';
+    bcInput.value = '';
     hideSuggestions();
     bcInput.focus();
+    // Directly add to cart via acim-caisse.js API
+    if (window._acimProcessBarcode) {
+      window._acimProcessBarcode(barcode);
+    } else if (barcode) {
+      bcInput.value = barcode;
+      bcInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+    }
   }
 
   function highlightSuggestion(index) {

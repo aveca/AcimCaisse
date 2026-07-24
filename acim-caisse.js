@@ -398,20 +398,18 @@
   // Auto-focus periodic (catch-all for Flutter stealing focus)
   setInterval(function(){_forceFocus();},2000);
 
-  // Scanner buffer: capture digits, force-focus, buffer
+  // Scanner buffer: capture digits ONLY when no input is focused
   var _scanBuf="",_scanTimer=null,_scanActive=false;
   document.addEventListener("keydown",function(e){
     if(_dialogOpen())return;
+    // Don't capture digits if user is typing in an input/textarea/select
+    var tag=document.activeElement?document.activeElement.tagName:"";
+    if(tag==="INPUT"||tag==="TEXTAREA"||tag==="SELECT")return;
     if(/^[0-9]$/.test(e.key)){
       _scanBuf+=e.key;_scanActive=true;
-      // Force focus to barcode field
-      if(document.activeElement!==_bcInput){
-        _forceFocus();
-        if(_bcInput)_bcInput.value+=e.key;
-        e.preventDefault();e.stopPropagation();
-      }
+      if(_bcInput)_bcInput.value=_scanBuf;
       clearTimeout(_scanTimer);_scanTimer=setTimeout(function(){
-        var bc=_bcInput?_bcInput.value.trim():_scanBuf;
+        var bc=_scanBuf;
         if(_bcInput)_bcInput.value="";
         if(bc.length>=4)_processBarcode(bc);
         _scanBuf="";_scanActive=false;
@@ -596,6 +594,148 @@
   }
 
   // ═══════════════════════════════════════════════════════
+  //  CATALOGUE PRODUITS — grid browser
+  // ═══════════════════════════════════════════════════════
+  function _showCatalog(){
+    if(_dialogOpen())return;
+    var ov=document.createElement("div");ov.id="acim-catalog";
+    ov.style.cssText="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);z-index:10000001;display:flex;align-items:"+(_mob?"flex-end":"center")+";justify-content:center;";
+    var card=document.createElement("div");
+    var cardW=_mob?"98vw":"700px";
+    var cardH=_mob?"90vh":"80vh";
+    card.style.cssText="background:#fff;border-radius:"+(_mob?"14px 14px 0 0":"14px")+";width:"+cardW+";max-width:95vw;height:"+cardH+";max-height:90vh;display:flex;flex-direction:column;overflow:hidden;font-family:Segoe UI,Arial,sans-serif;box-shadow:0 8px 32px rgba(0,0,0,0.3);";
+
+    // Header
+    var hd=document.createElement("div");
+    hd.style.cssText="padding:12px 16px;background:#1a1a2e;color:#fff;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;";
+    hd.innerHTML='<span style="font-size:16px;font-weight:700;">📦 Catalogue</span>';
+    var closeBtn=document.createElement("span");
+    closeBtn.textContent="✕";closeBtn.style.cssText="font-size:18px;cursor:pointer;padding:4px 8px;";
+    closeBtn.onclick=function(){ov.remove();};
+    hd.appendChild(closeBtn);card.appendChild(hd);
+
+    // Search bar
+    var searchRow=document.createElement("div");
+    searchRow.style.cssText="padding:8px 16px;border-bottom:1px solid #eee;display:flex;gap:8px;flex-shrink:0;";
+    var searchIn=document.createElement("input");searchIn.type="text";searchIn.placeholder="🔍 Rechercher...";
+    searchIn.style.cssText="flex:1;padding:8px 12px;border:2px solid #e0e0e0;border-radius:8px;font-size:14px;outline:none;";
+    searchIn.onfocus=function(){this.style.borderColor="#e65100";};
+    searchIn.onblur=function(){this.style.borderColor="#e0e0e0";};
+    searchRow.appendChild(searchIn);
+
+    // Category filter pills
+    var catRow=document.createElement("div");
+    catRow.style.cssText="padding:4px 16px 8px;border-bottom:1px solid #eee;display:flex;flex-wrap:wrap;gap:4px;flex-shrink:0;";
+    var activeCat="";
+    var allPill=document.createElement("button");
+    allPill.textContent="Tous";allPill.style.cssText="padding:4px 10px;border:2px solid #e65100;border-radius:16px;background:#fff3e0;font-size:12px;cursor:pointer;font-weight:700;";
+    catRow.appendChild(allPill);
+    CATS.forEach(function(cat){
+      var b=document.createElement("button");
+      b.textContent=cat.ic+" "+cat.id;b.style.cssText="padding:4px 10px;border:2px solid #e0e0e0;border-radius:16px;background:#fff;font-size:12px;cursor:pointer;";
+      b.onclick=function(){
+        activeCat=(activeCat===cat.id)?"":cat.id;
+        refreshCatPills();renderProducts();
+      };
+      catRow.appendChild(b);
+    });
+    function refreshCatPills(){
+      catRow.querySelectorAll("button").forEach(function(b,i){
+        if(i===0){b.style.borderColor=activeCat?"#e0e0e0":"#e65100";b.style.background=activeCat?"#fff":"#fff3e0";b.style.fontWeight=activeCat?"normal":"700";}
+        else{
+          var cid=CATS[i-1].id;b.style.borderColor=(activeCat===cid)?"#e65100":"#e0e0e0";
+          b.style.background=(activeCat===cid)?"#fff3e0":"#fff";b.style.fontWeight=(activeCat===cid)?"700":"normal";
+        }
+      });
+    }
+    card.appendChild(searchRow);card.appendChild(catRow);
+
+    // Product grid (scrollable)
+    var grid=document.createElement("div");
+    grid.style.cssText="flex:1;1 auto;overflow-y:auto;padding:12px 16px;";
+    card.appendChild(grid);
+    var countEl=document.createElement("div");
+    countEl.style.cssText="padding:6px 16px;border-top:1px solid #eee;font-size:12px;color:#888;text-align:center;flex-shrink:0;";
+    card.appendChild(countEl);
+
+    function renderProducts(){
+      var q=(searchIn.value||"").toLowerCase();
+      grid.innerHTML="";
+      var all=[];
+      var req=openCatalogDB();
+      req.then(function(d){
+        if(!d)return;
+        var tx=d.transaction("products","readonly");var st=tx.objectStore("products");
+        var r=st.getAll();r.onsuccess=function(){
+          all=r.result||[];
+          var filtered=all.filter(function(p){
+            if(activeCat&&(p.category||"")!==activeCat)return false;
+            if(q){var s=((p.name||"")+" "+(p.barcode||"")+" "+(p.category||"")).toLowerCase();if(s.indexOf(q)<0)return false;}
+            return true;
+          });
+          filtered.sort(function(a,b){return(a.name||"").localeCompare(b.name||"");});
+          countEl.textContent=filtered.length+" produit"+(filtered.length!==1?"s":"");
+          if(filtered.length===0){
+            grid.innerHTML='<div style="text-align:center;color:#999;padding:40px;font-size:14px;">Aucun produit trouvé</div>';
+            return;
+          }
+          filtered.forEach(function(p){
+            var card2=document.createElement("div");
+            var hasPrice=p.sale_price_cents>0;
+            card2.style.cssText="display:flex;align-items:center;padding:10px 12px;margin-bottom:6px;background:"+(hasPrice?"#fff":"#fff8e1")+";border:1px solid "+(hasPrice?"#e0e0e0":"#ffe082")+";border-radius:8px;cursor:pointer;transition:all .15s;";
+            card2.onmouseenter=function(){this.style.background="#f5f5f5";this.style.borderColor="#e65100";};
+            card2.onmouseleave=function(){this.style.background=hasPrice?"#fff":"#fff8e1";this.style.borderColor=hasPrice?"#e0e0e0":"#ffe082";};
+
+            var icon=document.createElement("span");
+            icon.textContent=_catIcon(p.category||"autre");
+            icon.style.cssText="font-size:20px;margin-right:10px;flex-shrink:0;";
+            card2.appendChild(icon);
+
+            var info=document.createElement("div");info.style.cssText="flex:1;min-width:0;";
+            var nm=document.createElement("div");nm.style.cssText="font-size:13px;font-weight:600;color:#1a1a2e;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;";
+            nm.textContent=p.name||p.barcode||"?";info.appendChild(nm);
+            var meta=document.createElement("div");meta.style.cssText="font-size:11px;color:#888;";
+            meta.textContent=(p.category||"")+(p.barcode?" · "+p.barcode:"")+(p.stockQty!=null?" · Stock:"+p.stockQty:"");
+            info.appendChild(meta);card2.appendChild(info);
+
+            var price=document.createElement("span");
+            price.style.cssText="font-size:14px;font-weight:700;color:#e65100;margin-left:8px;flex-shrink:0;";
+            price.textContent=hasPrice?(p.sale_price_cents/100).toFixed(2)+"€":"✏️ prix";
+            card2.appendChild(price);
+
+            card2.onclick=function(){
+              if(hasPrice){
+                _addToCart(p.name,p.sale_price_cents,p.barcode,p.category);
+                _toast("✅ "+p.name+" "+(p.sale_price_cents/100).toFixed(2)+"€");
+              }else{
+                // No price — add with 0, user can edit
+                _addToCart(p.name,0,p.barcode,p.category);
+                _toast("✏️ "+p.name+" — cliquez dans le ticket pour prix");
+              }
+            };
+            grid.appendChild(card2);
+          });
+        };
+      });
+    }
+
+    searchIn.addEventListener("input",function(){renderProducts();});
+    renderProducts();
+    ov.onclick=function(e){if(e.target===ov)ov.remove();};
+    document.body.appendChild(ov);
+    setTimeout(function(){searchIn.focus();},100);
+  }
+
+  function openCatalogDB(){
+    return new Promise(function(ok){
+      try{var r=indexedDB.open("acim-catalog",1);
+        r.onupgradeneeded=function(e){var d=e.target.result;if(!d.objectStoreNames.contains("products"))d.createObjectStore("products",{keyPath:"barcode"});};
+        r.onsuccess=function(){ok(r.result);};r.onerror=function(){ok(null);};
+      }catch(e){ok(null);}
+    });
+  }
+
+  // ═══════════════════════════════════════════════════════
   //  ENCAISSER
   // ═══════════════════════════════════════════════════════
   function _checkout(){
@@ -663,8 +803,12 @@
     bcBtn.onclick=function(){_openBarcodePage();};document.body.appendChild(bcBtn);
     var addBtn=document.createElement("div");addBtn.id="acim-add-btn";
     addBtn.style.cssText="position:fixed;bottom:20px;left:50%;transform:translateX(-50%);width:56px;height:56px;background:#e65100;color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:24px;cursor:pointer;z-index:99999998;box-shadow:0 4px 16px rgba(230,81,0,0.4);pointer-events:auto;";
-    addBtn.textContent="➕";addBtn.title="Ajouter produit (Ctrl+N)";
+    addBtn.textContent="➕";addBtn.title="Nouveau produit (Ctrl+N)";
     addBtn.onclick=function(){_quickCreate("",0);};document.body.appendChild(addBtn);
+    var catBtn=document.createElement("div");catBtn.id="acim-catalog-btn";
+    catBtn.style.cssText="position:fixed;bottom:20px;right:20px;width:48px;height:48px;background:#1565c0;color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;cursor:pointer;z-index:99999998;box-shadow:0 4px 16px rgba(21,101,192,0.4);pointer-events:auto;";
+    catBtn.textContent="📦";catBtn.title="Catalogue produits";
+    catBtn.onclick=function(){_showCatalog();};document.body.appendChild(catBtn);
   }
 
   // ═══════════════════════════════════════════════════════
@@ -674,16 +818,23 @@
     if(!_acquireTabLock()){
       _toast("⚠️ Caisse déjà ouverte dans un autre onglet");return;}
     _loadBcSeq().then(function(){
-      _log("v30 — menu fix, backup import, sales persistence, multi-tab lock");
+      _log("v31 — catalog, autocomplete fix, smart tracker, scanner fix");
       _createOverlay();_createFloatingButtons();_createBarcodeInput();
       _importBackupFromEmbedded().then(function(imported){
         if(imported)_toast("✅ Catalogue importé (38 produits)");
       });
+    });
+    // Keyboard shortcuts
+    document.addEventListener("keydown",function(e){
+      if(e.ctrlKey&&e.key==="k"){e.preventDefault();_showCatalog();}
+      if(e.ctrlKey&&e.key==="n"){e.preventDefault();_quickCreate("",0);}
     });
   }
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",init);else init();
 
   window._acimGetCartInfo=_cartInfo;
   window._acimDebug=function(){return{cart:_myCart.length};};
+  window._acimProcessBarcode=_processBarcode;
+  window._acimAddToCart=function(name,price,cat){_addToCart(name,price,"",cat);};
 })();
-// ─── FIN AcimCaisse v30 ───
+// ─── FIN AcimCaisse v31 ───

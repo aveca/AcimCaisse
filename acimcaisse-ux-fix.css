@@ -66,6 +66,29 @@
   pointer-events: none;
 }
 
+/* ── Floating buttons ── */
+#acim-barcode-btn,
+#acim-add-btn,
+#acim-catalog-btn {
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+#acim-barcode-btn:hover,
+#acim-add-btn:hover,
+#acim-catalog-btn:hover {
+  transform: scale(1.1);
+}
+#acim-add-btn:hover {
+  box-shadow: 0 6px 20px rgba(230, 81, 0, 0.5) !important;
+}
+#acim-catalog-btn:hover {
+  box-shadow: 0 6px 20px rgba(21, 101, 192, 0.5) !important;
+}
+
+/* ── Download button ── */
+#acim-download-btn:hover {
+  transform: translateY(-1px);
+}
+
 /* ── Responsive: mobile overlay ── */
 @media (max-width: 600px) {
   #acim-bc-input {
