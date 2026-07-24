@@ -1,0 +1,363 @@
+/**
+ * AcimCaisse UX Fix - Amélioration de la visibilité et de l'ergonomie
+ * Solution aux problèmes identifiés dans l'analyse des logs
+ */
+
+/* ============================================
+   1. RENDRE LE CHAMP CODE-BARRES ULTRA-VISIBLE
+   ============================================ */
+#acim-bc-input {
+  /* Taille et position */
+  width: 300px !important;
+  height: 50px !important;
+  font-size: 24px !important;
+  padding: 0 15px !important;
+  
+  /* Style */
+  border: 3px solid #e65100 !important;
+  border-radius: 8px !important;
+  background: white !important;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.2) !important;
+  
+  /* Animation pour attirer l'attention */
+  animation: pulse-glow 2s infinite alternate !important;
+  
+  /* Focus automatique */
+  outline: none !important;
+}
+
+#acim-bc-input:focus {
+  border-color: #19725b !important;
+  box-shadow: 0 0 0 4px rgba(25, 114, 91, 0.3) !important;
+  animation: none !important;
+}
+
+@keyframes pulse-glow {
+  from {
+    box-shadow: 0 0 0 0 rgba(230, 81, 0, 0.4) !important;
+  }
+  to {
+    box-shadow: 0 0 0 10px rgba(230, 81, 0, 0) !important;
+  }
+}
+
+/* ============================================
+   2. BOUTON SCANNER (📊) - LE RENDRE ÉVIDENT
+   ============================================ */
+#acim-barcode-btn {
+  /* Taille */
+  width: 80px !important;
+  height: 80px !important;
+  
+  /* Position (à côté du champ code-barres) */
+  position: absolute !important;
+  right: 10px !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  
+  /* Style */
+  background: #e65100 !important;
+  border: none !important;
+  border-radius: 50% !important;
+  cursor: pointer !important;
+  box-shadow: 0 4px 12px rgba(230, 81, 0, 0.4) !important;
+  
+  /* Animation */
+  transition: all 0.3s ease !important;
+  
+  /* Texte */
+  font-size: 30px !important;
+  color: white !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+#acim-barcode-btn:hover {
+  background: #c43e00 !important;
+  transform: translateY(-50%) scale(1.1) !important;
+  box-shadow: 0 6px 16px rgba(230, 81, 0, 0.6) !important;
+}
+
+#acim-barcode-btn:active {
+  transform: translateY(-50%) scale(0.95) !important;
+}
+
+/* ============================================
+   3. BOUTON VALIDER (À AJOUTER)
+   ============================================ */
+#acim-validate-btn {
+  /* Position (à droite du champ code-barres) */
+  position: absolute !important;
+  right: 100px !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  
+  /* Style */
+  background: #19725b !important;
+  color: white !important;
+  border: none !important;
+  border-radius: 8px !important;
+  padding: 10px 20px !important;
+  font-size: 18px !important;
+  font-weight: bold !important;
+  cursor: pointer !important;
+  box-shadow: 0 4px 8px rgba(25, 114, 91, 0.3) !important;
+  transition: all 0.3s ease !important;
+}
+
+#acim-validate-btn:hover {
+  background: #0f5744 !important;
+  transform: translateY(-50%) scale(1.05) !important;
+  box-shadow: 0 6px 12px rgba(25, 114, 91, 0.5) !important;
+}
+
+/* ============================================
+   4. OVERLAY DU TICKET - LE RENDRE PLUS CLAIR
+   ============================================ */
+#acim-ticket-overlay {
+  background: rgba(255, 255, 255, 0.95) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.2) !important;
+  padding: 20px !important;
+  
+  /* Animation d'apparition */
+  animation: fadeInUp 0.5s ease-out !important;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+#acim-ticket-overlay > div {
+  cursor: pointer !important;
+  transition: transform 0.2s ease !important;
+}
+
+#acim-ticket-overlay > div:hover {
+  transform: scale(1.02) !important;
+}
+
+/* ============================================
+   5. FLUTTER-VIEW - ÉVITER LES CLIQUES VIDES
+   ============================================ */
+flutter-view {
+  /* Désactiver le pointer-events pour éviter les clics accidentels */
+  pointer-events: none !important;
+}
+
+/* Sauf pour les éléments enfants qui doivent être cliquables */
+flutter-view * {
+  pointer-events: auto !important;
+}
+
+/* ============================================
+   6. BOUTONS GÉNÉRAUX - STYLE COHÉRENT
+   ============================================ */
+button,
+[role="button"],
+input[type="button"],
+input[type="submit"] {
+  min-height: 44px !important;
+  min-width: 44px !important;
+  border-radius: 8px !important;
+  font-size: 16px !important;
+  font-weight: 500 !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  border: none !important;
+}
+
+button:not(:disabled):hover,
+[role="button"]:not(:disabled):hover {
+  transform: scale(1.05) !important;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2) !important;
+}
+
+button:disabled,
+[role="button"]:disabled {
+  opacity: 0.5 !important;
+  cursor: not-allowed !important;
+}
+
+/* ============================================
+   7. FEEDBACK VISUEL SUR LES ACTIONS
+   ============================================ */
+/* Animation quand un produit est ajouté */
+@keyframes productAdded {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.1); opacity: 0.8; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.acim-product-added {
+  animation: productAdded 0.5s ease !important;
+}
+
+/* ============================================
+   8. ZONE DE TRAVAIL OPTIMISÉE
+   ============================================ */
+/* Tout doit être accessible sans scroller */
+body {
+  min-height: 100vh !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+/* Conteneur principal */
+#acim-main-container {
+  flex: 1 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  padding: 20px !important;
+  max-width: 1200px !important;
+  margin: 0 auto !important;
+  width: 100% !important;
+}
+
+/* Zone de scan (en haut) */
+#acim-scan-zone {
+  display: flex !important;
+  align-items: center !important;
+  gap: 20px !important;
+  margin-bottom: 20px !important;
+  width: 100% !important;
+  max-width: 600px !important;
+}
+
+/* Zone du panier (au milieu) */
+#acim-cart-zone {
+  flex: 1 !important;
+  width: 100% !important;
+  max-width: 800px !important;
+  overflow-y: auto !important;
+}
+
+/* Zone des totaux (en bas - STICKY) */
+#acim-totals-zone {
+  position: sticky !important;
+  bottom: 20px !important;
+  background: white !important;
+  padding: 20px !important;
+  border-radius: 12px !important;
+  box-shadow: 0 -4px 12px rgba(0,0,0,0.1) !important;
+  width: 100% !important;
+  max-width: 800px !important;
+  z-index: 100 !important;
+}
+
+/* ============================================
+   9. TOOLTIPS POUR GUIDER L'UTILISATEUR
+   ============================================ */
+[data-tooltip] {
+  position: relative !important;
+}
+
+[data-tooltip]:hover::after {
+  content: attr(data-tooltip) !important;
+  position: absolute !important;
+  bottom: 100% !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  background: #333 !important;
+  color: white !important;
+  padding: 8px 12px !important;
+  border-radius: 6px !important;
+  font-size: 14px !important;
+  white-space: nowrap !important;
+  z-index: 10000 !important;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.2) !important;
+}
+
+/* ============================================
+   10. RESPONSIVE POUR ÉCRANS TACTILES
+   ============================================ */
+@media (max-width: 768px) {
+  #acim-bc-input {
+    width: 250px !important;
+    font-size: 20px !important;
+  }
+  
+  #acim-barcode-btn {
+    width: 60px !important;
+    height: 60px !important;
+    font-size: 24px !important;
+  }
+  
+  #acim-validate-btn {
+    right: 80px !important;
+    padding: 8px 16px !important;
+    font-size: 16px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  #acim-scan-zone {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+  
+  #acim-bc-input {
+    width: 100% !important;
+  }
+  
+  #acim-barcode-btn,
+  #acim-validate-btn {
+    position: static !important;
+    transform: none !important;
+    width: 100% !important;
+    margin-top: 10px !important;
+  }
+}
+
+/* ============================================
+   11. ANIMATIONS DE CHARGEMENT
+   ============================================ */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.acim-loading {
+  animation: spin 1s linear infinite !important;
+}
+
+/* ============================================
+   12. COULEURS COHÉRENTES
+   ============================================ */
+:root {
+  --acim-primary: #19725b;
+  --acim-secondary: #e65100;
+  --acim-success: #2e7d32;
+  --acim-error: #c62828;
+  --acim-warning: #ff8f00;
+  --acim-info: #0d47a1;
+}
+
+/* Appliquer les couleurs aux boutons */
+.acim-btn-primary {
+  background: var(--acim-primary) !important;
+  color: white !important;
+}
+
+.acim-btn-secondary {
+  background: var(--acim-secondary) !important;
+  color: white !important;
+}
+
+.acim-btn-success {
+  background: var(--acim-success) !important;
+  color: white !important;
+}
+
+.acim-btn-error {
+  background: var(--acim-error) !important;
+  color: white !important;
+}

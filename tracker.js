@@ -321,6 +321,12 @@
   }
 
   function showExportNotification() {
+    // Vérifier que document.body existe (Flutter peut ne pas l'avoir)
+    if (!document.body) {
+      console.log('[Tracker] Notification skipped: document.body not available');
+      return;
+    }
+    
     // Créer une notification visuelle
     const notification = document.createElement('div');
     notification.style.cssText = `
@@ -336,24 +342,26 @@
       font-family: Arial, sans-serif;
       font-size: 14px;
       animation: slideIn 0.3s ease-out;
-      @keyframes slideIn {
-        from { transform: translateX(100%); opacity: 0; }
-        to { transform: translateX(0); opacity: 1; }
-      }
     `;
     notification.innerHTML = `
       <strong>✓ Logs exportés</strong><br>
       <small>Rapport UX généré (console + téléchargement)</small>
     `;
     
-    document.body.appendChild(notification);
-    
-    setTimeout(() => {
-      notification.style.animation = 'slideOut 0.3s ease-out';
-      notification.style.transform = 'translateX(100%)';
-      notification.style.opacity = '0';
-      setTimeout(() => notification.remove(), 300);
-    }, 5000);
+    try {
+      document.body.appendChild(notification);
+      
+      setTimeout(() => {
+        notification.style.animation = 'slideOut 0.3s ease-out';
+        notification.style.transform = 'translateX(100%)';
+        notification.style.opacity = '0';
+        setTimeout(() => {
+          if (notification.parentNode) notification.remove();
+        }, 300);
+      }, 5000);
+    } catch (e) {
+      console.log('[Tracker] Notification error:', e);
+    }
   }
 
   async function clearLogs() {

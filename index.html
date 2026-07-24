@@ -16,14 +16,58 @@
   <link rel="manifest" href="manifest.json">
   <!-- Tracker UX pour analyse des parcours utilisateurs -->
   <script src="tracker.js"></script>
+  <!-- CSS pour fixer l'UX/UI -->
+  <link rel="stylesheet" href="acimcaisse-ux-fix.css">
 </head>
 <body>
   <script src="flutter_bootstrap.js?v=30" async></script>
-  <!-- Initialisation du tracker après Flutter -->
+  
+  <!-- Bouton Valider (ajouté pour clarifier le workflow) -->
+  <button id="acim-validate-btn" data-tooltip="Valider le produit (Entrée)" style="display: none;">✓ Valider</button>
+  
+  <!-- Initialisation du tracker et des fixes UX -->
   <script>
     // Le tracker s'initialise automatiquement
     // Pour activer le bouton debug: ajouter ?debug=tracker à l'URL
     // Ex: https://aveca.github.io/AcimCaisse/?debug=tracker
+    
+    // Montrer le bouton Valider quand le champ code-barres est présent
+    function checkAndShowValidateBtn() {
+      const bcInput = document.getElementById('acim-bc-input');
+      const validateBtn = document.getElementById('acim-validate-btn');
+      
+      if (bcInput && validateBtn) {
+        validateBtn.style.display = 'block';
+        
+        // Positionner le bouton à côté du champ
+        const bcRect = bcInput.getBoundingClientRect();
+        validateBtn.style.position = 'absolute';
+        validateBtn.style.left = (bcRect.left + bcRect.width + 10) + 'px';
+        validateBtn.style.top = (bcRect.top + window.scrollY) + 'px';
+        
+        // Gérer le clic sur Valider
+        validateBtn.onclick = function() {
+          const event = new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter' });
+          bcInput.dispatchEvent(event);
+        };
+      }
+    }
+    
+    // Vérifier toutes les 500ms si le champ existe
+    setInterval(checkAndShowValidateBtn, 500);
+    
+    // Ajouter des tooltips aux éléments existants
+    function addTooltips() {
+      const barcodeBtn = document.getElementById('acim-barcode-btn');
+      if (barcodeBtn) {
+        barcodeBtn.setAttribute('data-tooltip', 'Ouvrir le scanner de code-barres');
+      }
+    }
+    
+    // Ajouter les tooltips après le chargement
+    window.addEventListener('load', addTooltips);
+    setTimeout(addTooltips, 1000);
+    setTimeout(addTooltips, 3000);
   </script>
 </body>
 </html>

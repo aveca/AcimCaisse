@@ -214,6 +214,14 @@ function step2_patch() {
     fs.copyFileSync(trackerSrc, trackerDest);
     console.log("    -> tracker.js copié");
   }
+  
+  // Copier le CSS de fix UX
+  const cssSrc = path.join(__dirname, "acimcaisse-ux-fix.css");
+  const cssDest = path.join(WORK, "app", "www", "acimcaisse-ux-fix.css");
+  if (fs.existsSync(cssSrc)) {
+    fs.copyFileSync(cssSrc, cssDest);
+    console.log("    -> acimcaisse-ux-fix.css copié");
+  }
 
   console.log("    -> barcode.html ecrit");
 
