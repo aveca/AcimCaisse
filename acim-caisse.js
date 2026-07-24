@@ -1135,7 +1135,8 @@
       previewArea.style.display="none";
       countDiv.textContent="";
 
-      if(file.name.endsWith(".json")){
+      var lowerName=file.name.toLowerCase();
+      if(lowerName.endsWith(".json")){
         // JSON import
         var reader=new FileReader();
         reader.onload=function(ev){
@@ -1160,7 +1161,7 @@
           }catch(ex){statusDiv.textContent="❌ Erreur JSON: "+ex.message;}
         };
         reader.readAsText(file);
-      }else if(file.name.endsWith(".pdf")){
+      }else if(lowerName.endsWith(".pdf")){
         // PDF import via acimExtractPdfText
         if(!window.acimExtractPdfText){
           statusDiv.textContent="❌ Module d'extraction PDF non chargé. Rechargez la page.";
