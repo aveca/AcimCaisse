@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AcimCaisse — Migration des données</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/sql-wasm.js"></script>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f2f5;color:#1a1a2e;padding:20px;}
+  .container{max-width:700px;margin:0 auto;}
+  h1{font-size:22px;margin-bottom:4px;}
+  .subtitle{font-size:13px;color:#666;margin-bottom:20px;}
+  .card{background:#fff;border-radius:12px;padding:16px;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,0.08);}
+  .card h2{font-size:16px;margin-bottom:8px;}
+  .card p{font-size:13px;color:#666;margin-bottom:8px;}
+  .btn{padding:10px 20px;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;transition:all .15s;}
+  .btn-primary{background:#e65100;color:#fff;}.btn-primary:hover{background:#c43e00;}
+  .btn-success{background:#2e7d32;color:#fff;}.btn-success:hover{background:#1b5e20;}
+  .btn-info{background:#1565c0;color:#fff;}.btn-info:hover{background:#0d47a1;}
+  .btn:disabled{opacity:0.5;cursor:not-allowed;}
+  .status{padding:8px 12px;border-radius:6px;font-size:13px;margin:8px 0;min-height:20px;}
+  .status-ok{background:#e8f5e9;color:#2e7d32;}
+  .status-err{background:#ffebee;color:#c62828;}
+  .status-info{background:#e3f2fd;color:#1565c0;}
+  .status-warn{background:#fff3e0;color:#e65100;}
+  table{width:100%;border-collapse:collapse;font-size:12px;margin:8px 0;}
+  th,td{padding:6px 8px;border-bottom:1px solid #f0f0f0;text-align:left;}
+  th{background:#f5f5f5;font-weight:700;}
+  .badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;}
+  .badge-ok{background:#e8f5e9;color:#2e7d32;}
+  .badge-err{background:#ffebee;color:#c62828;}
+  .badge-warn{background:#fff3e0;color:#e65100;}
+  .hidden{display:none;}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>🔄 Migration des données AcimCaisse</h1>
+  <p class="subtitle">Récupérez vos produits, ventes et paramètres de l'ancienne version Flutter vers la nouvelle.</p>
+
+  <div class="card" id="step-detect">
+    <h2>1. Détection de l'ancienne base</h2>
+    <p>Recherche de la base de données Flutter (acim_caisse) dans IndexedDB...</p>
+    <div id="detect-status" class="status status-info">En attente...</div>
+    <button class="btn btn-primary" id="btn-detect" onclick="detectAndExtract()">🔍 Détecter et extraire</button>
+  </div>
+
+  <div class="card hidden" id="step-preview">
+    <h2>2. Données trouvées</h2>
+    <div id="preview-content"></div>
+  </div>
+
+  <div class="card hidden" id="step-migrate">
+    <h2>3. Migration</h2>
+    <p>Import des données dans les nouvelles bases (acim-catalog, acim-sales, acim-meta).</p>
+    <div id="migrate-status" class="status status-info"></div>
+    <button class="btn btn-success hidden" id="btn-migrate" onclick="runMigration()">🚀 Lancer la migration</button>
+  </div>
+
+  <div class="card hidden" id="step-done">
+    <h2>✅ Migration terminée !</h2>
+    <div id="done-status" class="status status-ok"></div>
+    <p style="margin-top:8px;">Vous pouvez maintenant retourner à l'application :</p>
+    <a href="index.html" class="btn btn-info" style="display:inline-block;text-decoration:none;margin-top:8px;">🏪 Ouvrir AcimCaisse</a>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+var oldData = { products: [], categories: [], sales: [], saleItems: [], payments: [], settings: null };
+var SQL = null;
+
+// ─── DETECT AND EXTRACT ─────────────────────────────────
+function detectAndExtract() {
+  var status = document.getElementById("detect-status");
+  status.textContent = "🔍 Chargement de sql.js...";
+  status.className = "status status-info";
+  document.getElementById("btn-detect").disabled = true;
+
+  initSqlJs().then(function(sql) {
+    SQL = sql;
+    status.textContent = "🔍 Recherche de la base acim_caisse...";
+
+    var req = indexedDB.open("acim_caisse", 1);
+    req.onerror = function() {
+      status.textContent = "❌ Base acim_caisse non trouvée.";
+      status.className = "status status-err";
+      document.getElementById("btn-detect").disabled = false;
+    };
+    req.onsuccess = function(e) {
+      var db = e.target.result;
+      var storeNames = Array.from(db.objectStoreNames);
+      if (storeNames.indexOf("files") < 0 || storeNames.indexOf("blocks") < 0) {
+        status.textContent = "❌ Structure inattendue: " + storeNames.join(", ");
+        status.className = "status status-err";
+        return;
+      }
+      status.textContent = "✅ Base acim_caisse trouvée! Lecture des blocs...";
+      reconstructSQLite(db, status);
+    };
+  }).catch(function(err) {
+    status.textContent = "❌ Erreur chargement sql.js: " + err.message;
+    status.className = "status status-err";
+    document.getElementById("btn-detect").disabled = false;
+  });
+}
+
+// ─── RECONSTRUCT SQLITE FROM BLOCKS ─────────────────────
+function reconstructSQLite(idbDb, status) {
+  var tx = idbDb.transaction(["files", "blocks"], "readonly");
+  var filesStore = tx.objectStore("files");
+  var blocksStore = tx.objectStore("blocks");
+
+  var filesReq = filesStore.getAll();
+  filesReq.onsuccess = function() {
+    var files = filesReq.result;
+    if (!files || files.length === 0) {
+      status.textContent = "❌ Aucun fichier dans la base.";
+      status.className = "status status-err";
+      return;
+    }
+
+    var mainFile = files[0];
+    for (var i = 0; i < files.length; i++) {
+      if (files[i].length > (mainFile.length || 0)) mainFile = files[i];
+    }
+
+    status.textContent = "📦 Fichier: " + (mainFile.name || "default") + " (" + mainFile.length + " octets) — Lecture des blocs...";
+
+    // Get file key
+    var keyReq = filesStore.index("fileName").getKey(mainFile.name || "default");
+    keyReq.onsuccess = function() {
+      var fileId = keyReq.result;
+      if (fileId == null) {
+        // Try getting key from the first record
+        var getKeyReq = filesStore.getAllKeys();
+        getKeyReq.onsuccess = function() {
+          fileId = getKeyReq.result[0];
+          readBlocks(blocksStore, fileId, mainFile, status);
+        };
+        return;
+      }
+      readBlocks(blocksStore, fileId, mainFile, status);
+    };
+  };
+}
+
+function readBlocks(blocksStore, fileId, mainFile, status) {
+  var allBlocks = {};
+  var blockCount = 0;
+  var totalBlocks = Math.ceil(mainFile.length / 4096);
+  var range = IDBKeyRange.bound([fileId, 0], [fileId, mainFile.length + 4096]);
+  var cursorReq = blocksStore.openCursor(range);
+
+  cursorReq.onsuccess = function(ev) {
+    var cursor = ev.target.result;
+    if (cursor) {
+      var key = cursor.key;
+      var offset = key[1];
+      allBlocks[offset] = cursor.value;
+      blockCount++;
+      status.textContent = "📦 Blocs lus: " + blockCount + "/" + totalBlocks;
+      cursor.continue();
+    } else {
+      // Reconstruct
+      var sqliteFile = new Uint8Array(mainFile.length);
+      var offsets = Object.keys(allBlocks).map(Number).sort(function(a, b) { return a - b; });
+      for (var j = 0; j < offsets.length; j++) {
+        var off = offsets[j];
+        var block = allBlocks[off];
+        var len = Math.min(4096, mainFile.length - off);
+        for (var k = 0; k < len; k++) {
+          sqliteFile[off + k] = block[k];
+        }
+      }
+      status.textContent = "✅ SQLite reconstruit (" + sqliteFile.length + " octets) — Parsing...";
+      parseSQLite(sqliteFile);
+    }
+  };
+}
+
+// ─── PARSE SQLITE WITH sql.js ───────────────────────────
+function parseSQLite(data) {
+  var status = document.getElementById("detect-status");
+  try {
+    var db = new SQL.Database(data);
+
+    // Get list of tables
+    var tablesResult = db.exec("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name");
+    if (!tablesResult || tablesResult.length === 0 || tablesResult[0].values.length === 0) {
+      status.textContent = "❌ Aucune table trouvée dans la base SQLite.";
+      status.className = "status status-err";
+      return;
+    }
+
+    var tableNames = tablesResult[0].values.map(function(r) { return r[0]; });
+    status.textContent = "✅ Tables trouvées: " + tableNames.join(", ");
+    status.className = "status status-ok";
+
+    // Read each table
+    for (var ti = 0; ti < tableNames.length; ti++) {
+      var tName = tableNames[ti];
+      try {
+        var result = db.exec("SELECT * FROM [" + tName + "]");
+        if (!result || result.length === 0) continue;
+        var cols = result[0].columns;
+        var rows = result[0].values;
+
+        var objects = rows.map(function(row) {
+          var obj = {};
+          for (var ci = 0; ci < cols.length; ci++) {
+            obj[cols[ci]] = row[ci];
+          }
+          return obj;
+        });
+
+        switch (tName) {
+          case "products": oldData.products = objects; break;
+          case "categories": oldData.categories = objects; break;
+          case "sales": oldData.sales = objects; break;
+          case "sale_items": oldData.saleItems = objects; break;
+          case "payments": oldData.payments = objects; break;
+          case "settings": oldData.settings = objects[0] || null; break;
+          default: console.log("Table ignorée:", tName, objects.length, "lignes"); break;
+        }
+      } catch (e) {
+        console.warn("Erreur table " + tName + ":", e);
+      }
+    }
+
+    db.close();
+    showPreview();
+  } catch (e) {
+    status.textContent = "❌ Erreur parsing SQLite: " + e.message;
+    status.className = "status status-err";
+    document.getElementById("btn-detect").disabled = false;
+  }
+}
+
+// ─── SHOW PREVIEW ───────────────────────────────────────
+function showPreview() {
+  document.getElementById("step-preview").classList.remove("hidden");
+  document.getElementById("step-migrate").classList.remove("hidden");
+  document.getElementById("btn-migrate").classList.remove("hidden");
+
+  var html = '<table><tr><th>Table</th><th>Enregistrements</th><th>Champs</th></tr>';
+  function row(name, data) {
+    var cols = data.length > 0 ? Object.keys(data[0]).join(", ") : "—";
+    var cls = data.length > 0 ? "ok" : "warn";
+    return '<tr><td>' + name + '</td><td>' + data.length + '</td><td style="font-size:10px;color:#888;">' + cols + '</td></tr>';
+  }
+  html += row("📦 Produits", oldData.products);
+  html += row("🏷️ Catégories", oldData.categories);
+  html += row("💰 Ventes", oldData.sales);
+  html += row("📋 Articles de vente", oldData.saleItems);
+  html += row("💳 Paiements", oldData.payments);
+  html += '<tr><td>⚙️ Paramètres</td><td>' + (oldData.settings ? "1" : "0") + '</td><td style="font-size:10px;color:#888;">' + (oldData.settings ? Object.keys(oldData.settings).join(", ") : "—") + '</td></tr>';
+  html += '</table>';
+
+  // Sample products
+  if (oldData.products.length > 0) {
+    html += '<h3 style="font-size:13px;margin:12px 0 4px;">Échantillon produits:</h3>';
+    html += '<table><tr><th>Nom</th><th>Prix</th><th>Stock</th><th>Code</th></tr>';
+    var sample = oldData.products.slice(0, 8);
+    for (var i = 0; i < sample.length; i++) {
+      var p = sample[i];
+      html += '<tr><td>' + esc(p.name || "?") + '</td><td>' + (p.salePriceCents || 0) + 'cts</td><td>' + (p.stockQty || 0) + '</td><td style="font-size:10px;">' + esc(p.barcode || "") + '</td></tr>';
+    }
+    html += '</table>';
+  }
+
+  // Sample sales
+  if (oldData.sales.length > 0) {
+    html += '<h3 style="font-size:13px;margin:12px 0 4px;">Échantillon ventes:</h3>';
+    html += '<table><tr><th>Tick</th><th>Total</th><th>Date</th><th>Statut</th></tr>';
+    var sampleS = oldData.sales.slice(0, 5);
+    for (var j = 0; j < sampleS.length; j++) {
+      var s = sampleS[j];
+      html += '<tr><td>#' + (s.ticketNumber || "?") + '</td><td>' + (s.totalCents || 0) + 'cts</td><td>' + esc(s.soldAt || s.createdAt || "") + '</td><td>' + esc(s.status || "completed") + '</td></tr>';
+    }
+    html += '</table>';
+  }
+
+  document.getElementById("preview-content").innerHTML = html;
+}
+
+function esc(s) { return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+
+// ─── RUN MIGRATION ──────────────────────────────────────
+function runMigration() {
+  var status = document.getElementById("migrate-status");
+  status.textContent = "🚀 Migration en cours...";
+  status.className = "status status-info";
+  document.getElementById("btn-migrate").disabled = true;
+
+  // Category UUID -> name mapping
+  var catMap = {};
+  for (var i = 0; i < oldData.categories.length; i++) {
+    var c = oldData.categories[i];
+    catMap[c.id] = c.name || "Divers";
+  }
+
+  function mapCategory(name) {
+    if (!name) return "autre";
+    var l = name.toLowerCase();
+    if (l.indexOf("viande") >= 0 || l.indexOf("frais") >= 0 || l.indexOf("boucherie") >= 0 || l.indexOf("volaille") >= 0) return "viande";
+    if (l.indexOf("laitier") >= 0 || l.indexOf("froid") >= 0 || l.indexOf("crème") >= 0) return "laitier";
+    if (l.indexOf("épicerie") >= 0 || l.indexOf("epicerie") >= 0 || l.indexOf("sec") >= 0 || l.indexOf("alimentaire") >= 0) return "epicerie";
+    if (l.indexOf("boulangerie") >= 0 || l.indexOf("pain") >= 0 || l.indexOf("pâtisserie") >= 0) return "boulangerie";
+    if (l.indexOf("boisson") >= 0 || l.indexOf("soda") >= 0 || l.indexOf("jus") >= 0 || l.indexOf("eau") >= 0) return "boisson";
+    if (l.indexOf("surgelé") >= 0 || l.indexOf("congelé") >= 0 || l.indexOf("congele") >= 0 || l.indexOf("glace") >= 0) return "surgelé";
+    if (l.indexOf("snack") >= 0 || l.indexOf("chips") >= 0 || l.indexOf("biscuit") >= 0 || l.indexOf("confiserie") >= 0) return "snack";
+    if (l.indexOf("condiment") >= 0 || l.indexOf("épice") >= 0 || l.indexOf("epice") >= 0 || l.indexOf("sauce") >= 0) return "condiment";
+    if (l.indexOf("ménager") >= 0 || l.indexOf("menager") >= 0 || l.indexOf("entretien") >= 0 || l.indexOf("hygiène") >= 0) return "menager";
+    if (l.indexOf("vin") >= 0 || l.indexOf("alcool") >= 0 || l.indexOf("bière") >= 0 || l.indexOf("spiritueux") >= 0) return "vin";
+    return "autre";
+  }
+
+  // Migrate products
+  var prodPromises = [];
+  var prodCount = 0;
+  for (var pi = 0; pi < oldData.products.length; pi++) {
+    var p = oldData.products[pi];
+    var name = p.name || "";
+    var barcode = p.barcode || "";
+    if (!name && !barcode) continue;
+
+    var catName = catMap[p.categoryId] || p.categoryId || "";
+    var mappedCat = mapCategory(catName);
+
+    prodPromises.push(dbNew("acim-catalog", "products", {
+      barcode: barcode || "MIGR-" + Date.now() + "-" + pi,
+      name: name,
+      sale_price_cents: p.salePriceCents || 0,
+      category: mappedCat,
+      stockQty: p.stockQty || 0,
+      pricePerUnit: p.pricePerUnit || null,
+      unitType: p.unit || null,
+      source: "flutter-migration",
+      last_updated: Date.now()
+    }));
+    prodCount++;
+  }
+
+  Promise.all(prodPromises).then(function() {
+    // Migrate sales
+    var salePromises = [];
+    var salesCount = 0;
+    for (var si = 0; si < oldData.sales.length; si++) {
+      var sale = oldData.sales[si];
+      if (sale.status === "voided" || sale.status === "cancelled") continue;
+
+      var saleId = sale.id || "";
+      var ticketNumber = sale.ticketNumber || 0;
+      var totalCents = sale.totalCents || 0;
+      var discountCents = sale.discountCents || 0;
+      var soldAt = sale.soldAt || sale.createdAt || "";
+      var timestamp = soldAt ? new Date(soldAt).getTime() : Date.now();
+
+      // Find items for this sale
+      var items = oldData.saleItems.filter(function(it) { return it.saleId === saleId; }).map(function(it) {
+        return {
+          name: it.productName || "",
+          price: it.unitSalePriceCents || 0,
+          barcode: it.productId || "",
+          cat: "autre",
+          weight: null, unitType: null, pricePerUnit: null,
+          discountCents: it.discountCents || 0,
+          qty: it.qty || 1
+        };
+      });
+
+      // Find payments for this sale
+      var payments = oldData.payments.filter(function(pa) { return pa.saleId === saleId; }).map(function(pa) {
+        return {
+          method: pa.method || "especes",
+          amountCents: pa.amountCents || 0,
+          tenderedCents: pa.tenderedCents || pa.amountCents || 0,
+          changeCents: pa.changeCents || 0
+        };
+      });
+
+      salePromises.push(dbNew("acim-sales", "sales", {
+        ticketNumber: ticketNumber,
+        timestamp: timestamp,
+        isoTime: new Date(timestamp).toISOString(),
+        items: items,
+        totalCents: totalCents,
+        discountCents: discountCents,
+        payments: payments,
+        itemCount: items.length
+      }));
+      salesCount++;
+    }
+    return Promise.all(salePromises);
+  }).then(function() {
+    // Migrate settings
+    var metaPromises = [];
+    if (oldData.settings) {
+      metaPromises.push(dbNew("acim-meta", "meta", {
+        key: "acim-store-settings",
+        value: { storeName: oldData.settings.storeName || "AcimCaisse", footer: oldData.settings.ticketFooter || "Merci de votre visite !" }
+      }));
+      metaPromises.push(dbNew("acim-meta", "meta", {
+        key: "acim-ticket-seq",
+        value: { value: oldData.settings.nextTicketNumber || 1 }
+      }));
+    }
+    return Promise.all(metaPromises);
+  }).then(function() {
+    status.textContent = "✅ Migration terminée!";
+    status.className = "status status-ok";
+    document.getElementById("step-done").classList.remove("hidden");
+    document.getElementById("done-status").innerHTML =
+      "📦 <strong>" + prodCount + " produits</strong> migrés<br>" +
+      "💰 <strong>" + salesCount + " ventes</strong> migrées<br>" +
+      "⚙️ Paramètres transférés";
+  }).catch(function(err) {
+    status.textContent = "❌ Erreur: " + err.message;
+    status.className = "status status-err";
+    console.error("Migration error:", err);
+    document.getElementById("btn-migrate").disabled = false;
+  });
+}
+
+// ─── DB HELPER ──────────────────────────────────────────
+function dbNew(dbName, storeName, data) {
+  return new Promise(function(ok) {
+    try {
+      var req = indexedDB.open(dbName, 1);
+      req.onupgradeneeded = function(e) {
+        var d = e.target.result;
+        if (!d.objectStoreNames.contains(storeName)) {
+          if (storeName === "sales") d.createObjectStore(storeName, { keyPath: "id", autoIncrement: true });
+          else if (storeName === "products") d.createObjectStore(storeName, { keyPath: "barcode" });
+          else if (storeName === "meta") d.createObjectStore(storeName, { keyPath: "key" });
+        }
+      };
+      req.onsuccess = function(e) {
+        var db = e.target.result;
+        var tx = db.transaction(storeName, "readwrite");
+        tx.objectStore(storeName).put(data);
+        tx.oncomplete = function() { ok(); };
+        tx.onerror = function() { ok(); };
+      };
+      req.onerror = function() { ok(); };
+    } catch (e) { ok(); }
+  });
+}
+</script>
+</body>
+</html>

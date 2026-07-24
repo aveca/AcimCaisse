@@ -145165,6 +145165,9 @@ if(typeof dartMainRunner==="function"){dartMainRunner(s,[])}else{s([])}})
       {label:"📋 Historique des ventes",fn:function(){ov.remove();_showHistory();}},
       {label:"📄 Importer facture fournisseur",fn:function(){ov.remove();_showInvoiceImport();}},
       {label:"🏷️ Imprimer codes-barres",fn:function(){window.open("barcode.html","_blank");}},
+      {label:"📤 Exporter mes données",fn:function(){ov.remove();_showExportDialog();}},
+      {label:"📥 Importer des données (JSON)",fn:function(){ov.remove();_showImportDialog();}},
+      {label:"🔄 Migrer depuis l'ancienne version",fn:function(){window.open("migration.html","_blank");}},
       {label:"⚙️ Paramètres",fn:function(){ov.remove();_showSettings();}},
     ];
     btns.forEach(function(b){
@@ -145223,6 +145226,12 @@ if(typeof dartMainRunner==="function"){dartMainRunner(s,[])}else{s([])}})
         row.onclick=function(){_showReceipt(s.ticketNumber||0,s.items||[],s.totalCents||0,s.discountCents||0,s.payments||[]);};
         listDiv.appendChild(row);
       });
+      // Show total
+      var totalSales=sales.reduce(function(sum,s){return sum+(s.totalCents||0);},0);
+      var totalDiv=document.createElement("div");
+      totalDiv.style.cssText="padding:10px;border-top:2px solid #e65100;font-weight:700;font-size:14px;display:flex;justify-content:space-between;";
+      totalDiv.innerHTML='<span>Total général ('+sales.length+' ventes)</span><span style="color:#e65100;">'+(totalSales/100).toFixed(2).replace(".",",")+' €</span>';
+      listDiv.appendChild(totalDiv);
     });
   }
 
@@ -145643,6 +145652,207 @@ if(typeof dartMainRunner==="function"){dartMainRunner(s,[])}else{s([])}})
 
   function _dialogOpen(){return!!document.getElementById("acim-inline-edit")||!!document.getElementById("acim-quick")||!!document.getElementById("acim-weigh")||!!document.getElementById("acim-payment")||!!document.getElementById("acim-receipt")||!!document.getElementById("acim-history")||!!document.getElementById("acim-menu")||!!document.getElementById("acim-settings")||!!document.getElementById("acim-invoice")||!!document.getElementById("acim-disc-dialog");}
 
+  // ─── EXPORT / IMPORT JSON ─────────────────────────────
+  function _exportAllData(){
+    return Promise.all([_dbGetAll(),_getSalesHistory(),_openMeta().then(function(d){
+      if(!d)return{};return new Promise(function(ok){
+        var r=d.transaction("meta","readonly").objectStore("meta").getAll();
+        r.onsuccess=function(){var obj={};(r.result||[]).forEach(function(e){obj[e.key]=e.value;});ok(obj);};
+        r.onerror=function(){ok({});};
+      });
+    }).catch(function(){return{};})]).then(function(results){
+      return{
+        version:1,
+        exportDate:new Date().toISOString(),
+        source:"acim-caisse-v34",
+        products:results[0]||[],
+        sales:results[1]||[],
+        meta:results[2]||{}
+      };
+    });
+  }
+  function _downloadJSON(data,filename){
+    var blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
+    var url=URL.createObjectURL(blob);
+    var a=document.createElement("a");a.href=url;a.download=filename;
+    document.body.appendChild(a);a.click();document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+  function _showExportDialog(){
+    var old=document.getElementById("acim-export");if(old)old.remove();
+    var ov=document.createElement("div");ov.id="acim-export";
+    ov.style.cssText="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:10000002;display:flex;align-items:center;justify-content:center;";
+    var card=document.createElement("div");
+    card.style.cssText="background:#fff;border-radius:14px;padding:20px;width:380px;max-width:95vw;box-shadow:0 8px 24px rgba(0,0,0,0.3);font-family:Segoe UI,Arial,sans-serif;";
+    var ti=document.createElement("div");ti.style.cssText="font-size:18px;font-weight:700;margin-bottom:12px;color:#1a1a2e;text-align:center;";
+    ti.textContent="📤 Exporter mes données";card.appendChild(ti);
+    var desc=document.createElement("div");desc.style.cssText="font-size:12px;color:#666;margin-bottom:16px;text-align:center;";
+    desc.textContent="Télécharge un fichier JSON contenant tous vos produits, ventes et paramètres.";
+    card.appendChild(desc);
+    var statusDiv=document.createElement("div");statusDiv.style.cssText="font-size:13px;color:#666;min-height:20px;margin-bottom:12px;text-align:center;";
+    card.appendChild(statusDiv);
+    var br=document.createElement("div");br.style.cssText="display:flex;gap:8px;";
+    var bClose=document.createElement("button");bClose.textContent="Annuler";
+    bClose.style.cssText="flex:1;padding:10px;border:2px solid #e0e0e0;border-radius:8px;background:#fff;font-size:14px;cursor:pointer;";
+    bClose.onclick=function(){ov.remove();};
+    var bExport=document.createElement("button");bExport.textContent="📤 Télécharger le fichier";
+    bExport.style.cssText="flex:2;padding:10px;border:none;border-radius:8px;background:#1565c0;color:#fff;font-size:14px;cursor:pointer;font-weight:700;";
+    bExport.onclick=function(){
+      statusDiv.textContent="⏳ Préparation de l'export...";
+      bExport.disabled=true;bExport.style.opacity="0.5";
+      _exportAllData().then(function(data){
+        var dateStr=new Date().toISOString().slice(0,10);
+        var filename="acimcaisse-backup-"+dateStr+".json";
+        _downloadJSON(data,filename);
+        statusDiv.textContent="✅ Fichier téléchargé: "+filename;
+        statusDiv.style.color="#2e7d32";
+      }).catch(function(err){
+        statusDiv.textContent="❌ Erreur: "+err.message;
+        statusDiv.style.color="#c62828";
+        bExport.disabled=false;bExport.style.opacity="1";
+      });
+    };
+    br.appendChild(bClose);br.appendChild(bExport);card.appendChild(br);
+    ov.appendChild(card);ov.onclick=function(e){if(e.target===ov)ov.remove();};
+    document.body.appendChild(ov);
+  }
+
+  function _showImportDialog(){
+    var old=document.getElementById("acim-import");if(old)old.remove();
+    var ov=document.createElement("div");ov.id="acim-import";
+    ov.style.cssText="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:10000002;display:flex;align-items:center;justify-content:center;";
+    var card=document.createElement("div");
+    card.style.cssText="background:#fff;border-radius:14px;padding:20px;width:420px;max-width:95vw;max-height:80vh;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,0.3);font-family:Segoe UI,Arial,sans-serif;";
+    var ti=document.createElement("div");ti.style.cssText="font-size:18px;font-weight:700;margin-bottom:12px;color:#1a1a2e;text-align:center;";
+    ti.textContent="📥 Importer des données";card.appendChild(ti);
+    var desc=document.createElement("div");desc.style.cssText="font-size:12px;color:#666;margin-bottom:12px;text-align:center;";
+    desc.textContent="Importe un fichier JSON exporté depuis AcimCaisse. Les doublons (même code-barres) sont écrasés.";
+    card.appendChild(desc);
+    var fileInput=document.createElement("input");fileInput.type="file";fileInput.accept=".json";
+    fileInput.style.cssText="width:100%;padding:10px;border:2px dashed #e0e0e0;border-radius:8px;font-size:14px;cursor:pointer;margin-bottom:12px;";
+    card.appendChild(fileInput);
+    var statusDiv=document.createElement("div");statusDiv.style.cssText="font-size:12px;color:#666;min-height:20px;margin-bottom:8px;";
+    card.appendChild(statusDiv);
+    var previewDiv=document.createElement("div");previewDiv.style.cssText="display:none;margin-bottom:12px;";
+    card.appendChild(previewDiv);
+    var br=document.createElement("div");br.style.cssText="display:flex;gap:8px;margin-top:8px;";
+    var bClose=document.createElement("button");bClose.textContent="Annuler";
+    bClose.style.cssText="flex:1;padding:10px;border:2px solid #e0e0e0;border-radius:8px;background:#fff;font-size:14px;cursor:pointer;";
+    bClose.onclick=function(){ov.remove();};
+    var bImport=document.createElement("button");bImport.textContent="📥 Importer";
+    bImport.style.cssText="flex:2;padding:10px;border:none;border-radius:8px;background:#2e7d32;color:#fff;font-size:14px;cursor:pointer;font-weight:700;display:none;";
+    card.appendChild(br);card.appendChild(bImport);
+    var parsedData=null;
+    fileInput.onchange=function(e){
+      var file=e.target.files[0];if(!file)return;
+      statusDiv.textContent="⏳ Lecture de "+file.name+"...";
+      previewDiv.style.display="none";bImport.style.display="none";parsedData=null;
+      var reader=new FileReader();
+      reader.onload=function(ev){
+        try{
+          parsedData=JSON.parse(ev.target.result);
+          var prodCount=(parsedData.products||[]).length;
+          var salesCount=(parsedData.sales||[]).length;
+          var hasMeta=!!parsedData.meta&&Object.keys(parsedData.meta).length>0;
+          previewDiv.style.display="block";
+          previewDiv.innerHTML='<div style="background:#f5f5f5;border-radius:8px;padding:12px;font-size:13px;">'
+            +'<div style="font-weight:700;margin-bottom:6px;">📊 Aperçu:</div>'
+            +'<div>📦 '+prodCount+' produit(s)</div>'
+            +'<div>💰 '+salesCount+' vente(s)</div>'
+            +'<div>⚙️ Paramètres: '+(hasMeta?"Oui":"Non")+'</div>'
+            +(parsedData.exportDate?'<div style="color:#888;font-size:11px;margin-top:4px;">Exporté le: '+new Date(parsedData.exportDate).toLocaleString("fr-FR")+'</div>':"")
+            +(parsedData.source?'<div style="color:#888;font-size:11px;">Source: '+parsedData.source+'</div>':"")
+            +'</div>';
+          statusDiv.textContent="✅ Fichier valide! Cliquez sur Importer.";
+          statusDiv.style.color="#2e7d32";
+          bImport.style.display="block";
+        }catch(ex){
+          statusDiv.textContent="❌ Fichier invalide: "+ex.message;
+          statusDiv.style.color="#c62828";
+        }
+      };
+      reader.readAsText(file);
+    };
+    bImport.onclick=function(){
+      if(!parsedData)return;
+      bImport.disabled=true;bImport.style.opacity="0.5";
+      statusDiv.textContent="⏳ Importation en cours...";
+      var products=parsedData.products||[];
+      var sales=parsedData.sales||[];
+      var meta=parsedData.meta||{};
+      var prodPromises=[];
+      var prodCount=0;
+      products.forEach(function(p){
+        if(!p.barcode)return;
+        prodPromises.push(_dbGet(p.barcode).then(function(existing){
+          _dbPut({
+            barcode:p.barcode,
+            name:p.name||"Sans nom",
+            sale_price_cents:p.sale_price_cents||0,
+            category:p.category||"autre",
+            stockQty:p.stockQty||0,
+            pricePerUnit:p.pricePerUnit||null,
+            unitType:p.unitType||null,
+            source:p.source||"json-import",
+            last_updated:p.last_updated||Date.now()
+          });
+          prodCount++;
+        }));
+      });
+      Promise.all(prodPromises).then(function(){
+        var salesPromises=[];
+        var salesCount=0;
+        return _openSalesDB().then(function(d){
+          if(!d||sales.length===0)return;
+          return new Promise(function(ok){
+            var tx=d.transaction("sales","readwrite");
+            var store=tx.objectStore("sales");
+            sales.forEach(function(s){
+              if(!s)return;
+              store.put({
+                ticketNumber:s.ticketNumber||0,
+                timestamp:s.timestamp||Date.now(),
+                isoTime:s.isoTime||new Date(s.timestamp||Date.now()).toISOString(),
+                items:s.items||[],
+                totalCents:s.totalCents||0,
+                discountCents:s.discountCents||0,
+                payments:s.payments||[],
+                itemCount:s.itemCount||(s.items?s.items.length:0)
+              });
+              salesCount++;
+            });
+            tx.oncomplete=function(){ok();};tx.onerror=function(){ok();};
+          });
+        });
+      }).then(function(){
+        return _openMeta().then(function(d){
+          if(!d)return;
+          return new Promise(function(ok){
+            var tx=d.transaction("meta","readwrite");
+            var store=tx.objectStore("meta");
+            Object.keys(meta).forEach(function(k){
+              store.put({key:k,value:meta[k]});
+            });
+            tx.oncomplete=function(){ok();};tx.onerror=function(){ok();};
+          });
+        });
+      }).then(function(){
+        statusDiv.textContent="✅ Import terminé: "+prodCount+" produits, "+salesCount+" ventes importés!";
+        statusDiv.style.color="#2e7d32";
+        _refreshAndFilter();
+        _loadTicketSeq();
+        _loadSettings();
+        _loadBcSeq();
+      }).catch(function(err){
+        statusDiv.textContent="❌ Erreur import: "+err.message;
+        statusDiv.style.color="#c62828";
+        bImport.disabled=false;bImport.style.opacity="1";
+      });
+    };
+    ov.appendChild(card);ov.onclick=function(e){if(e.target===ov)ov.remove();};
+    document.body.appendChild(ov);
+  }
+
   // ─── TOAST ────────────────────────────────────────────
   function _toast(msg){
     if(!msg)return;var old=document.getElementById("acim-toast");if(old)old.remove();
@@ -145686,6 +145896,8 @@ if(typeof dartMainRunner==="function"){dartMainRunner(s,[])}else{s([])}})
   window._acimWeighProduct=_weighProduct;
 })();
 // ─── FIN AcimCaisse v34 ───
+
+
 
 
 
