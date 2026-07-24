@@ -145232,30 +145232,46 @@ if(typeof dartMainRunner==="function"){dartMainRunner(s,[])}else{s([])}})
     var ov=document.createElement("div");ov.id="acim-invoice";
     ov.style.cssText="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:10000002;display:flex;align-items:center;justify-content:center;";
     var card=document.createElement("div");
-    card.style.cssText="background:#fff;border-radius:14px;padding:20px;width:400px;max-width:95vw;box-shadow:0 8px 24px rgba(0,0,0,0.3);font-family:Segoe UI,Arial,sans-serif;";
+    card.style.cssText="background:#fff;border-radius:14px;padding:20px;width:420px;max-width:95vw;max-height:80vh;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,0.3);font-family:Segoe UI,Arial,sans-serif;";
     var ti=document.createElement("div");ti.style.cssText="font-size:18px;font-weight:700;margin-bottom:12px;color:#1a1a2e;";
     ti.textContent="📄 Importer une facture fournisseur";card.appendChild(ti);
     var desc=document.createElement("div");desc.style.cssText="font-size:12px;color:#666;margin-bottom:12px;";
-    desc.textContent="Sélectionnez un fichier PDF de facture fournisseur pour importer les produits dans le catalogue.";
+    desc.textContent="Sélectionnez un fichier PDF de facture fournisseur. Le texte sera extrait (OCR si nécessaire) puis vérifiable avant import.";
     card.appendChild(desc);
 
-    var fileInput=document.createElement("input");fileInput.type="file";fileInput.accept=".pdf,.json,.csv";
+    var fileInput=document.createElement("input");fileInput.type="file";fileInput.accept=".pdf,.json";
     fileInput.style.cssText="width:100%;padding:10px;border:2px dashed #e0e0e0;border-radius:8px;font-size:14px;cursor:pointer;margin-bottom:12px;";
     card.appendChild(fileInput);
 
-    var statusDiv=document.createElement("div");statusDiv.style.cssText="font-size:12px;color:#666;min-height:20px;";
+    var statusDiv=document.createElement("div");statusDiv.style.cssText="font-size:12px;color:#666;min-height:20px;margin-bottom:8px;";
     card.appendChild(statusDiv);
+
+    // Preview area for extracted text
+    var previewArea=document.createElement("div");previewArea.style.cssText="display:none;margin-bottom:12px;";
+    var previewLabel=document.createElement("div");previewLabel.style.cssText="font-size:11px;color:#888;margin-bottom:4px;";
+    previewLabel.textContent="Texte extrait (vérifiable) :";previewArea.appendChild(previewLabel);
+    var previewTA=document.createElement("textarea");previewTA.rows=8;
+    previewTA.style.cssText="width:100%;font-size:11px;font-family:monospace;padding:8px;border:1px solid #e0e0e0;border-radius:6px;resize:vertical;box-sizing:border-box;";
+    previewArea.appendChild(previewTA);
+    card.appendChild(previewArea);
+
+    // Product count preview
+    var countDiv=document.createElement("div");countDiv.style.cssText="font-size:13px;font-weight:700;color:#e65100;min-height:20px;margin-bottom:8px;";
+    card.appendChild(countDiv);
 
     fileInput.onchange=function(e){
       var file=e.target.files[0];
       if(!file)return;
-      statusDiv.textContent="⏳ Lecture de "+file.name+"...";
-      var reader=new FileReader();
-      reader.onload=function(ev){
-        var content=ev.target.result;
-        if(file.name.endsWith(".json")){
+      statusDiv.textContent="⏳ Chargement de "+file.name+"...";
+      previewArea.style.display="none";
+      countDiv.textContent="";
+
+      if(file.name.endsWith(".json")){
+        // JSON import
+        var reader=new FileReader();
+        reader.onload=function(ev){
           try{
-            var data=JSON.parse(content);
+            var data=JSON.parse(ev.target.result);
             var products=data.products||data;
             var count=0;
             if(Array.isArray(products)){
@@ -145263,8 +145279,9 @@ if(typeof dartMainRunner==="function"){dartMainRunner(s,[])}else{s([])}})
                 var name=p.name||p.n||p.designation||"";
                 var price=p.sale_price_cents||p.p||p.price_cents||0;
                 var barcode=p.barcode||p.bc||"INV-"+Date.now()+"-"+Math.floor(Math.random()*9999);
+                var stock=p.stockQty||p.s||0;
                 if(name){
-                  _dbPut({barcode:barcode,name:name,sale_price_cents:price,category:"epicerie",source:"invoice-import",last_updated:Date.now()});
+                  _dbPut({barcode:barcode,name:name,sale_price_cents:price,category:"epicerie",stockQty:stock,source:"invoice-import",last_updated:Date.now()});
                   count++;
                 }
               });
@@ -145272,18 +145289,108 @@ if(typeof dartMainRunner==="function"){dartMainRunner(s,[])}else{s([])}})
             statusDiv.textContent="✅ "+count+" produits importés!";
             _refreshAndFilter();
           }catch(ex){statusDiv.textContent="❌ Erreur JSON: "+ex.message;}
-        }else{
-          statusDiv.textContent="ℹ️ Format non supporté directement. Utilisez le fichier JSON du catalogue.";
+        };
+        reader.readAsText(file);
+      }else if(file.name.endsWith(".pdf")){
+        // PDF import via acimExtractPdfText
+        if(!window.acimExtractPdfText){
+          statusDiv.textContent="❌ Module d'extraction PDF non chargé. Rechargez la page.";
+          return;
         }
-      };
-      reader.readAsText(file);
+        var reader2=new FileReader();
+        reader2.onload=function(ev){
+          statusDiv.textContent="⏳ Extraction du texte du PDF (OCR si nécessaire)...";
+          var bytes=new Uint8Array(ev.target.result);
+          window.acimExtractPdfText(bytes).then(function(rawText){
+            if(!rawText||!rawText.trim()){
+              statusDiv.textContent="❌ Aucun texte extrait du PDF.";
+              return;
+            }
+            statusDiv.textContent="✅ Texte extrait! Vérifiez puis importez.";
+            previewTA.value=rawText;
+            previewArea.style.display="block";
+
+            // Parse products from extracted text
+            var products=_parseInvoiceText(rawText);
+            countDiv.textContent=products.length+" produit(s) détecté(s)";
+            window._acimParsedProducts=products;
+          }).catch(function(err){
+            statusDiv.textContent="❌ Erreur extraction: "+err.message;
+            console.error("[AcimCaisse] PDF extraction error:",err);
+          });
+        };
+        reader2.readAsArrayBuffer(file);
+      }else{
+        statusDiv.textContent="❌ Format non supporté. Utilisez PDF ou JSON.";
+      }
     };
+
+    // Parse invoice text into products
+    function _parseInvoiceText(text){
+      var lines=text.split("\n");
+      var products=[];
+      for(var i=0;i<lines.length;i++){
+        var line=lines[i].trim();
+        if(!line)continue;
+        // Skip headers/footers
+        var lower=line.toLowerCase();
+        if(/total|tva|facture|conditions|escompte|acompte|net a payer|port ht|montant ht|base ht|designation|adresse|tel|fax|email/.test(lower))continue;
+        // Try to extract: code name qty price total
+        // Patterns: "123 CODE ARTICLE Description 10 5.50 55.00"
+        var m=line.match(/^(\d{3})\s+(\S+)\s+(.+?)\s+(\d+(?:[.,]\d+)?)\s+(\d+(?:[.,]\d+)?)\s+(\d+(?:[.,]\d+)?)\s*$/);
+        if(m){
+          var barcode=m[2].replace(/[|\\\/]/g,"");
+          var name=m[3].trim();
+          var qty=parseFloat(m[4].replace(",","."))||1;
+          var unitPrice=parseFloat(m[5].replace(",","."))||0;
+          var total=parseFloat(m[6].replace(",","."))||0;
+          if(name&&total>0){
+            products.push({barcode:barcode,name:name,qty:qty,unitPrice:unitPrice,totalCents:Math.round(total*100)});
+          }
+          continue;
+        }
+        // Simpler pattern: numbers + text
+        var nums=line.match(/\d+[.,]\d{2}/g);
+        if(nums&&nums.length>=2){
+          var totalVal=parseFloat(nums[nums.length-1].replace(",","."));
+          var priceVal=parseFloat(nums[nums.length-2].replace(",","."));
+          var namePart=line.replace(/\d+[.,]\d{2}/g,"").replace(/\s+/g," ").trim();
+          if(namePart&&totalVal>0){
+            products.push({barcode:"INV-"+Date.now()+"-"+Math.floor(Math.random()*9999),name:namePart,qty:1,unitPrice:priceVal,totalCents:Math.round(totalVal*100)});
+          }
+        }
+      }
+      return products;
+    }
 
     var br=document.createElement("div");br.style.cssText="display:flex;gap:8px;margin-top:12px;";
     var bClose=document.createElement("button");bClose.textContent="Fermer";
     bClose.style.cssText="flex:1;padding:10px;border:2px solid #e0e0e0;border-radius:8px;background:#fff;font-size:14px;cursor:pointer;";
     bClose.onclick=function(){ov.remove();};
-    br.appendChild(bClose);card.appendChild(br);
+    var bImport=document.createElement("button");bImport.textContent="📥 Importer dans le catalogue";
+    bImport.style.cssText="flex:2;padding:10px;border:none;border-radius:8px;background:#e65100;color:#fff;font-size:14px;cursor:pointer;font-weight:700;";
+    bImport.onclick=function(){
+      var products=window._acimParsedProducts;
+      if(!products||products.length===0){statusDiv.textContent="❌ Aucun produit à importer.";return;}
+      var count=0;
+      var promises=[];
+      products.forEach(function(p){
+        promises.push(_dbGet(p.barcode).then(function(existing){
+          if(!existing){
+            _dbPut({barcode:p.barcode,name:p.name,sale_price_cents:Math.round(p.unitPrice*100)||0,category:"epicerie",stockQty:p.qty||0,source:"invoice-import",last_updated:Date.now()});
+            count++;
+          }
+        }));
+      });
+      Promise.all(promises).then(function(){
+        statusDiv.textContent="✅ "+count+" produits importés dans le catalogue!";
+        window._acimParsedProducts=null;
+        previewArea.style.display="none";
+        countDiv.textContent="";
+        _refreshAndFilter();
+      });
+    };
+    br.appendChild(bClose);br.appendChild(bImport);card.appendChild(br);
     ov.appendChild(card);ov.onclick=function(e){if(e.target===ov)ov.remove();};
     document.body.appendChild(ov);
   }
@@ -145578,6 +145685,8 @@ if(typeof dartMainRunner==="function"){dartMainRunner(s,[])}else{s([])}})
   window._acimWeighProduct=_weighProduct;
 })();
 // ─── FIN AcimCaisse v34 ───
+
+
 
 
 

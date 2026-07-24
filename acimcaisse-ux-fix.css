@@ -97,19 +97,29 @@ flutter-view {
 
 /* ── Print: hide everything except receipt ── */
 @media print {
-  body > *:not(#acim-receipt):not(#acim-receipt *) {
-    display: none !important;
+  * {
+    visibility: hidden !important;
+  }
+  #acim-receipt,
+  #acim-receipt * {
+    visibility: visible !important;
   }
   #acim-receipt {
-    position: static !important;
-    background: #fff !important;
-    box-shadow: none !important;
-    width: 100% !important;
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: auto !important;
+    width: 80mm !important;
     max-width: 80mm !important;
     margin: 0 auto !important;
     padding: 5mm !important;
+    background: #fff !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
     font-family: 'Courier New', monospace !important;
     font-size: 12pt !important;
+    z-index: 99999999 !important;
   }
   #acim-receipt > div {
     border-radius: 0 !important;
@@ -120,8 +130,12 @@ flutter-view {
   }
   #acim-receipt button {
     display: none !important;
+    visibility: hidden !important;
   }
   #acim-receipt hr {
     border-top: 1px dashed #000 !important;
+  }
+  #acim-receipt div[style*="display:flex"][style*="gap:8px"][style*="margin-top:12px"] {
+    display: none !important;
   }
 }
