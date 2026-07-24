@@ -145782,6 +145782,7 @@ if(typeof dartMainRunner==="function"){dartMainRunner(s,[])}else{s([])}})
       var meta=parsedData.meta||{};
       var prodPromises=[];
       var prodCount=0;
+      var salesCount=0;
       products.forEach(function(p){
         if(!p.barcode)return;
         prodPromises.push(_dbGet(p.barcode).then(function(existing){
@@ -145801,7 +145802,6 @@ if(typeof dartMainRunner==="function"){dartMainRunner(s,[])}else{s([])}})
       });
       Promise.all(prodPromises).then(function(){
         var salesPromises=[];
-        var salesCount=0;
         return _openSalesDB().then(function(d){
           if(!d||sales.length===0)return;
           return new Promise(function(ok){
@@ -145896,6 +145896,7 @@ if(typeof dartMainRunner==="function"){dartMainRunner(s,[])}else{s([])}})
   window._acimWeighProduct=_weighProduct;
 })();
 // ─── FIN AcimCaisse v34 ───
+
 
 
 
