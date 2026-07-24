@@ -643,18 +643,15 @@
     if(!_acquireTabLock()){_toast("⚠ Caisse déjà ouverte dans un autre onglet");return;}
     _loadBcSeq().then(function(){
       _log("v32 — POS UI complète");
-      _dbGetAll().then(function(all){
-        _allProducts=all;
+      // Sequential: import FIRST, THEN read DB, THEN build UI
+      _importBackupFromEmbedded().then(function(imported){
+        if(imported)_toast("✅ Catalogue importé (38 produits)");
+        return _dbGetAll();
+      }).then(function(all){
+        _allProducts=all||[];
+        _log("Produits chargés: "+_allProducts.length);
         _createPOS();
         _renderPOS();
-      });
-      _importBackupFromEmbedded().then(function(imported){
-        if(imported){
-          _dbGetAll().then(function(all){
-            _allProducts=all;_filterProducts();
-          });
-          _toast("✅ Catalogue importé (38 produits)");
-        }
       });
     });
     document.addEventListener("keydown",function(e){
