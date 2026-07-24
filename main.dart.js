@@ -144694,8 +144694,8 @@ if(typeof dartMainRunner==="function"){dartMainRunner(s,[])}else{s([])}})
     var item=_myCart[idx];
     var oldCard=document.getElementById("acim-inline-edit");if(oldCard)oldCard.remove();
     var card=document.createElement("div");card.id="acim-inline-edit";
-    var left=Math.min(clickX-140,Math.max(10,window.innerWidth-300));
-    var top=Math.min(clickY-20,10);
+    var left=Math.max(10,(window.innerWidth-280)/2);
+    var top=Math.max(10,(window.innerHeight-400)/2);
     card.style.cssText="position:fixed;left:"+left+"px;top:"+top+"px;width:280px;background:#fff;border-radius:12px;padding:14px;box-shadow:0 6px 20px rgba(0,0,0,0.25);z-index:10000001;font-family:Segoe UI,Arial,sans-serif;";
     var ti=document.createElement("div");ti.style.cssText="font-size:13px;font-weight:700;margin-bottom:8px;color:#1a1a2e;";ti.textContent=_catIcon(item.cat||"autre")+" Modifier";card.appendChild(ti);
     var ni=document.createElement("input");ni.type="text";ni.value=item.name||"";ni.placeholder="Nom";
