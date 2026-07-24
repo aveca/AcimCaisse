@@ -1,4 +1,4 @@
-// ─── AcimCaisse v25 — _myCart Only, No Dart Sync ──────────
+// ─── AcimCaisse v28 — _myCart Only, scanner auto-focus, panier unique ──────────
 // Injecté DANS l'IIFE dartProgram (A, J, $, t, B accessibles)
 // _myCart = seule source de vérité, AUCUN sync Dart
 ;(function(){
@@ -176,32 +176,61 @@
   }
 
   // ═══════════════════════════════════════════════════════
-  //  SCANNER AUTO + CHAMP BARCODE (auto-focus)
+  //  SCANNER AUTO + CHAMP BARCODE (auto-focus permanent)
   // ═══════════════════════════════════════════════════════
-  var _bcInput=null;
+  var _bcInput=null,_autoFocusTimer=null;
   function _createBarcodeInput(){
     if(_bcInput)return;
     _bcInput=document.createElement("input");_bcInput.id="acim-bc-input";
-    _bcInput.type="text";_bcInput.placeholder="🔍 Scanner ou taper code-barres...";
-    _bcInput.style.cssText="position:fixed;top:8px;left:8px;width:220px;padding:8px 12px;border:2px solid #e65100;border-radius:10px;font-size:14px;font-weight:700;font-family:Segoe UI,Arial,sans-serif;z-index:99999999;outline:none;background:#fff;box-shadow:0 4px 16px rgba(230,81,0,0.3);";
+    _bcInput.type="text";_bcInput.placeholder="🔍 Scanner ou taper code...";
+    _bcInput.style.cssText="position:fixed;top:8px;left:8px;width:260px;padding:10px 14px;border:3px solid #e65100;border-radius:12px;font-size:16px;font-weight:700;font-family:Segoe UI,Arial,sans-serif;z-index:99999999;outline:none;background:#fff;box-shadow:0 4px 20px rgba(230,81,0,0.4);animation:acimPulse 2s ease-in-out infinite;";
+    // Pulsing animation stylesheet
+    var pulseStyle=document.createElement("style");pulseStyle.id="acim-pulse-style";
+    pulseStyle.textContent="@keyframes acimPulse{0%,100%{box-shadow:0 4px 20px rgba(230,81,0,0.4);}50%{box-shadow:0 4px 28px rgba(230,81,0,0.7);border-color:#ff6d00;}}";
+    document.head.appendChild(pulseStyle);
     _bcInput.addEventListener("keydown",function(e){
       if(e.key==="Enter"){var bc=this.value.trim();this.value="";if(bc.length>=4)_processBarcode(bc);else _toast("❌ Code trop court");}
       if(e.key==="Escape"){this.value="";this.blur();}
     });
+    // Auto-focus permanent: reprend le focus après blur (si pas de dialog)
+    _bcInput.addEventListener("blur",function(){
+      clearTimeout(_autoFocusTimer);
+      _autoFocusTimer=setTimeout(function(){
+        if(!_dialogOpen()&&_bcInput&&!_bcInput.value)_bcInput.focus();
+      },300);
+    });
     document.body.appendChild(_bcInput);
+    // Focus immédiat
+    setTimeout(function(){if(_bcInput)_bcInput.focus();},100);
   }
 
-  // Auto-focus barcode field on first digit (scanner signature)
+  // Auto-focus périodique (catch-all: si Flutter steal le focus)
+  function _keepBarcodeFocused(){
+    if(!_bcInput)return;
+    if(!_dialogOpen()&&!_bcInput.value&&document.activeElement!==_bcInput){
+      try{_bcInput.focus();}catch(e){}
+    }
+  }
+  setInterval(_keepBarcodeFocused,3000);
+
+  // Scanner buffer: capture digits EVEN IF Flutter intercepts focus
   var _scanBuf="",_scanTimer=null,_scanActive=false;
   document.addEventListener("keydown",function(e){
     if(_dialogOpen())return;
-    // Si c'est un digit et pas déjà dans notre champ → auto-focus + buffer
-    if(/^[0-9]$/.test(e.key)&&e.target!==_bcInput){
-      // Signature scanner: digit rapide → focus le champ et transférer
-      if(_bcInput){_bcInput.focus();_bcInput.value+=e.key;e.preventDefault();}
+    // Digit → auto-focus + buffer (même si Flutter a le focus)
+    if(/^[0-9]$/.test(e.key)){
+      if(_bcInput&&document.activeElement!==_bcInput){
+        _bcInput.focus();
+        // Ajouter le digit au champ si Flutter ne l'a pas déjà mis
+        if(!_bcInput.value.endsWith(e.key))_bcInput.value+=e.key;
+        e.preventDefault();e.stopPropagation();
+      }
       _scanBuf+=e.key;_scanActive=true;
       clearTimeout(_scanTimer);_scanTimer=setTimeout(function(){
-        if(_scanBuf.length>=4)_processBarcode(_scanBuf);
+        // Si le champ a du contenu, utiliser ça (priorité au champ visible)
+        var bc=_bcInput?_bcInput.value.trim():_scanBuf;
+        if(_bcInput)_bcInput.value="";
+        if(bc.length>=4)_processBarcode(bc);
         _scanBuf="";_scanActive=false;
       },120);
     }
@@ -458,7 +487,7 @@
   //  INIT
   // ═══════════════════════════════════════════════════════
   function init(){
-    _log("v26 — barcode input field, scanner 120ms, _myCart only");
+    _log("v28 — barcode auto-focus permanent, panier unique, scanner 120ms, _myCart only");
     _createOverlay();_createFloatingButtons();_createBarcodeInput();
   }
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",init);else init();
