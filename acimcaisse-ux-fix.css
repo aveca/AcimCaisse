@@ -1,53 +1,61 @@
 /**
- * AcimCaisse UX Fix — styles for JS overlay elements only
- * These elements are created by acim-caisse.js in document.body.
- * DO NOT add rules for Flutter elements (they live in shadow DOM).
- * DO NOT add rules for non-existent IDs/classes.
+ * AcimCaisse v32 — POS UI styles
  */
 
-/* ── Barcode input (created by _createBarcodeInput) ── */
-#acim-bc-input {
-  transition: border-color 0.2s, box-shadow 0.2s;
+/* ── Hide Flutter behind POS overlay ── */
+flutter-view {
+  opacity: 0 !important;
+  pointer-events: none !important;
 }
 
-#acim-bc-input:focus {
-  border-color: #19725b !important;
-  box-shadow: 0 0 0 3px rgba(25, 114, 91, 0.25) !important;
+/* ── POS main container ── */
+#acim-pos {
+  animation: acimFadeIn 0.2s ease-out;
+}
+@keyframes acimFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
-/* ── Autocomplete suggestions ── */
-#acim-autocomplete-suggestions {
-  position: absolute;
-  background: #fff;
-  border: 2px solid #19725b;
-  border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.25);
-  max-height: 200px;
-  overflow-y: auto;
-  z-index: 10000;
-  display: none;
-  width: 350px;
-  max-width: 90vw;
-}
-
-.acim-suggestion-item {
-  padding: 10px 15px;
-  cursor: pointer;
-  border-bottom: 1px solid #eee;
+/* ── POS search input ── */
+#acim-pos-search {
   transition: background 0.15s;
 }
-
-.acim-suggestion-item:hover {
-  background: #f0f0f0;
+#acim-pos-search:focus {
+  background: #3a3a6e !important;
+}
+#acim-pos-search::placeholder {
+  color: #aaa;
 }
 
-.acim-suggestion-item:last-child {
-  border-bottom: none;
+/* ── Category pills ── */
+#acim-pos-cats button {
+  transition: all 0.15s;
+}
+#acim-pos-cats button:hover {
+  transform: translateY(-1px);
 }
 
-/* ── Ticket overlay (desktop sidebar) ── */
-#acim-ticket-overlay {
-  font-family: 'Segoe UI', Arial, sans-serif;
+/* ── Product grid ── */
+#acim-pos-grid > div {
+  cursor: pointer;
+  user-select: none;
+}
+#acim-pos-grid > div:active {
+  transform: scale(0.96);
+}
+
+/* ── Cart item rows ── */
+#acim-pos-items > div {
+  user-select: none;
+}
+
+/* ── Checkout button ── */
+#acim-pos-checkout {
+  transition: background 0.15s, transform 0.1s;
+}
+#acim-pos-checkout:active {
+  transform: scale(0.97);
 }
 
 /* ── Inline edit card ── */
@@ -66,33 +74,12 @@
   pointer-events: none;
 }
 
-/* ── Floating buttons ── */
-#acim-barcode-btn,
-#acim-add-btn,
-#acim-catalog-btn {
-  transition: transform 0.15s, box-shadow 0.15s;
-}
-#acim-barcode-btn:hover,
-#acim-add-btn:hover,
-#acim-catalog-btn:hover {
-  transform: scale(1.1);
-}
-#acim-add-btn:hover {
-  box-shadow: 0 6px 20px rgba(230, 81, 0, 0.5) !important;
-}
-#acim-catalog-btn:hover {
-  box-shadow: 0 6px 20px rgba(21, 101, 192, 0.5) !important;
-}
-
-/* ── Download button ── */
-#acim-download-btn:hover {
-  transform: translateY(-1px);
-}
-
-/* ── Responsive: mobile overlay ── */
-@media (max-width: 600px) {
-  #acim-bc-input {
-    width: 200px !important;
-    font-size: 14px !important;
+/* ── Responsive: mobile ── */
+@media (max-width: 768px) {
+  #acim-pos {
+    flex-direction: column !important;
+  }
+  #acim-pos > div:last-child {
+    flex-direction: column !important;
   }
 }

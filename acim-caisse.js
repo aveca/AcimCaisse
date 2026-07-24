@@ -1,6 +1,4 @@
-// ─── AcimCaisse v30 — menu fix, backup import, sales persistence, multi-tab lock ──
-// Injecté DANS l'IIFE dartProgram (A, J, $, t, B accessibles)
-// _myCart = seule source de vérité, AUCUN sync Dart
+// ─── AcimCaisse v32 — POS UI complète ──
 ;(function(){
   "use strict";
   var _log=function(m){console.log("[Acim] "+m);};
@@ -31,11 +29,10 @@
   window.addEventListener("beforeunload",_releaseTabLock);
   setInterval(_refreshTabLock,3000);
 
-  // ─── AUTO-BARCODE (persisted in IndexedDB) ───────────
+  // ─── AUTO-BARCODE ────────────────────────────────────
   var _bcSeq=1000;
   var _bcSeqKey="acim-bc-seq";
   function _nextBarcode(){return "ACIM-"+(_bcSeq++);}
-
   function _loadBcSeq(){
     return _openMeta().then(function(d){
       if(!d)return;return new Promise(function(ok){
@@ -54,7 +51,7 @@
   var _origNextBarcode=_nextBarcode;
   _nextBarcode=function(){var bc=_origNextBarcode();_saveBcSeq();return bc;};
 
-  // ─── META STORE (for bcSeq, settings) ────────────────
+  // ─── META STORE ──────────────────────────────────────
   var _metaDb=null;
   function _openMeta(){
     if(_metaDb)return Promise.resolve(_metaDb);
@@ -66,38 +63,19 @@
     });
   }
 
-  // Responsive
-  var _mob=window.innerWidth<600;
-  function _isMob(){return window.innerWidth<600;}
-  window.addEventListener("resize",function(){
-    var wasMob=_mob;_mob=_isMob();
-    if(wasMob!==_mob){if(_overlay){_overlay.remove();_overlay=null;_linesEls=[];}_createOverlay();}
-  });
-
-  // Catégories
+  // ─── CATEGORIES ──────────────────────────────────────
   var CATS=[
-    {id:"viande",ic:"🥩",kw:["viande","poulet","steak","merguez","saucisse","escalope","haché","agneau","veau","charcuterie","côte"]},
-    {id:"laitier",ic:"🧀",kw:["lait","fromage","yaourt","beurre","crème","labné","camembert","emmental","mozzarella"]},
-    {id:"épicerie",ic:"🏪",kw:["riz","pâtes","sauce","huile","conserves","thon","haricots","maïs","tomate","olive","miel","couscous"]},
-    {id:"boulangerie",ic:"🍞",kw:["pain","baguette","pita","matza","challah","brioche","biscotte"]},
-    {id:"boisson",ic:"🥤",kw:["jus","eau","soda","limonade","thé","café","sirop"]},
-    {id:"surgelé",ic:"🧊",kw:["surgelé","pizza","beignet","nugget","frite","glace"]},
-    {id:"snack",ic:"🍪",kw:["biscuit","chips","chocolat","bonbon","barre","pretzel"]},
-    {id:"condiment",ic:"🧂",kw:["sel","poivre","épice","moutarde","ketchup","mayo","vinaigre"]},
-    {id:"ménager",ic:"🧴",kw:["savon","lessive","nettoyant","papier","sac"]},
-    {id:"vin",ic:"🍷",kw:["vin","kiddouch","malbec","cabernet","merlot"]},
-    {id:"autre",ic:"📦",kw:[]}
+    {id:"viande",ic:"🥩"}, {id:"laitier",ic:"🧀"}, {id:"epicerie",ic:"🏪"},
+    {id:"boulangerie",ic:"🍞"}, {id:"boisson",ic:"🥤"}, {id:"surgelé",ic:"🧊"},
+    {id:"snack",ic:"🍪"}, {id:"condiment",ic:"🧂"}, {id:"menager",ic:"🧴"},
+    {id:"vin",ic:"🍷"}, {id:"autre",ic:"📦"}
   ];
-  function _guessCat(t){
-    if(!t)return"autre";var s=t.toLowerCase(),best="autre",bs=0;
-    for(var i=0;i<CATS.length;i++){var sc=0;
-      for(var k=0;k<CATS[i].kw.length;k++){if(s.includes(CATS[i].kw[k]))sc++;}
-      if(sc>bs){bs=sc;best=CATS[i].id;}}return best;}
   function _catIcon(id){
     for(var i=0;i<CATS.length;i++)if(CATS[i].id===id)return CATS[i].ic;
-    return "📦";}
+    return "📦";
+  }
 
-  // Catalogue IndexedDB
+  // ─── CATALOGUE IndexedDB ─────────────────────────────
   var _db=null;
   function _openDB(){
     if(_db)return Promise.resolve(_db);
@@ -108,10 +86,10 @@
     return new Promise(function(ok){var r=d.transaction("products","readonly").objectStore("products").get(bc);r.onsuccess=function(){ok(r.result||null);};r.onerror=function(){ok(null);};});});}
   function _dbPut(p){return _openDB().then(function(d){if(!d)return;
     return new Promise(function(ok){var tx=d.transaction("products","readwrite");tx.objectStore("products").put(p);tx.oncomplete=ok;tx.onerror=ok;});});}
+  function _dbGetAll(){return _openDB().then(function(d){if(!d)return[];
+    return new Promise(function(ok){var r=d.transaction("products","readonly").objectStore("products").getAll();r.onsuccess=function(){ok(r.result||[]);};r.onerror=function(){ok([]);};});});}
 
-  // ═══════════════════════════════════════════════════════
-  //  SALES STORE — persist sales history
-  // ═══════════════════════════════════════════════════════
+  // ─── SALES STORE ─────────────────────────────────────
   function _openSalesDB(){
     return new Promise(function(ok){
       try{var r=indexedDB.open("acim-sales",1);
@@ -125,20 +103,16 @@
     _openSalesDB().then(function(d){
       if(!d)return;var tx=d.transaction("sales","readwrite");
       tx.objectStore("sales").put({
-        timestamp:Date.now(),
-        isoTime:new Date().toISOString(),
+        timestamp:Date.now(),isoTime:new Date().toISOString(),
         items:items.map(function(it){return{name:it.name,price:it.priceCents,barcode:it.bc||"",cat:it.cat};}),
-        totalCents:totalCents,
-        itemCount:items.length
+        totalCents:totalCents,itemCount:items.length
       });
     }).catch(function(e){_err("Sale persist failed:",e);});
   }
 
-  // ═══════════════════════════════════════════════════════
-  //  BACKUP IMPORT — JSON → IndexedDB acim-catalog
-  // ═══════════════════════════════════════════════════════
+  // ─── BACKUP IMPORT ───────────────────────────────────
   var _BACKUP_IMPORTED_KEY="acim-backup-imported-v1";
-  var _BACKUP_DATA={"format":1,"categories":[{"id":"13b06477","name":"Frais"},{"id":"562843c7","name":"Sec"},{"id":"adb67835","name":"Congele"},{"id":"0bfc0834","name":"Divers"},{"id":"a7a910fe","name":"Vin"},{"id":"16a4e603","name":"Alcool"}],"products":[{"n":"R#E_Gourmet# Viennoisses Volaille Mron","c":"0bfc0834","p":0,"s":80},{"n":"R[Guli] Mortadelle Volaille","c":"0bfc0834","p":0,"s":20},{"n":"R[Guli] Cabanossi Gendarme","c":"0bfc0834","p":0,"s":12},{"n":"R[Guli] Bavarois Mini Kabanos","c":"0bfc0834","p":0,"s":36},{"n":"R[Guli] Panais Entier","c":"0bfc0834","p":0,"s":60},{"n":"Bissli Falafel OSEM 100g","c":"16a4e603","p":400,"s":0},{"n":"Bissli Grill OSEM 100g","c":"16a4e603","p":400,"s":0},{"n":"Bissli Boulgar OSEM 100g","c":"16a4e603","p":400,"s":0},{"n":"Bissli Hot OSEM 100g","c":"16a4e603","p":400,"s":0},{"n":"Bamba OSEM 100g","c":"16a4e603","p":400,"s":0},{"n":"Bamba OSEM 70g","c":"16a4e603","p":300,"s":0},{"n":"Tapouk OSEM 100g","c":"16a4e603","p":400,"s":0},{"n":"Tapouk OSEM 70g","c":"16a4e603","p":300,"s":0},{"n":"Cracotte OSEM 100g","c":"16a4e603","p":400,"s":0},{"n":"Cracotte OSEM 70g","c":"16a4e603","p":300,"s":0},{"n":"Krembo OSEM Vanille","c":"16a4e603","p":500,"s":0},{"n":"Krembo OSEM Chocolat","c":"16a4e603","p":500,"s":0},{"n":"Aigle Noir Fumoir Saumon 200g","c":"13b06477","p":1200,"s":0},{"n":"Aigle Noir Fumoir Thon 200g","c":"13b06477","p":1000,"s":0},{"n":"Steak Hach\u00e9 5% 1kg","c":"13b06477","p":800,"s":0},{"n":"Steak Hach\u00e9 15% 1kg","c":"13b06477","p":750,"s":0},{"n":"Poulet Entier Frais","c":"13b06477","p":500,"s":0},{"n":"Cuisses de Poulet Frais 1kg","c":"13b06477","p":600,"s":0},{"n":"Blanc de Poulet Frais 1kg","c":"13b06477","p":900,"s":0},{"n":"Merguez Frais 1kg","c":"13b06477","p":700,"s":0},{"n":"Saucisse Frais 1kg","c":"13b06477","p":650,"s":0},{"n":"Escalope de Dinde Frais 1kg","c":"13b06477","p":1100,"s":0},{"n":"Agneau Hach\u00e9 1kg","c":"13b06477","p":1400,"s":0},{"n":"C\u00f4tes de Porc Frais 1kg","c":"13b06477","p":900,"s":0},{"n":"Riz Basmati 1kg","c":"adb67835","p":250,"s":0},{"n":"P\u00eates Fusilli 500g","c":"adb67835","p":180,"s":0},{"n":"Huile d\'Olive 75cl","c":"adb67835","p":600,"s":0},{"n":"Thon en Conserve 185g","c":"adb67835","p":350,"s":0},{"n":"Haricots Blancs Conserve 400g","c":"adb67835","p":200,"s":0},{"n":"Sauce Tomate 70cl","c":"adb67835","p":250,"s":0},{"n":"Yaourt Nature x12","c":"562843c7","p":500,"s":0},{"n":"Camembert 250g","c":"562843c7","p":450,"s":0},{"n":"Beurre Doux 250g","c":"562843c7","p":250,"s":0}]};
+  var _BACKUP_DATA={"format":1,"categories":[{"id":"13b06477","name":"Frais"},{"id":"562843c7","name":"Sec"},{"id":"adb67835","name":"Congele"},{"id":"0bfc0834","name":"Divers"},{"id":"a7a910fe","name":"Vin"},{"id":"16a4e603","name":"Alcool"}],"products":[{"n":"R#E_Gourmet# Viennoisses Volaille Mron","c":"0bfc0834","p":0,"s":80},{"n":"R[Guli] Mortadelle Volaille","c":"0bfc0834","p":0,"s":20},{"n":"R[Guli] Cabanossi Gendarme","c":"0bfc0834","p":0,"s":12},{"n":"R[Guli] Bavarois Mini Kabanos","c":"0bfc0834","p":0,"s":36},{"n":"R[Guli] Panais Entier","c":"0bfc0834","p":0,"s":60},{"n":"Bissli Falafel OSEM 100g","c":"16a4e603","p":400,"s":0},{"n":"Bissli Grill OSEM 100g","c":"16a4e603","p":400,"s":0},{"n":"Bissli Boulgar OSEM 100g","c":"16a4e603","p":400,"s":0},{"n":"Bissli Hot OSEM 100g","c":"16a4e603","p":400,"s":0},{"n":"Bamba OSEM 100g","c":"16a4e603","p":400,"s":0},{"n":"Bamba OSEM 70g","c":"16a4e603","p":300,"s":0},{"n":"Tapouk OSEM 100g","c":"16a4e603","p":400,"s":0},{"n":"Tapouk OSEM 70g","c":"16a4e603","p":300,"s":0},{"n":"Cracotte OSEM 100g","c":"16a4e603","p":400,"s":0},{"n":"Cracotte OSEM 70g","c":"16a4e603","p":300,"s":0},{"n":"Krembo OSEM Vanille","c":"16a4e603","p":500,"s":0},{"n":"Krembo OSEM Chocolat","c":"16a4e603","p":500,"s":0},{"n":"Aigle Noir Fumoir Saumon 200g","c":"13b06477","p":1200,"s":0},{"n":"Aigle Noir Fumoir Thon 200g","c":"13b06477","p":1000,"s":0},{"n":"Steak Hach\u00e9 5% 1kg","c":"13b06477","p":800,"s":0},{"n":"Steak Hach\u00e9 15% 1kg","c":"13b06477","p":750,"s":0},{"n":"Poulet Entier Frais","c":"13b06477","p":500,"s":0},{"n":"Cuisses de Poulet Frais 1kg","c":"13b06477","p":600,"s":0},{"n":"Blanc de Poulet Frais 1kg","c":"13b06477","p":900,"s":0},{"n":"Merguez Frais 1kg","c":"13b06477","p":700,"s":0},{"n":"Saucisse Frais 1kg","c":"13b06477","p":650,"s":0},{"n":"Escalope de Dinde Frais 1kg","c":"13b06477","p":1100,"s":0},{"n":"Agneau Hach\u00e9 1kg","c":"13b06477","p":1400,"s":0},{"n":"C\u00f4tes de Porc Frais 1kg","c":"13b06477","p":900,"s":0},{"n":"Filet de Poulet 1kg","c":"13b06477","p":1200,"s":0},{"n":"Boeuf Hach\u00e9 Surgel\u00e9 1kg","c":"adb67835","p":900,"s":0},{"n":"Nuggets Poulet Surgel\u00e9 1kg","c":"adb67835","p":700,"s":0},{"n":"Frites Surgel\u00e9es 2kg","c":"adb67835","p":600,"s":0},{"n":"Pizza Surgel\u00e9e","c":"adb67835","p":500,"s":0},{"n":"Eau Min\u00e9rale 1.5L","c":"a7a910fe","p":100,"s":0},{"n":"Coca-Cola 33cl","c":"a7a910fe","p":150,"s":0},{"n":"Jus d'Orange 1L","c":"a7a910fe","p":350,"s":0},{"n":"Vin Rouge 75cl","c":"a7a910fe","p":800,"s":0}]};
   function _importBackupFromEmbedded(){
     return _openMeta().then(function(d){
       if(!d)return false;
@@ -185,238 +159,328 @@
     }).catch(function(e){_err("Backup import error:",e);return false;});
   }
 
-  // Open Food Facts
-  var _OFF="https://world.openfoodfacts.org/api/v0/product/";
-  function _lookupOFF(bc){return fetch(_OFF+bc+".json").then(function(r){return r.json()})
-    .then(function(d){if(d.status===1&&d.product){var p=d.product;
-      return{barcode:bc,name:p.product_name_fr||p.product_name||"",category:_guessCat((p.product_name||"")+" "+(p.categories||"")),sale_price_cents:0};}
-      return null;}).catch(function(){return null;});}
-
-  // ═══════════════════════════════════════════════════════
-  //  _myCart — SOURCE DE VÉRITÉ (pas Dart)
-  // ═══════════════════════════════════════════════════════
+  // ─── CART ────────────────────────────────────────────
   var _myCart=[];
   var _realBcMap={};
-
   function _addToCart(name,priceCents,barcode,categoryId){
-    if(!name){_toast("❌ Nom manquant");return false;}
+    if(!name){_toast("Nom manquant");return false;}
     var myId="M"+Date.now()+Math.floor(Math.random()*9999);
     _myCart.push({myId:myId,name:name,priceCents:priceCents||0,bc:barcode||"",cat:categoryId||"autre"});
     _realBcMap[myId]=barcode||"";
     _dbPut({barcode:barcode||myId,name:name,sale_price_cents:priceCents||0,category:categoryId||"autre",source:"add",last_updated:Date.now()});
     try{document.dispatchEvent(new CustomEvent("acim:add",{detail:{name:name,price:priceCents,barcode:barcode,cat:categoryId}}));}catch(e){}
-    _pollCart();_broadcastCart();return true;}
-
+    _renderPOS();return true;
+  }
   function _cartInfo(){
     var info=[];
     for(var i=0;i<_myCart.length;i++){var e=_myCart[i];
       info.push({idx:i,myId:e.myId,name:e.name,price:e.priceCents,bc:_realBcMap[e.myId]||e.bc,cat:e.cat});
-    }return info;}
+    }return info;
+  }
+  function _removeFromCart(idx){
+    _myCart.splice(idx,1);_renderPOS();_broadcastCart();
+  }
+  function _cartTotal(){
+    var t=0;for(var i=0;i<_myCart.length;i++)t+=_myCart[i].priceCents;return t;
+  }
 
-  // BroadcastChannel (écran client)
+  // ─── BROADCAST (écran client) ────────────────────────
   var _custBc=null;
   try{_custBc=new BroadcastChannel("acim-customer-display");}catch(e){}
-
   function _broadcastCart(){
     if(!_custBc)return;var info=_cartInfo();var total=0;
     for(var i=0;i<info.length;i++)total+=info[i].price;
     _custBc.postMessage({type:"cart-update",lines:info,total:total});}
-
   function _broadcastClear(){
-    if(!_custBc)return;
-    _custBc.postMessage({type:"cart-clear"});}
+    if(!_custBc)return;_custBc.postMessage({type:"cart-clear"});}
 
-  // ═══════════════════════════════════════════════════════
-  //  OVERLAY TICKET — Total ALWAYS visible (sticky)
-  // ═══════════════════════════════════════════════════════
-  var _overlay=null,_linesEls=[],_pollTimer=null,_overlayInner=null,_overlayList=null,_overlayTotalEl=null;
-  function _getLH(){return _mob?28:26;}
+  // ─────────────────────────────────────────────────────
+  //  POS UI — LAYOUT
+  // ─────────────────────────────────────────────────────
+  var _pos=null,_posSearch=null,_posCats=null,_posGrid=null,_posCart=null,_posTotal=null,_posItems=null,_posCheckout=null;
+  var _allProducts=[],_filteredProducts=[],_activeCat="";
 
-  function _createOverlay(){
-    if(_overlay)return;
-    var ov=document.createElement("div");ov.id="acim-ticket-overlay";
-    if(_mob){
-      ov.style.cssText="position:fixed;bottom:0;left:0;right:0;z-index:1000000;pointer-events:none;background:transparent;font-family:Segoe UI,Arial,sans-serif;";
-    }else{
-      ov.style.cssText="position:fixed;top:44px;right:8px;width:280px;max-height:calc(100vh - 52px);z-index:1000000;pointer-events:none;background:transparent;font-family:Segoe UI,Arial,sans-serif;display:flex;flex-direction:column;";
-    }
-    ov.setAttribute("role","list");ov.setAttribute("aria-label","Ticket");
-    document.body.appendChild(ov);_overlay=ov;_pollCart();}
+  function _createPOS(){
+    if(_pos)return;
+    _pos=document.createElement("div");_pos.id="acim-pos";
+    _pos.style.cssText="position:fixed;top:0;left:0;right:0;bottom:0;z-index:999999;display:flex;flex-direction:column;background:#f0f2f5;font-family:Segoe UI,Arial,sans-serif;";
 
-  function _pollCart(){
-    if(!_overlay)return;
-    if(_dialogOpen()){clearTimeout(_pollTimer);_pollTimer=setTimeout(_pollCart,500);return;}
-    var info=_cartInfo();
-    var total=0;for(var ti=0;ti<info.length;ti++)total+=info[ti].price;
-    var lh=_getLH();
+    // ── TOP BAR ──
+    var topBar=document.createElement("div");
+    topBar.style.cssText="display:flex;align-items:center;padding:8px 12px;background:#1a1a2e;gap:8px;flex-shrink:0;";
+    var logo=document.createElement("span");
+    logo.textContent="🏪 AcimCaisse";logo.style.cssText="color:#fff;font-size:15px;font-weight:700;margin-right:4px;flex-shrink:0;";
+    topBar.appendChild(logo);
 
-    // ── Desktop: sidebar panel with sticky total ──
-    if(!_mob){
-      if(info.length===0){
-        _overlay.innerHTML="";
-        var em=document.createElement("div");
-        em.style.cssText="pointer-events:auto;background:rgba(255,255,255,0.95);border-radius:10px;padding:16px;box-shadow:0 2px 8px rgba(0,0,0,0.1);border:1px solid #e0e0e0;text-align:center;color:#999;font-size:13px;";
-        em.textContent="🛒 Scanner un produit…";
-        _overlay.appendChild(em);
-      }else{
-        // Build once if structure missing, or rebuild full
-        _overlay.innerHTML="";
-        var inner=document.createElement("div");
-        inner.style.cssText="pointer-events:auto;background:rgba(255,255,255,0.97);border-radius:10px;box-shadow:0 2px 12px rgba(0,0,0,0.18);border:1px solid #e0e0e0;display:flex;flex-direction:column;max-height:calc(100vh - 52px);overflow:hidden;";
-
-        // HEADER (sticky top)
-        var hd=document.createElement("div");
-        hd.style.cssText="padding:6px 10px;background:#1a1a2e;color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;";
-        hd.innerHTML='<span>🛒 Ticket</span><span>'+info.length+' lignes</span>';
-        inner.appendChild(hd);
-
-        // LIST (scrollable middle)
-        var lb=document.createElement("div");
-        lb.id="acim-list-area";
-        lb.style.cssText="flex:1 1 auto;overflow-y:auto;overflow-x:hidden;min-height:0;";
-        for(var i=0;i<info.length;i++){
-          var ln=document.createElement("div");
-          var isZero=info[i].price===0;
-          var borderStyle=isZero?"border-left:3px solid #e65100;":"border-left:3px solid transparent;";
-          ln.style.cssText="height:"+lh+"px;padding:2px 8px;cursor:pointer;pointer-events:auto;"+borderStyle+"font-size:11px;display:flex;align-items:center;justify-content:space-between;color:#333;background:transparent;";
-          var ns=document.createElement("span");ns.style.cssText="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;";
-          ns.textContent=(isZero?"✏️ ":"")+info[i].name;ln.appendChild(ns);
-          if(info[i].price>0){var ps=document.createElement("span");ps.style.cssText="font-size:12px;font-weight:700;color:#e65100;margin-left:4px;";ps.textContent=(info[i].price/100).toFixed(2)+"€";ln.appendChild(ps);}
-          else{var ps=document.createElement("span");ps.style.cssText="font-size:11px;color:#e65100;margin-left:4px;";ps.textContent="✏️";ln.appendChild(ps);}
-          var dup=document.createElement("span");dup.textContent="⟳";dup.title="Ajouter encore";
-          dup.style.cssText="font-size:12px;cursor:pointer;margin-left:4px;color:#1a1a2e;opacity:0.4;";
-          dup.onmouseenter=function(){this.style.opacity="1";};dup.onmouseleave=function(){this.style.opacity="0.4";};
-          ln.appendChild(dup);
-          ln.onmouseenter=function(){this.style.background="rgba(230,81,0,0.06)";};
-          ln.onmouseleave=function(){this.style.background="transparent";};
-          (function(idx,item){
-            ln.addEventListener("click",function(e){
-              if(e.target.textContent==="⟳"){e.stopPropagation();_addToCart(item.name,item.price,item.bc,item.cat);_toast("✅ "+item.name+" ajouté");return;}
-              e.stopPropagation();_inlineEdit(idx,e.clientX,e.clientY);
-            });
-          })(i,info[i]);
-          lb.appendChild(ln);
-        }
-        inner.appendChild(lb);
-
-        // FOOTER (sticky bottom — ALWAYS visible)
-        var foot=document.createElement("div");
-        foot.id="acim-total-bar";
-        foot.style.cssText="padding:8px 10px;display:flex;align-items:center;justify-content:space-between;background:#fff3e0;border-top:2px solid #e65100;flex-shrink:0;";
-        var totSpan=document.createElement("span");
-        totSpan.style.cssText="font-weight:700;font-size:15px;color:#1a1a2e;";
-        totSpan.textContent="Total: "+(total/100).toFixed(2)+"€";
-        foot.appendChild(totSpan);
-        var pay=document.createElement("button");pay.textContent="💰 Encaisser";
-        pay.style.cssText="padding:6px 12px;border:none;border-radius:6px;background:#e65100;color:#fff;font-size:14px;cursor:pointer;font-weight:700;";
-        pay.onclick=function(){_checkout();};foot.appendChild(pay);
-        inner.appendChild(foot);
-
-        _overlay.appendChild(inner);
-      }
-    }
-
-    // ── Mobile: bottom strip ──
-    if(_mob){
-      if(info.length===0){
-        _overlay.innerHTML="";
-        var em=document.createElement("div");
-        em.style.cssText="pointer-events:auto;background:rgba(255,255,255,0.95);border-top:2px solid #e65100;border-radius:0;padding:10px;text-align:center;color:#999;font-size:14px;";
-        em.textContent="🛒 Scanner un produit…";
-        _overlay.appendChild(em);
-      }else{
-        _overlay.innerHTML="";
-        var strip=document.createElement("div");
-        strip.style.cssText="pointer-events:auto;background:rgba(255,255,255,0.97);border-top:2px solid #e65100;display:flex;flex-direction:column;max-height:180px;overflow:hidden;";
-        // Total bar (top, always visible)
-        var totBar=document.createElement("div");
-        totBar.style.cssText="padding:6px 10px;display:flex;align-items:center;justify-content:space-between;background:#fff3e0;font-size:13px;font-weight:700;";
-        totBar.innerHTML='<span style="color:#1a1a2e;">🛒 '+info.length+' · Total: '+((total/100).toFixed(2))+'€</span>';
-        var pay=document.createElement("button");pay.textContent="💰";
-        pay.style.cssText="padding:4px 8px;border:none;border-radius:6px;background:#e65100;color:#fff;font-size:12px;cursor:pointer;font-weight:700;";
-        pay.onclick=function(){_checkout();};totBar.appendChild(pay);
-        strip.appendChild(totBar);
-        // Scrollable list
-        var lb=document.createElement("div");
-        lb.style.cssText="flex:1;overflow-y:auto;overflow-x:hidden;";
-        for(var i=0;i<info.length;i++){
-          var ln=document.createElement("div");
-          var isZero=info[i].price===0;
-          ln.style.cssText="display:inline-flex;align-items:center;height:26px;padding:2px 6px;margin:1px;cursor:pointer;"+(isZero?"border-left:2px solid #e65100;":"")+"border-radius:4px;white-space:nowrap;font-size:11px;color:#333;background:rgba(255,255,255,0.95);";
-          var ns=document.createElement("span");ns.style.cssText="font-size:12px;overflow:hidden;text-overflow:ellipsis;max-width:100px;";
-          ns.textContent=(isZero?"✏️ ":"")+info[i].name;ln.appendChild(ns);
-          if(info[i].price>0){var ps=document.createElement("span");ps.style.cssText="font-size:12px;font-weight:700;color:#e65100;margin-left:4px;";ps.textContent=(info[i].price/100).toFixed(2)+"€";ln.appendChild(ps);}
-          (function(idx,item){
-            ln.addEventListener("click",function(e){
-              e.stopPropagation();_inlineEdit(idx,e.clientX,e.clientY);
-            });
-          })(i,info[i]);
-          lb.appendChild(ln);
-        }
-        strip.appendChild(lb);
-        _overlay.appendChild(strip);
-      }
-    }
-
-    clearTimeout(_pollTimer);_pollTimer=setTimeout(_pollCart,2000);
-  }
-
-  // ═══════════════════════════════════════════════════════
-  //  SCANNER — focus-forced (blur Flutter first)
-  // ═══════════════════════════════════════════════════════
-  var _bcInput=null,_autoFocusTimer=null;
-  function _forceFocus(){
-    if(!_bcInput||_dialogOpen())return;
-    // CRITICAL FIX: blur Flutter's focused element FIRST, then focus ours
-    if(document.activeElement&&document.activeElement!==_bcInput){
-      try{document.activeElement.blur();}catch(e){}
-    }
-    try{_bcInput.focus();}catch(e){}
-  }
-  function _createBarcodeInput(){
-    if(_bcInput)return;
-    _bcInput=document.createElement("input");_bcInput.id="acim-bc-input";
-    _bcInput.type="text";_bcInput.placeholder="🔍 Scanner / taper code...";
-    _bcInput.autocomplete="off";_bcInput.setAttribute("autofocus","");
-    _bcInput.style.cssText="position:fixed;top:8px;left:8px;width:260px;padding:10px 14px;border:3px solid #e65100;border-radius:12px;font-size:16px;font-weight:700;font-family:Segoe UI,Arial,sans-serif;z-index:99999999;outline:none;background:#fff;box-shadow:0 2px 8px rgba(230,81,0,0.4);";
-    _bcInput.addEventListener("keydown",function(e){
-      if(e.key==="Enter"){var bc=this.value.trim();this.value="";if(bc.length>=4)_processBarcode(bc);else _toast("❌ Code trop court");}
-      if(e.key==="Escape"){this.value="";}
+    _posSearch=document.createElement("input");_posSearch.id="acim-pos-search";
+    _posSearch.type="text";_posSearch.placeholder="Rechercher un produit (nom ou code-barres)...";
+    _posSearch.style.cssText="flex:1;padding:8px 14px;border:none;border-radius:8px;font-size:14px;outline:none;background:#2a2a4e;color:#fff;min-width:0;";
+    _posSearch.addEventListener("input",function(){_filterProducts();});
+    _posSearch.addEventListener("keydown",function(e){
+      if(e.key==="Enter"){var v=this.value.trim();if(v.length>=2){_processBarcode(v);this.value="";this.focus();}}
+      if(e.key==="Escape"){this.value="";_filterProducts();this.blur();}
     });
-    // When user clicks elsewhere, re-focus after short delay (unless dialog open)
-    _bcInput.addEventListener("blur",function(){
-      clearTimeout(_autoFocusTimer);
-      _autoFocusTimer=setTimeout(function(){_forceFocus();},500);
-    });
-    document.body.appendChild(_bcInput);
-    // Focus after Flutter loads
-    setTimeout(function(){_forceFocus();},300);
-    setTimeout(function(){_forceFocus();},1000);
-    setTimeout(function(){_forceFocus();},3000);
+    topBar.appendChild(_posSearch);
+
+    var newBtn=document.createElement("button");
+    newBtn.textContent="➕";newBtn.title="Nouveau produit";
+    newBtn.style.cssText="padding:6px 10px;border:none;border-radius:6px;background:#2a2a4e;color:#fff;font-size:16px;cursor:pointer;flex-shrink:0;";
+    newBtn.onclick=function(){_quickCreate("",0);};
+    topBar.appendChild(newBtn);
+
+    _pos.appendChild(topBar);
+
+    // ── BODY: left (products) + right (cart) ──
+    var body=document.createElement("div");
+    body.style.cssText="flex:1;display:flex;overflow:hidden;";
+
+    // LEFT PANEL
+    var left=document.createElement("div");
+    left.style.cssText="flex:1;display:flex;flex-direction:column;overflow:hidden;padding:8px;";
+
+    // Category pills
+    _posCats=document.createElement("div");
+    _posCats.id="acim-pos-cats";
+    _posCats.style.cssText="display:flex;gap:4px;padding:4px 0 8px;overflow-x:auto;flex-shrink:0;";
+    _buildCatPills();
+    left.appendChild(_posCats);
+
+    // Product grid
+    _posGrid=document.createElement("div");
+    _posGrid.id="acim-pos-grid";
+    _posGrid.style.cssText="flex:1;overflow-y:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;align-content:start;padding:4px 0;";
+    left.appendChild(_posGrid);
+    body.appendChild(left);
+
+    // RIGHT PANEL — Cart
+    var right=document.createElement("div");
+    right.id="acim-pos-right";
+    right.style.cssText="width:320px;display:flex;flex-direction:column;background:#fff;border-left:2px solid #e0e0e0;flex-shrink:0;";
+
+    var cartHd=document.createElement("div");
+    cartHd.style.cssText="padding:10px 14px;background:#1a1a2e;color:#fff;font-size:13px;font-weight:700;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;";
+    cartHd.innerHTML='<span>🛒 Ticket</span><span id="acim-pos-count">0 article</span>';
+    right.appendChild(cartHd);
+
+    _posItems=document.createElement("div");
+    _posItems.id="acim-pos-items";
+    _posItems.style.cssText="flex:1;overflow-y:auto;padding:4px 0;";
+    right.appendChild(_posItems);
+
+    var cartFoot=document.createElement("div");
+    cartFoot.style.cssText="padding:10px 14px;border-top:2px solid #e65100;background:#fff3e0;flex-shrink:0;";
+    var totalRow=document.createElement("div");
+    totalRow.style.cssText="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;";
+    var totalLabel=document.createElement("span");
+    totalLabel.style.cssText="font-size:14px;color:#1a1a2e;";totalLabel.textContent="Total";
+    _posTotal=document.createElement("span");
+    _posTotal.id="acim-pos-total";
+    _posTotal.style.cssText="font-size:22px;font-weight:700;color:#e65100;";_posTotal.textContent="0,00 €";
+    totalRow.appendChild(totalLabel);totalRow.appendChild(_posTotal);
+    cartFoot.appendChild(totalRow);
+
+    _posCheckout=document.createElement("button");
+    _posCheckout.id="acim-pos-checkout";
+    _posCheckout.textContent="💰 Encaisser";
+    _posCheckout.style.cssText="width:100%;padding:12px;border:none;border-radius:10px;background:#e65100;color:#fff;font-size:16px;font-weight:700;cursor:pointer;transition:background .15s;";
+    _posCheckout.onmouseenter=function(){this.style.background="#c43e00";};
+    _posCheckout.onmouseleave=function(){this.style.background="#e65100";};
+    _posCheckout.onclick=function(){_checkout();};
+    cartFoot.appendChild(_posCheckout);
+    right.appendChild(cartFoot);
+
+    body.appendChild(right);
+    _pos.appendChild(body);
+    document.body.appendChild(_pos);
   }
 
-  // Auto-focus periodic (catch-all for Flutter stealing focus)
-  setInterval(function(){_forceFocus();},2000);
+  function _buildCatPills(){
+    _posCats.innerHTML="";
+    var all=document.createElement("button");
+    all.textContent="Tous";all.style.cssText="padding:5px 12px;border:2px solid #e65100;border-radius:16px;background:#fff3e0;font-size:12px;cursor:pointer;font-weight:700;flex-shrink:0;";
+    all.onclick=function(){_activeCat="";_refreshCatPills();_filterProducts();};
+    _posCats.appendChild(all);
+    CATS.forEach(function(cat){
+      var b=document.createElement("button");
+      b.textContent=cat.ic+" "+cat.id;b.style.cssText="padding:5px 12px;border:2px solid #e0e0e0;border-radius:16px;background:#fff;font-size:12px;cursor:pointer;flex-shrink:0;transition:all .15s;";
+      b.onmouseenter=function(){this.style.borderColor="#e65100";};
+      b.onmouseleave=function(){this.style.borderColor=_activeCat===cat.id?"#e65100":"#e0e0e0";};
+      b.onclick=function(){_activeCat=(_activeCat===cat.id)?"":cat.id;_refreshCatPills();_filterProducts();};
+      _posCats.appendChild(b);
+    });
+  }
 
-  // Scanner buffer: capture digits ONLY when no input is focused
-  var _scanBuf="",_scanTimer=null,_scanActive=false;
+  function _refreshCatPills(){
+    var btns=_posCats.querySelectorAll("button");
+    btns[0].style.borderColor=_activeCat?"#e0e0e0":"#e65100";
+    btns[0].style.background=_activeCat?"#fff":"#fff3e0";
+    btns[0].style.fontWeight=_activeCat?"normal":"700";
+    for(var i=1;i<btns.length;i++){
+      var cid=CATS[i-1].id;
+      btns[i].style.borderColor=_activeCat===cid?"#e65100":"#e0e0e0";
+      btns[i].style.background=_activeCat===cid?"#fff3e0":"#fff";
+      btns[i].style.fontWeight=_activeCat===cid?"700":"normal";
+    }
+  }
+
+  function _filterProducts(){
+    var q=(_posSearch.value||"").toLowerCase();
+    _filteredProducts=_allProducts.filter(function(p){
+      if(_activeCat&&(p.category||"")!==_activeCat)return false;
+      if(q){var s=((p.name||"")+" "+(p.barcode||"")).toLowerCase();if(s.indexOf(q)<0)return false;}
+      return true;
+    });
+    _filteredProducts.sort(function(a,b){return(a.name||"").localeCompare(b.name||"");});
+    _renderGrid();
+  }
+
+  function _renderGrid(){
+    _posGrid.innerHTML="";
+    if(_filteredProducts.length===0){
+      _posGrid.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:40px;color:#999;font-size:14px;">Aucun produit trouvé</div>';
+      return;
+    }
+    _filteredProducts.forEach(function(p){
+      var card=document.createElement("div");
+      var hasPrice=p.sale_price_cents>0;
+      card.style.cssText="background:#fff;border-radius:10px;padding:10px;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,0.08);border:2px solid "+(hasPrice?"transparent":"#ffe082")+";transition:all .15s;display:flex;flex-direction:column;align-items:center;text-align:center;";
+      card.onmouseenter=function(){this.style.boxShadow="0 3px 12px rgba(0,0,0,0.15)";this.style.borderColor="#e65100";};
+      card.onmouseleave=function(){this.style.boxShadow="0 1px 3px rgba(0,0,0,0.08)";this.style.borderColor=hasPrice?"transparent":"#ffe082";};
+
+      var ic=document.createElement("span");
+      ic.textContent=_catIcon(p.category||"autre");
+      ic.style.cssText="font-size:28px;margin-bottom:4px;";
+      card.appendChild(ic);
+
+      var nm=document.createElement("div");
+      nm.style.cssText="font-size:12px;font-weight:600;color:#1a1a2e;line-height:1.2;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;";
+      nm.textContent=p.name||"?";card.appendChild(nm);
+
+      if(hasPrice){
+        var pr=document.createElement("div");
+        pr.style.cssText="font-size:15px;font-weight:700;color:#e65100;margin-top:4px;";
+        pr.textContent=(p.sale_price_cents/100).toFixed(2)+"€";
+        card.appendChild(pr);
+      }else{
+        var noPr=document.createElement("div");
+        noPr.style.cssText="font-size:11px;color:#e65100;margin-top:4px;font-weight:600;";
+        noPr.textContent="✏️ Sans prix";
+        card.appendChild(noPr);
+      }
+
+      card.onclick=function(){
+        if(hasPrice){
+          _addToCart(p.name,p.sale_price_cents,p.barcode,p.category);
+          _toast("✅ "+p.name);
+        }else{
+          _addToCart(p.name,0,p.barcode,p.category);
+          _toast("✏️ "+p.name+" — cliquez dans le ticket pour le prix");
+        }
+      };
+      _posGrid.appendChild(card);
+    });
+  }
+
+  function _renderCart(){
+    var info=_cartInfo();var total=_cartTotal();
+    document.getElementById("acim-pos-count").textContent=info.length+" article"+(info.length!==1?"s":"");
+    _posTotal.textContent=(total/100).toFixed(2).replace(".",",")+" €";
+    _posItems.innerHTML="";
+    if(info.length===0){
+      _posItems.innerHTML='<div style="text-align:center;padding:40px;color:#999;font-size:13px;">Aucun produit dans le ticket</div>';
+      _posCheckout.textContent="💰 Encaisser (0,00 €)";
+      _posCheckout.style.opacity="0.5";
+      return;
+    }
+    _posCheckout.textContent="💰 Encaisser "+(total/100).toFixed(2).replace(".",",")+" €";
+    _posCheckout.style.opacity="1";
+    info.forEach(function(item){
+      var row=document.createElement("div");
+      var isZero=item.price===0;
+      row.style.cssText="display:flex;align-items:center;padding:8px 10px;border-bottom:1px solid #f0f0f0;transition:background .15s;";
+      row.onmouseenter=function(){this.style.background="#fafafa";};
+      row.onmouseleave=function(){this.style.background="transparent";};
+
+      var icon=document.createElement("span");
+      icon.textContent=_catIcon(item.cat||"autre");
+      icon.style.cssText="font-size:16px;margin-right:8px;flex-shrink:0;";
+      row.appendChild(icon);
+
+      var infoDiv=document.createElement("div");
+      infoDiv.style.cssText="flex:1;min-width:0;";
+      var nm=document.createElement("div");
+      nm.style.cssText="font-size:12px;font-weight:600;color:"+(isZero?"#e65100":"#1a1a2e")+";overflow:hidden;text-overflow:ellipsis;white-space:nowrap;";
+      nm.textContent=isZero?"✏️ "+item.name:item.name;
+      infoDiv.appendChild(nm);
+
+      if(item.price>0){
+        var pr=document.createElement("div");
+        pr.style.cssText="font-size:13px;font-weight:700;color:#e65100;";
+        pr.textContent=(item.price/100).toFixed(2).replace(".",",")+" €";
+        infoDiv.appendChild(pr);
+      }
+      row.appendChild(infoDiv);
+
+      // Action buttons
+      var actions=document.createElement("div");
+      actions.style.cssText="display:flex;gap:2px;flex-shrink:0;margin-left:6px;";
+
+      var dupBtn=document.createElement("span");
+      dupBtn.textContent="⟳";dupBtn.title="Ajouter encore";
+      dupBtn.style.cssText="font-size:14px;cursor:pointer;padding:4px 6px;border-radius:4px;color:#1a1a2e;opacity:0.4;";
+      dupBtn.onmouseenter=function(){this.style.opacity="1";this.style.background="#f0f0f0";};
+      dupBtn.onmouseleave=function(){this.style.opacity="0.4";this.style.background="transparent";};
+      dupBtn.onclick=function(e){e.stopPropagation();_addToCart(item.name,item.price,item.bc,item.cat);_toast("✅ "+item.name);};
+      actions.appendChild(dupBtn);
+
+      var editBtn=document.createElement("span");
+      editBtn.textContent="✏️";editBtn.title="Modifier";
+      editBtn.style.cssText="font-size:12px;cursor:pointer;padding:4px 6px;border-radius:4px;color:#1a1a2e;opacity:0.4;";
+      editBtn.onmouseenter=function(){this.style.opacity="1";this.style.background="#f0f0f0";};
+      editBtn.onmouseleave=function(){this.style.opacity="0.4";this.style.background="transparent";};
+      editBtn.onclick=function(e){e.stopPropagation();_inlineEdit(item.idx,50,50);};
+      actions.appendChild(editBtn);
+
+      var delBtn=document.createElement("span");
+      delBtn.textContent="✕";delBtn.title="Supprimer";
+      delBtn.style.cssText="font-size:13px;cursor:pointer;padding:4px 6px;border-radius:4px;color:#c62828;opacity:0.4;";
+      delBtn.onmouseenter=function(){this.style.opacity="1";this.style.background="#ffebee";};
+      delBtn.onmouseleave=function(){this.style.opacity="0.4";this.style.background="transparent";};
+      delBtn.onclick=function(e){e.stopPropagation();_removeFromCart(item.idx);_toast("Supprimé");};
+      actions.appendChild(delBtn);
+
+      row.appendChild(actions);
+      _posItems.appendChild(row);
+    });
+  }
+
+  function _renderPOS(){
+    if(!_pos)return;
+    _filterProducts();
+    _renderCart();
+    _broadcastCart();
+  }
+
+  // ─── SCANNER BUFFER ──────────────────────────────────
+  var _scanBuf="",_scanTimer=null;
   document.addEventListener("keydown",function(e){
-    if(_dialogOpen())return;
-    // Don't capture digits if user is typing in an input/textarea/select
+    if(!_pos)return;
     var tag=document.activeElement?document.activeElement.tagName:"";
     if(tag==="INPUT"||tag==="TEXTAREA"||tag==="SELECT")return;
     if(/^[0-9]$/.test(e.key)){
-      _scanBuf+=e.key;_scanActive=true;
-      if(_bcInput)_bcInput.value=_scanBuf;
+      _scanBuf+=e.key;
+      _posSearch.value=_scanBuf;_posSearch.focus();
+      _filterProducts();
       clearTimeout(_scanTimer);_scanTimer=setTimeout(function(){
         var bc=_scanBuf;
-        if(_bcInput)_bcInput.value="";
-        if(bc.length>=4)_processBarcode(bc);
-        _scanBuf="";_scanActive=false;
-      },120);
+        if(bc.length>=4){_posSearch.value="";_processBarcode(bc);}
+        else{_posSearch.value="";}
+        _scanBuf="";
+      },150);
     }
   },true);
 
+  // ─── PROCESS BARCODE ─────────────────────────────────
   function _processBarcode(bc){
     _log("Scanner: "+bc);
     try{document.dispatchEvent(new CustomEvent("acim:scan",{detail:{barcode:bc}}));}catch(e){}
@@ -427,53 +491,48 @@
       }
       if(local&&local.name){
         _addToCart(local.name,0,bc,local.category);
-        _toast("✏️ "+local.name+" — cliquez pour prix");return;
+        _toast("✏️ "+local.name+" — cliquez dans le ticket pour le prix");return;
       }
+      // Not found locally — try Open Food Facts
       _lookupOFF(bc).then(function(off){
-        if(off&&off.name){
-          _dbPut({barcode:bc,name:off.name,sale_price_cents:0,category:off.category,source:"openfoodfacts",last_updated:Date.now()});
-          _addToCart(off.name,0,bc,off.category);
-          _toast("🔍 "+off.name+" — cliquez pour prix");
-        }else{
-          _addToCart("Produit "+bc,0,bc,"autre");
-          _dbPut({barcode:bc,name:"Produit "+bc,sale_price_cents:0,category:"autre",source:"scan-unknown",last_updated:Date.now()});
-          _toast("❓ "+bc+" — cliquez pour modifier");
-        }
+        if(off){_addToCart(off.name,0,bc,off.category);_toast("📡 "+off.name+" (Open Food Facts)");return;}
+        _toast("❌ Produit inconnu: "+bc);
       });
-    });}
+    });
+  }
 
-  // ═══════════════════════════════════════════════════════
-  //  ÉDITION INLINE — carte flottante
-  // ═══════════════════════════════════════════════════════
+  // ─── CHECKOUT ────────────────────────────────────────
+  function _checkout(){
+    if(_myCart.length===0){_toast("Panier vide");return;}
+    var total=_cartTotal();
+    var saleItems=_myCart.slice();
+    _persistSale(saleItems,total);
+    try{document.dispatchEvent(new CustomEvent("acim:checkout",{detail:{total:total,count:saleItems.length}}));}catch(e){}
+    _broadcastClear();_myCart=[];_realBcMap={};
+    _renderPOS();
+    _toast("✅ Encaissé ! "+(total/100).toFixed(2)+"€");
+  }
+
+  // ─── INLINE EDIT ─────────────────────────────────────
   function _inlineEdit(idx,clickX,clickY){
-    var info=_cartInfo();
-    if(idx<0||idx>=info.length)return;
-    var item=info[idx];
-    var existing=document.getElementById("acim-inline-edit");if(existing)existing.remove();
+    if(!_myCart[idx])return;
+    var item=_myCart[idx];
+    var oldCard=document.getElementById("acim-inline-edit");if(oldCard)oldCard.remove();
     var card=document.createElement("div");card.id="acim-inline-edit";
-    if(_mob){
-      card.style.cssText="position:fixed;left:0;right:0;bottom:0;width:100%;max-height:70vh;background:#fff;border-radius:14px 14px 0 0;padding:16px;box-shadow:0 -4px 20px rgba(0,0,0,0.25);z-index:10000001;font-family:Segoe UI,Arial,sans-serif;overflow-y:auto;";
-    }else{
-      var left=Math.min(Math.max(clickX-20,10),window.innerWidth-300);
-      var top=Math.min(clickY-20,10);
-      card.style.cssText="position:fixed;left:"+left+"px;top:"+top+"px;width:280px;background:#fff;border-radius:12px;padding:14px;box-shadow:0 6px 20px rgba(0,0,0,0.25);z-index:10000001;font-family:Segoe UI,Arial,sans-serif;";
-    }
-    // Titre
-    var ti=document.createElement("div");ti.style.cssText="font-size:13px;font-weight:700;margin-bottom:8px;color:#1a1a2e;display:flex;align-items:center;gap:4px;";
-    ti.textContent=_catIcon(item.cat||"autre")+" Modifier";card.appendChild(ti);
-    // Nom
+    var left=Math.min(clickX-140,Math.max(10,window.innerWidth-300));
+    var top=Math.min(clickY-20,10);
+    card.style.cssText="position:fixed;left:"+left+"px;top:"+top+"px;width:280px;background:#fff;border-radius:12px;padding:14px;box-shadow:0 6px 20px rgba(0,0,0,0.25);z-index:10000001;font-family:Segoe UI,Arial,sans-serif;";
+    var ti=document.createElement("div");ti.style.cssText="font-size:13px;font-weight:700;margin-bottom:8px;color:#1a1a2e;";ti.textContent=_catIcon(item.cat||"autre")+" Modifier";card.appendChild(ti);
     var ni=document.createElement("input");ni.type="text";ni.value=item.name||"";ni.placeholder="Nom";
     ni.style.cssText="width:100%;font-size:14px;padding:8px 12px;border:2px solid #e0e0e0;border-radius:8px;outline:none;box-sizing:border-box;margin-bottom:6px;";
     ni.onfocus=function(){this.style.borderColor="#e65100";this.select();};ni.onblur=function(){this.style.borderColor="#e0e0e0";};card.appendChild(ni);
-    // Prix
     var row=document.createElement("div");row.style.cssText="display:flex;align-items:center;gap:4px;margin-bottom:6px;";
     var pi=document.createElement("input");pi.type="number";pi.step="0.01";pi.min="0";
-    pi.value=item.price>0?(item.price/100).toFixed(2):"";pi.placeholder="Prix";
+    pi.value=item.priceCents>0?(item.priceCents/100).toFixed(2):"";pi.placeholder="Prix";
     pi.style.cssText="flex:1;font-size:16px;font-weight:700;padding:8px 12px;border:2px solid #e0e0e0;border-radius:8px;outline:none;";
     pi.onfocus=function(){this.style.borderColor="#e65100";this.select();};pi.onblur=function(){this.style.borderColor="#e0e0e0";};
     var eu=document.createElement("span");eu.style.cssText="font-size:16px;font-weight:700;color:#e65100;";eu.textContent="€";
     row.appendChild(pi);row.appendChild(eu);card.appendChild(row);
-    // Poids
     var poidsRow=document.createElement("div");poidsRow.style.cssText="display:flex;align-items:center;gap:4px;margin-bottom:6px;";
     var exPoids="",exUnit="kg";
     var pm=item.name&&item.name.match(/ (\d+[.,]?\d*)\s*(kg|g|L|pc|pièce)/);
@@ -487,23 +546,19 @@
       var o=document.createElement("option");o.value=u[0];o.textContent=u[1];
       if(u[0]==exUnit)o.selected=true;unitSel.appendChild(o);});
     poidsRow.appendChild(poidsIn);poidsRow.appendChild(unitSel);card.appendChild(poidsRow);
-    // Catégories
     var cr=document.createElement("div");cr.style.cssText="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:8px;";
-    var selCat=item.cat||_guessCat(item.name||"");
+    var selCat=item.cat||"autre";
     for(var ci=0;ci<CATS.length;ci++){(function(cat){
       var b=document.createElement("button");b.textContent=cat.ic;b.title=cat.id;
       b.style.cssText="padding:4px 6px;border:2px solid #e0e0e0;border-radius:6px;background:#fff;font-size:14px;cursor:pointer;"+(cat.id===selCat?"border-color:#e65100;background:#fff3e0;":"");
       b.onclick=function(){cr.querySelectorAll("button").forEach(function(x){x.style.borderColor="#e0e0e0";x.style.background="#fff";});this.style.borderColor="#e65100";this.style.background="#fff3e0";selCat=cat.id;};
       cr.appendChild(b);
     })(CATS[ci]);}card.appendChild(cr);
-    // Barcode tag
-    if(item.bc){var bcRow=document.createElement("div");bcRow.style.cssText="display:flex;align-items:center;gap:4px;margin-bottom:8px;font-size:11px;color:#888;";
-      bcRow.textContent="📊 "+item.bc;card.appendChild(bcRow);}
-    // Boutons
+    if(item.bc){var bcRow=document.createElement("div");bcRow.style.cssText="display:flex;align-items:center;gap:4px;margin-bottom:8px;font-size:11px;color:#888;";bcRow.textContent="📊 "+item.bc;card.appendChild(bcRow);}
     var br=document.createElement("div");br.style.cssText="display:flex;gap:6px;";
     var bDel=document.createElement("button");bDel.textContent="🗑️";bDel.title="Supprimer";
     bDel.style.cssText="padding:6px 8px;border:1px solid #ffcdd2;border-radius:6px;background:#fff;font-size:12px;cursor:pointer;color:#c62828;";
-    bDel.onclick=function(){card.remove();_myCart.splice(idx,1);_toast("Supprimé");_pollCart();_broadcastCart();};
+    bDel.onclick=function(){card.remove();_removeFromCart(idx);_toast("Supprimé");};
     var bCancel=document.createElement("button");bCancel.textContent="×";
     bCancel.style.cssText="padding:6px 8px;border:1px solid #e0e0e0;border-radius:6px;background:#f5f5f5;font-size:12px;cursor:pointer;";
     bCancel.onclick=function(){card.remove();};
@@ -519,317 +574,95 @@
       _myCart[idx].name=nn;_myCart[idx].priceCents=pc;_myCart[idx].cat=selCat;
       _dbPut({barcode:_myCart[idx].bc||_myCart[idx].myId,name:nn,sale_price_cents:pc,category:selCat,source:"edit",last_updated:Date.now()});
       _toast("✅ "+nn+(pc>0?" "+(pc/100).toFixed(2)+"€":""));
-      _pollCart();_broadcastCart();
+      _renderPOS();
     };
     br.appendChild(bDel);br.appendChild(bCancel);br.appendChild(bOk);card.appendChild(br);
     document.body.appendChild(card);
   }
 
-  // ═══════════════════════════════════════════════════════
-  //  CRÉATION RAPIDE ➕
-  // ═══════════════════════════════════════════════════════
+  // ─── QUICK CREATE ────────────────────────────────────
   function _quickCreate(name,priceCents,barcode,category){
     if(_dialogOpen())return;
     var ov=document.createElement("div");ov.id="acim-quick";
-    ov.style.cssText="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.3);z-index:10000001;display:flex;align-items:"+(_mob?"flex-end":"center")+";justify-content:center;";
-    var card=document.createElement("div");var cardW=_mob?"95vw":"320px";
-    card.style.cssText="background:#fff;border-radius:"+(_mob?"14px 14px 0 0":"14px")+";padding:"+(_mob?"16px":"20px")+";width:"+cardW+";max-width:95vw;box-shadow:0 8px 24px rgba(0,0,0,0.2);font-family:Segoe UI,Arial,sans-serif;";
-    var ti=document.createElement("div");ti.style.cssText="font-size:16px;font-weight:700;margin-bottom:12px;color:#1a1a2e;";
-    ti.textContent="⚡ Nouveau produit";card.appendChild(ti);
-    // Nom
-    var ni=document.createElement("input");ni.type="text";ni.value=name||"";ni.placeholder="Nom du produit";
-    ni.style.cssText="width:100%;font-size:15px;padding:10px 14px;border:2px solid #e0e0e0;border-radius:10px;outline:none;box-sizing:border-box;margin-bottom:8px;";
+    ov.style.cssText="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.3);z-index:10000001;display:flex;align-items:center;justify-content:center;";
+    var card=document.createElement("div");
+    card.style.cssText="background:#fff;border-radius:14px;padding:20px;width:320px;max-width:95vw;box-shadow:0 8px 24px rgba(0,0,0,0.2);font-family:Segoe UI,Arial,sans-serif;";
+    var ti=document.createElement("div");ti.style.cssText="font-size:16px;font-weight:700;margin-bottom:12px;color:#1a1a2e;";ti.textContent="➕ Nouveau produit";card.appendChild(ti);
+    var ni=document.createElement("input");ni.type="text";ni.placeholder="Nom du produit";ni.value=name||"";
+    ni.style.cssText="width:100%;font-size:15px;padding:10px 14px;border:3px solid #e0e0e0;border-radius:10px;outline:none;box-sizing:border-box;margin-bottom:8px;";
     ni.onfocus=function(){this.style.borderColor="#e65100";};ni.onblur=function(){this.style.borderColor="#e0e0e0";};card.appendChild(ni);
-    // Prix
-    var row=document.createElement("div");row.style.cssText="display:flex;align-items:center;gap:6px;margin-bottom:8px;";
-    var pi=document.createElement("input");pi.type="number";pi.step="0.01";pi.min="0";
-    pi.value=priceCents?(priceCents/100).toFixed(2):"";pi.placeholder="Prix total";
-    pi.style.cssText="flex:1;font-size:18px;font-weight:700;padding:10px 14px;border:2px solid #e0e0e0;border-radius:10px;outline:none;";
+    var row=document.createElement("div");row.style.cssText="display:flex;align-items:center;gap:4px;margin-bottom:8px;";
+    var pi=document.createElement("input");pi.type="number";pi.step="0.01";pi.min="0";pi.value=priceCents>0?(priceCents/100).toFixed(2):"";
+    pi.placeholder="Prix de vente";pi.style.cssText="flex:1;font-size:16px;font-weight:700;padding:10px 14px;border:3px solid #e0e0e0;border-radius:10px;outline:none;";
     pi.onfocus=function(){this.style.borderColor="#e65100";};pi.onblur=function(){this.style.borderColor="#e0e0e0";};
     var eu=document.createElement("span");eu.style.cssText="font-size:18px;font-weight:700;color:#e65100;";eu.textContent="€";
     row.appendChild(pi);row.appendChild(eu);card.appendChild(row);
-    // Poids
-    var poidsRow=document.createElement("div");poidsRow.style.cssText="display:flex;align-items:center;gap:6px;margin-bottom:8px;";
-    var poidsIn=document.createElement("input");poidsIn.type="number";poidsIn.step="0.001";poidsIn.min="0";poidsIn.placeholder="Poids (optionnel)";
-    poidsIn.style.cssText="flex:1;font-size:14px;padding:8px 12px;border:2px solid #e0e0e0;border-radius:10px;outline:none;";
-    poidsIn.onfocus=function(){this.style.borderColor="#e65100";};poidsIn.onblur=function(){this.style.borderColor="#e0e0e0";};
-    var unitSel=document.createElement("select");unitSel.style.cssText="font-size:14px;padding:8px;border:2px solid #e0e0e0;border-radius:10px;outline:none;background:#fff;";
-    [["kg","kg"],["g","g"],["L","L"],["pc","pièce"]].forEach(function(u){var o=document.createElement("option");o.value=u[0];o.textContent=u[1];unitSel.appendChild(o);});
-    poidsRow.appendChild(poidsIn);poidsRow.appendChild(unitSel);card.appendChild(poidsRow);
-    // Auto barcode
-    var autoBc=barcode||_nextBarcode();
-    var bcRow=document.createElement("div");bcRow.style.cssText="display:flex;align-items:center;gap:6px;margin-bottom:10px;padding:6px 10px;background:#f5f5f5;border-radius:8px;";
-    bcRow.textContent="📊 Code: "+autoBc;card.appendChild(bcRow);
-    // Catégories
     var cr=document.createElement("div");cr.style.cssText="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:12px;";
-    var selCat=category||_guessCat(name||"");
+    var selCat=category||"autre";
     for(var ci=0;ci<CATS.length;ci++){(function(cat){
-      var b=document.createElement("button");b.textContent=cat.ic;b.title=cat.id;
-      b.style.cssText="padding:6px 8px;border:2px solid #e0e0e0;border-radius:8px;background:#fff;font-size:16px;cursor:pointer;"+(cat.id===selCat?"border-color:#e65100;background:#fff3e0;":"");
+      var b=document.createElement("button");b.textContent=cat.ic+" "+cat.id;
+      b.style.cssText="padding:5px 10px;border:2px solid #e0e0e0;border-radius:8px;background:#fff;font-size:12px;cursor:pointer;"+(cat.id===selCat?"border-color:#e65100;background:#fff3e0;":"");
       b.onclick=function(){cr.querySelectorAll("button").forEach(function(x){x.style.borderColor="#e0e0e0";x.style.background="#fff";});this.style.borderColor="#e65100";this.style.background="#fff3e0";selCat=cat.id;};
       cr.appendChild(b);
     })(CATS[ci]);}card.appendChild(cr);
-    // Boutons
     var br=document.createElement("div");br.style.cssText="display:flex;gap:8px;";
-    var bCancel=document.createElement("button");bCancel.textContent="× Annuler";
-    bCancel.style.cssText="flex:1;padding:10px;border:1px solid #e0e0e0;border-radius:10px;background:#f5f5f5;font-size:14px;cursor:pointer;";
+    var bCancel=document.createElement("button");bCancel.textContent="Annuler";
+    bCancel.style.cssText="flex:1;padding:10px;border:2px solid #e0e0e0;border-radius:8px;background:#fff;font-size:14px;cursor:pointer;";
     bCancel.onclick=function(){ov.remove();};
-    var bOk=document.createElement("button");bOk.textContent="✓ Ajouter";
-    bOk.style.cssText="flex:2;padding:10px;border:none;border-radius:10px;background:#e65100;color:#fff;font-size:14px;cursor:pointer;font-weight:700;";
+    var bOk=document.createElement("button");bOk.textContent="Ajouter au ticket";
+    bOk.style.cssText="flex:2;padding:10px;border:none;border-radius:8px;background:#e65100;color:#fff;font-size:14px;cursor:pointer;font-weight:700;";
     bOk.onclick=function(){
       var nn=ni.value.trim(),np=parseFloat(pi.value);
-      var pv=parseFloat(poidsIn.value),u=unitSel.value;
-      if(pv>0){nn=nn+" "+pv+u;}
       if(!nn){ni.style.borderColor="#c62828";ni.focus();return;}
       var pc=isNaN(np)?0:Math.round(np*100);
-      ov.remove();
+      var autoBc=_nextBarcode();
       _addToCart(nn,pc,autoBc,selCat);
       _dbPut({barcode:autoBc,name:nn,sale_price_cents:pc,category:selCat,source:"manual",last_updated:Date.now()});
-      _toastWithPrint(nn,pc,autoBc);
+      ov.remove();
+      _toast("✅ "+nn+(pc>0?" "+(pc/100).toFixed(2)+"€":""));
     };
     br.appendChild(bCancel);br.appendChild(bOk);card.appendChild(br);
     ov.appendChild(card);
     ov.onclick=function(e){if(e.target===ov)ov.remove();};
     document.body.appendChild(ov);
+    setTimeout(function(){ni.focus();},100);
   }
 
-  // ═══════════════════════════════════════════════════════
-  //  CATALOGUE PRODUITS — grid browser
-  // ═══════════════════════════════════════════════════════
-  function _showCatalog(){
-    if(_dialogOpen())return;
-    var ov=document.createElement("div");ov.id="acim-catalog";
-    ov.style.cssText="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);z-index:10000001;display:flex;align-items:"+(_mob?"flex-end":"center")+";justify-content:center;";
-    var card=document.createElement("div");
-    var cardW=_mob?"98vw":"700px";
-    var cardH=_mob?"90vh":"80vh";
-    card.style.cssText="background:#fff;border-radius:"+(_mob?"14px 14px 0 0":"14px")+";width:"+cardW+";max-width:95vw;height:"+cardH+";max-height:90vh;display:flex;flex-direction:column;overflow:hidden;font-family:Segoe UI,Arial,sans-serif;box-shadow:0 8px 32px rgba(0,0,0,0.3);";
+  function _dialogOpen(){return !!document.getElementById("acim-inline-edit")||!!document.getElementById("acim-quick");}
 
-    // Header
-    var hd=document.createElement("div");
-    hd.style.cssText="padding:12px 16px;background:#1a1a2e;color:#fff;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;";
-    hd.innerHTML='<span style="font-size:16px;font-weight:700;">📦 Catalogue</span>';
-    var closeBtn=document.createElement("span");
-    closeBtn.textContent="✕";closeBtn.style.cssText="font-size:18px;cursor:pointer;padding:4px 8px;";
-    closeBtn.onclick=function(){ov.remove();};
-    hd.appendChild(closeBtn);card.appendChild(hd);
-
-    // Search bar
-    var searchRow=document.createElement("div");
-    searchRow.style.cssText="padding:8px 16px;border-bottom:1px solid #eee;display:flex;gap:8px;flex-shrink:0;";
-    var searchIn=document.createElement("input");searchIn.type="text";searchIn.placeholder="🔍 Rechercher...";
-    searchIn.style.cssText="flex:1;padding:8px 12px;border:2px solid #e0e0e0;border-radius:8px;font-size:14px;outline:none;";
-    searchIn.onfocus=function(){this.style.borderColor="#e65100";};
-    searchIn.onblur=function(){this.style.borderColor="#e0e0e0";};
-    searchRow.appendChild(searchIn);
-
-    // Category filter pills
-    var catRow=document.createElement("div");
-    catRow.style.cssText="padding:4px 16px 8px;border-bottom:1px solid #eee;display:flex;flex-wrap:wrap;gap:4px;flex-shrink:0;";
-    var activeCat="";
-    var allPill=document.createElement("button");
-    allPill.textContent="Tous";allPill.style.cssText="padding:4px 10px;border:2px solid #e65100;border-radius:16px;background:#fff3e0;font-size:12px;cursor:pointer;font-weight:700;";
-    catRow.appendChild(allPill);
-    CATS.forEach(function(cat){
-      var b=document.createElement("button");
-      b.textContent=cat.ic+" "+cat.id;b.style.cssText="padding:4px 10px;border:2px solid #e0e0e0;border-radius:16px;background:#fff;font-size:12px;cursor:pointer;";
-      b.onclick=function(){
-        activeCat=(activeCat===cat.id)?"":cat.id;
-        refreshCatPills();renderProducts();
-      };
-      catRow.appendChild(b);
-    });
-    function refreshCatPills(){
-      catRow.querySelectorAll("button").forEach(function(b,i){
-        if(i===0){b.style.borderColor=activeCat?"#e0e0e0":"#e65100";b.style.background=activeCat?"#fff":"#fff3e0";b.style.fontWeight=activeCat?"normal":"700";}
-        else{
-          var cid=CATS[i-1].id;b.style.borderColor=(activeCat===cid)?"#e65100":"#e0e0e0";
-          b.style.background=(activeCat===cid)?"#fff3e0":"#fff";b.style.fontWeight=(activeCat===cid)?"700":"normal";
-        }
-      });
-    }
-    card.appendChild(searchRow);card.appendChild(catRow);
-
-    // Product grid (scrollable)
-    var grid=document.createElement("div");
-    grid.style.cssText="flex:1;1 auto;overflow-y:auto;padding:12px 16px;";
-    card.appendChild(grid);
-    var countEl=document.createElement("div");
-    countEl.style.cssText="padding:6px 16px;border-top:1px solid #eee;font-size:12px;color:#888;text-align:center;flex-shrink:0;";
-    card.appendChild(countEl);
-
-    function renderProducts(){
-      var q=(searchIn.value||"").toLowerCase();
-      grid.innerHTML="";
-      var all=[];
-      var req=openCatalogDB();
-      req.then(function(d){
-        if(!d)return;
-        var tx=d.transaction("products","readonly");var st=tx.objectStore("products");
-        var r=st.getAll();r.onsuccess=function(){
-          all=r.result||[];
-          var filtered=all.filter(function(p){
-            if(activeCat&&(p.category||"")!==activeCat)return false;
-            if(q){var s=((p.name||"")+" "+(p.barcode||"")+" "+(p.category||"")).toLowerCase();if(s.indexOf(q)<0)return false;}
-            return true;
-          });
-          filtered.sort(function(a,b){return(a.name||"").localeCompare(b.name||"");});
-          countEl.textContent=filtered.length+" produit"+(filtered.length!==1?"s":"");
-          if(filtered.length===0){
-            grid.innerHTML='<div style="text-align:center;color:#999;padding:40px;font-size:14px;">Aucun produit trouvé</div>';
-            return;
-          }
-          filtered.forEach(function(p){
-            var card2=document.createElement("div");
-            var hasPrice=p.sale_price_cents>0;
-            card2.style.cssText="display:flex;align-items:center;padding:10px 12px;margin-bottom:6px;background:"+(hasPrice?"#fff":"#fff8e1")+";border:1px solid "+(hasPrice?"#e0e0e0":"#ffe082")+";border-radius:8px;cursor:pointer;transition:all .15s;";
-            card2.onmouseenter=function(){this.style.background="#f5f5f5";this.style.borderColor="#e65100";};
-            card2.onmouseleave=function(){this.style.background=hasPrice?"#fff":"#fff8e1";this.style.borderColor=hasPrice?"#e0e0e0":"#ffe082";};
-
-            var icon=document.createElement("span");
-            icon.textContent=_catIcon(p.category||"autre");
-            icon.style.cssText="font-size:20px;margin-right:10px;flex-shrink:0;";
-            card2.appendChild(icon);
-
-            var info=document.createElement("div");info.style.cssText="flex:1;min-width:0;";
-            var nm=document.createElement("div");nm.style.cssText="font-size:13px;font-weight:600;color:#1a1a2e;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;";
-            nm.textContent=p.name||p.barcode||"?";info.appendChild(nm);
-            var meta=document.createElement("div");meta.style.cssText="font-size:11px;color:#888;";
-            meta.textContent=(p.category||"")+(p.barcode?" · "+p.barcode:"")+(p.stockQty!=null?" · Stock:"+p.stockQty:"");
-            info.appendChild(meta);card2.appendChild(info);
-
-            var price=document.createElement("span");
-            price.style.cssText="font-size:14px;font-weight:700;color:#e65100;margin-left:8px;flex-shrink:0;";
-            price.textContent=hasPrice?(p.sale_price_cents/100).toFixed(2)+"€":"✏️ prix";
-            card2.appendChild(price);
-
-            card2.onclick=function(){
-              if(hasPrice){
-                _addToCart(p.name,p.sale_price_cents,p.barcode,p.category);
-                _toast("✅ "+p.name+" "+(p.sale_price_cents/100).toFixed(2)+"€");
-              }else{
-                // No price — add with 0, user can edit
-                _addToCart(p.name,0,p.barcode,p.category);
-                _toast("✏️ "+p.name+" — cliquez dans le ticket pour prix");
-              }
-            };
-            grid.appendChild(card2);
-          });
-        };
-      });
-    }
-
-    searchIn.addEventListener("input",function(){renderProducts();});
-    renderProducts();
-    ov.onclick=function(e){if(e.target===ov)ov.remove();};
-    document.body.appendChild(ov);
-    setTimeout(function(){searchIn.focus();},100);
-  }
-
-  function openCatalogDB(){
-    return new Promise(function(ok){
-      try{var r=indexedDB.open("acim-catalog",1);
-        r.onupgradeneeded=function(e){var d=e.target.result;if(!d.objectStoreNames.contains("products"))d.createObjectStore("products",{keyPath:"barcode"});};
-        r.onsuccess=function(){ok(r.result);};r.onerror=function(){ok(null);};
-      }catch(e){ok(null);}
-    });
-  }
-
-  // ═══════════════════════════════════════════════════════
-  //  ENCAISSER
-  // ═══════════════════════════════════════════════════════
-  function _checkout(){
-    if(_myCart.length===0){_toast("⚠ Panier vide");return;}
-    var total=0;var saleItems=[];
-    for(var i=0;i<_myCart.length;i++){total+=_myCart[i].priceCents;saleItems.push(_myCart[i]);}
-    _persistSale(saleItems,total);
-    try{document.dispatchEvent(new CustomEvent("acim:checkout",{detail:{total:total,count:saleItems.length}}));}catch(e){}
-    _broadcastClear();_myCart=[];_realBcMap={};_pollCart();
-    _toast("✅ Encaissé ! "+(total/100).toFixed(2)+"€");}
-
-  // ═══════════════════════════════════════════════════════
-  //  DIVERS
-  // ═══════════════════════════════════════════════════════
-  var _dialogOpen=function(){return !!document.getElementById("acim-inline-edit")||!!document.getElementById("acim-quick")||!!document.getElementById("acim-scanner");};
-
+  // ─── TOAST ────────────────────────────────────────────
   function _toast(msg){
     if(!msg)return;var old=document.getElementById("acim-toast");if(old)old.remove();
     var t=document.createElement("div");t.id="acim-toast";t.textContent=msg;
-    t.style.cssText="position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:#1a1a2e;color:#fff;padding:10px 20px;border-radius:10px;font-size:14px;font-family:Segoe UI,Arial,sans-serif;z-index:99999999;box-shadow:0 4px 16px rgba(0,0,0,0.3);max-width:80vw;text-align:center;";
-    document.body.appendChild(t);setTimeout(function(){t.style.transition="opacity 0.3s";t.style.opacity="0";setTimeout(function(){t.remove();},300);},2500);}
-
-  function _toastWithPrint(name,priceCents,barcode){
-    var old=document.getElementById("acim-toast");if(old)old.remove();
-    var t=document.createElement("div");t.id="acim-toast";
-    t.style.cssText="position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:#1a1a2e;color:#fff;padding:12px 20px;border-radius:10px;font-size:14px;font-family:Segoe UI,Arial,sans-serif;z-index:99999999;box-shadow:0 4px 16px rgba(0,0,0,0.3);max-width:90vw;text-align:center;display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:center;";
-    var msg=document.createElement("span");
-    msg.textContent="✅ "+name+(priceCents>0?" "+(priceCents/100).toFixed(2)+"€":" — ✏️ prix à compléter");
-    t.appendChild(msg);
-    if(barcode){var pr=document.createElement("button");pr.textContent="🖨️ Imprimer";
-      pr.style.cssText="padding:6px 12px;border:none;border-radius:6px;background:#e65100;color:#fff;font-size:12px;cursor:pointer;font-weight:700;";
-      pr.onclick=function(){t.remove();_openBarcodePage(name,barcode);};t.appendChild(pr);}
-    document.body.appendChild(t);
-    setTimeout(function(){t.style.transition="opacity 0.3s";t.style.opacity="0";setTimeout(function(){t.remove();},300);},4000);}
-
-  function _openBarcodePage(name,code){
-    var basePath=window.location.pathname.replace(/[^/]*$/,"");
-    var url=basePath+"barcode.html";
-    if(name||code){var params=[];
-      if(name)params.push("nom="+encodeURIComponent(name));
-      if(code)params.push("code="+encodeURIComponent(code));
-      url+="?"+params.join("&");}
-    window.open(url,"_blank");}
-
-  // Ctrl+N = ajout rapide
-  document.addEventListener("keydown",function(e){
-    if(e.ctrlKey&&!e.altKey&&!e.shiftKey&&e.key==="n"){e.preventDefault();_quickCreate("",0);}
-    if(e.ctrlKey&&!e.altKey&&!e.shiftKey&&e.key==="b"){e.preventDefault();_openBarcodePage();}
-    if(e.key==="F2"){e.preventDefault();var info=_cartInfo();if(info.length&&!_dialogOpen())_inlineEdit(0,window.innerWidth*0.75,20+_getLH()/2);}
-  });
-
-  // Camera désactivation
-  if(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia){
-    var _origGetUserMedia=navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
-    navigator.mediaDevices.getUserMedia=function(c){return Promise.reject(new DOMException("Camera managed by AcimCaisse","NotAllowedError"));};
+    t.style.cssText="position:fixed;bottom:60px;left:50%;transform:translateX(-50%);background:#1a1a2e;color:#fff;padding:10px 20px;border-radius:10px;font-size:14px;font-family:Segoe UI,Arial,sans-serif;z-index:99999999;box-shadow:0 4px 16px rgba(0,0,0,0.3);max-width:80vw;text-align:center;";
+    document.body.appendChild(t);setTimeout(function(){t.style.transition="opacity 0.3s";t.style.opacity="0";setTimeout(function(){t.remove();},300);},2500);
   }
 
-  // ═══════════════════════════════════════════════════════
-  //  BOUTONS FLOTTANTS
-  // ═══════════════════════════════════════════════════════
-  function _createFloatingButtons(){
-    var bcBtn=document.createElement("div");bcBtn.id="acim-barcode-btn";
-    bcBtn.style.cssText="position:fixed;bottom:20px;left:20px;width:48px;height:48px;background:#1a1a2e;color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;cursor:pointer;z-index:99999998;box-shadow:0 4px 16px rgba(0,0,0,0.3);pointer-events:auto;";
-    bcBtn.textContent="📊";bcBtn.title="Codes-barres (Ctrl+B)";
-    bcBtn.onclick=function(){_openBarcodePage();};document.body.appendChild(bcBtn);
-    var addBtn=document.createElement("div");addBtn.id="acim-add-btn";
-    addBtn.style.cssText="position:fixed;bottom:20px;left:50%;transform:translateX(-50%);width:56px;height:56px;background:#e65100;color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:24px;cursor:pointer;z-index:99999998;box-shadow:0 4px 16px rgba(230,81,0,0.4);pointer-events:auto;";
-    addBtn.textContent="➕";addBtn.title="Nouveau produit (Ctrl+N)";
-    addBtn.onclick=function(){_quickCreate("",0);};document.body.appendChild(addBtn);
-    var catBtn=document.createElement("div");catBtn.id="acim-catalog-btn";
-    catBtn.style.cssText="position:fixed;bottom:20px;right:20px;width:48px;height:48px;background:#1565c0;color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;cursor:pointer;z-index:99999998;box-shadow:0 4px 16px rgba(21,101,192,0.4);pointer-events:auto;";
-    catBtn.textContent="📦";catBtn.title="Catalogue produits";
-    catBtn.onclick=function(){_showCatalog();};document.body.appendChild(catBtn);
-  }
-
-  // ═══════════════════════════════════════════════════════
-  //  INIT
-  // ═══════════════════════════════════════════════════════
+  // ─── INIT ────────────────────────────────────────────
   function init(){
-    if(!_acquireTabLock()){
-      _toast("⚠️ Caisse déjà ouverte dans un autre onglet");return;}
+    if(!_acquireTabLock()){_toast("⚠ Caisse déjà ouverte dans un autre onglet");return;}
     _loadBcSeq().then(function(){
-      _log("v31 — catalog, autocomplete fix, smart tracker, scanner fix");
-      _createOverlay();_createFloatingButtons();_createBarcodeInput();
+      _log("v32 — POS UI complète");
+      _dbGetAll().then(function(all){
+        _allProducts=all;
+        _createPOS();
+        _renderPOS();
+      });
       _importBackupFromEmbedded().then(function(imported){
-        if(imported)_toast("✅ Catalogue importé (38 produits)");
+        if(imported){
+          _dbGetAll().then(function(all){
+            _allProducts=all;_filterProducts();
+          });
+          _toast("✅ Catalogue importé (38 produits)");
+        }
       });
     });
-    // Keyboard shortcuts
     document.addEventListener("keydown",function(e){
-      if(e.ctrlKey&&e.key==="k"){e.preventDefault();_showCatalog();}
+      if(e.ctrlKey&&e.key==="k"){e.preventDefault();_posSearch.focus();}
       if(e.ctrlKey&&e.key==="n"){e.preventDefault();_quickCreate("",0);}
     });
   }
+
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",init);else init();
 
   window._acimGetCartInfo=_cartInfo;
@@ -837,4 +670,4 @@
   window._acimProcessBarcode=_processBarcode;
   window._acimAddToCart=function(name,price,cat){_addToCart(name,price,"",cat);};
 })();
-// ─── FIN AcimCaisse v31 ───
+// ─── FIN AcimCaisse v32 ───
