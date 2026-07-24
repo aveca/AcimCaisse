@@ -200,6 +200,31 @@
   var _pos=null,_posSearch=null,_posCats=null,_posGrid=null,_posCart=null,_posTotal=null,_posItems=null,_posCheckout=null;
   var _allProducts=[],_filteredProducts=[],_activeCat="";
 
+  // ─── TOGGLE POS / FLUTTER ──────────────────────────────
+  var _reopenBtn=null;
+  function _togglePOS(show){
+    if(!_pos)_createPOS();
+    if(show){
+      _pos.style.display="flex";
+      if(_reopenBtn)_reopenBtn.style.display="none";
+      document.documentElement.style.setProperty("--acim-flutter-opacity","0");
+      document.documentElement.style.setProperty("--acim-flutter-pointer","none");
+      setTimeout(function(){_posSearch.focus();},100);
+    }else{
+      _pos.style.display="none";
+      if(!_reopenBtn){
+        _reopenBtn=document.createElement("div");_reopenBtn.id="acim-reopen-btn";
+        _reopenBtn.style.cssText="position:fixed;bottom:20px;left:50%;transform:translateX(-50%);padding:12px 24px;background:#e65100;color:#fff;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;z-index:999998;box-shadow:0 4px 16px rgba(230,81,0,0.4);font-family:Segoe UI,Arial,sans-serif;";
+        _reopenBtn.textContent="🛒 Ouvrir la caisse";
+        _reopenBtn.onclick=function(){_togglePOS(true);};
+        document.body.appendChild(_reopenBtn);
+      }
+      _reopenBtn.style.display="flex";
+      document.documentElement.style.setProperty("--acim-flutter-opacity","1");
+      document.documentElement.style.setProperty("--acim-flutter-pointer","auto");
+    }
+  }
+
   function _createPOS(){
     if(_pos)return;
     _pos=document.createElement("div");_pos.id="acim-pos";
@@ -230,6 +255,14 @@
     newBtn.style.cssText="padding:6px 10px;border:none;border-radius:6px;background:#2a2a4e;color:#fff;font-size:16px;cursor:pointer;flex-shrink:0;";
     newBtn.onclick=function(){_quickCreate("",0);};
     topBar.appendChild(newBtn);
+
+    var closeBtn=document.createElement("button");
+    closeBtn.textContent="✕ Factures";closeBtn.title="Fermer la caisse — accéder aux factures Flutter";
+    closeBtn.style.cssText="padding:6px 12px;border:1px solid rgba(255,255,255,0.3);border-radius:6px;background:transparent;color:#fff;font-size:12px;cursor:pointer;flex-shrink:0;white-space:nowrap;";
+    closeBtn.onmouseenter=function(){this.style.background="rgba(255,255,255,0.1)";};
+    closeBtn.onmouseleave=function(){this.style.background="transparent";};
+    closeBtn.onclick=function(){_togglePOS(false);};
+    topBar.appendChild(closeBtn);
 
     _pos.appendChild(topBar);
 

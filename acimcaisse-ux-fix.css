@@ -2,10 +2,14 @@
  * AcimCaisse v32 — POS UI styles
  */
 
-/* ── Hide Flutter behind POS overlay ── */
+/* ── Hide Flutter behind POS overlay (toggleable) ── */
+:root {
+  --acim-flutter-opacity: 0;
+  --acim-flutter-pointer: none;
+}
 flutter-view {
-  opacity: 0 !important;
-  pointer-events: none !important;
+  opacity: var(--acim-flutter-opacity) !important;
+  pointer-events: var(--acim-flutter-pointer) !important;
 }
 
 /* ── POS main container ── */
@@ -74,7 +78,14 @@ flutter-view {
   pointer-events: none;
 }
 
-/* ── Responsive: mobile ── */
+/* ── Reopen button (when POS is closed) ── */
+#acim-reopen-btn {
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+#acim-reopen-btn:hover {
+  transform: translateX(-50%) translateY(-2px);
+  box-shadow: 0 6px 20px rgba(230, 81, 0, 0.5) !important;
+}
 @media (max-width: 768px) {
   #acim-pos {
     flex-direction: column !important;
