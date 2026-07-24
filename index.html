@@ -18,6 +18,10 @@
   <script src="tracker.js"></script>
   <!-- CSS pour fixer l'UX/UI -->
   <link rel="stylesheet" href="acimcaisse-ux-fix.css">
+  <!-- Correction des stocks négatifs -->
+  <script src="fix-negative-stock.js"></script>
+  <!-- Autocomplétion pour la saisie manuelle -->
+  <script src="barcode-autocomplete.js"></script>
 </head>
 <body>
   <script src="flutter_bootstrap.js?v=30" async></script>
@@ -25,7 +29,7 @@
   <!-- Bouton Valider (ajouté pour clarifier le workflow) -->
   <button id="acim-validate-btn" data-tooltip="Valider le produit (Entrée)" style="display: none;">✓ Valider</button>
   
-  <!-- 
+  <!--
     INJECTION DANS LE SHADOW DOM DE FLUTTER
     C'est la solution définitive pour que les styles CSS pénètrent dans flutter-view
     -->
@@ -276,6 +280,65 @@
     }
     
     setInterval(checkCartVisibility, 1000);
+    
+    // ============================================
+    // INITIALISATION DES NOUVEAUX MODULES
+    // ============================================
+    
+    // Initialiser la correction des stocks négatifs
+    setTimeout(() => {
+      if (window.AcimCaisseStockFix) {
+        window.AcimCaisseStockFix.fix();
+      }
+    }, 3000);
+    
+    // Initialiser l'autocomplétion (démarre automatiquement)
+    // Le script barcode-autocomplete.js s'initialise lui-même
+    
+    // ============================================
+    // FEEDBACK VISUEL POUR LA SAISIE
+    // ============================================
+    function addInputFeedback() {
+      const bcInput = document.getElementById('acim-bc-input');
+      if (!bcInput) {
+        setTimeout(addInputFeedback, 500);
+        return;
+      }
+      
+      // Ajouter un indicateur de chargement/recherche
+      const feedbackDiv = document.createElement('div');
+      feedbackDiv.id = 'acim-input-feedback';
+      feedbackDiv.style.cssText = `
+        position: absolute;
+        left: 0;
+        top: -30px;
+        font-size: 12px;
+        color: #666;
+        height: 20px;
+        display: none;
+      `;
+      bcInput.parentNode.insertBefore(feedbackDiv, bcInput);
+      
+      // Mettre à jour le feedback lors de la saisie
+      bcInput.addEventListener('input', (e) => {
+        const value = e.target.value;
+        if (value.length >= 2) {
+          feedbackDiv.textContent = '🔍 Recherche en cours...';
+          feedbackDiv.style.display = 'block';
+        } else {
+          feedbackDiv.style.display = 'none';
+        }
+      });
+      
+      // Masquer le feedback après 1 seconde
+      bcInput.addEventListener('blur', () => {
+        setTimeout(() => {
+          feedbackDiv.style.display = 'none';
+        }, 1000);
+      });
+    }
+    
+    setTimeout(addInputFeedback, 1000);
   </script>
 </body>
 </html>
