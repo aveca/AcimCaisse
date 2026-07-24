@@ -1,4 +1,4 @@
-// ─── AcimCaisse v28 — _myCart Only, scanner auto-focus, panier unique ──────────
+// ─── AcimCaisse v29 — scanner focus-forced, total sticky, panier unique ──────────
 // Injecté DANS l'IIFE dartProgram (A, J, $, t, B accessibles)
 // _myCart = seule source de vérité, AUCUN sync Dart
 ;(function(){
@@ -55,7 +55,7 @@
 
   // Open Food Facts
   var _OFF="https://world.openfoodfacts.org/api/v0/product/";
-  function _lookupOFF(bc){return fetch(_OFF+bc+".json").then(function(r){return r.json();})
+  function _lookupOFF(bc){return fetch(_OFF+bc+".json").then(function(r){return r.json()})
     .then(function(d){if(d.status===1&&d.product){var p=d.product;
       return{barcode:bc,name:p.product_name_fr||p.product_name||"",category:_guessCat((p.product_name||"")+" "+(p.categories||"")),sale_price_cents:0};}
       return null;}).catch(function(){return null;});}
@@ -63,7 +63,7 @@
   // ═══════════════════════════════════════════════════════
   //  _myCart — SOURCE DE VÉRITÉ (pas Dart)
   // ═══════════════════════════════════════════════════════
-  var _myCart=[]; // [{myId,name,priceCents,bc,cat}]
+  var _myCart=[];
   var _realBcMap={};
 
   function _addToCart(name,priceCents,barcode,categoryId){
@@ -94,18 +94,18 @@
     _custBc.postMessage({type:"cart-clear"});}
 
   // ═══════════════════════════════════════════════════════
-  //  OVERLAY TICKET
+  //  OVERLAY TICKET — Total ALWAYS visible (sticky)
   // ═══════════════════════════════════════════════════════
-  var _overlay=null,_linesEls=[],_pollTimer=null;
+  var _overlay=null,_linesEls=[],_pollTimer=null,_overlayInner=null,_overlayList=null,_overlayTotalEl=null;
   function _getLH(){return _mob?28:26;}
 
   function _createOverlay(){
     if(_overlay)return;
     var ov=document.createElement("div");ov.id="acim-ticket-overlay";
     if(_mob){
-      ov.style.cssText="position:fixed;bottom:0;left:0;right:0;max-height:160px;z-index:1000000;pointer-events:none;background:transparent;overflow-y:auto;overflow-x:hidden;";
+      ov.style.cssText="position:fixed;bottom:0;left:0;right:0;z-index:1000000;pointer-events:none;background:transparent;font-family:Segoe UI,Arial,sans-serif;";
     }else{
-      ov.style.cssText="position:fixed;top:8px;right:8px;width:280px;max-height:50vh;z-index:1000000;pointer-events:none;background:transparent;overflow-y:auto;overflow-x:hidden;border-radius:10px;font-family:Segoe UI,Arial,sans-serif;";
+      ov.style.cssText="position:fixed;top:44px;right:8px;width:280px;max-height:calc(100vh - 52px);z-index:1000000;pointer-events:none;background:transparent;font-family:Segoe UI,Arial,sans-serif;display:flex;flex-direction:column;";
     }
     ov.setAttribute("role","list");ov.setAttribute("aria-label","Ticket");
     document.body.appendChild(ov);_overlay=ov;_pollCart();}
@@ -114,120 +114,170 @@
     if(!_overlay)return;
     if(_dialogOpen()){clearTimeout(_pollTimer);_pollTimer=setTimeout(_pollCart,500);return;}
     var info=_cartInfo();
-    // Show/hide background
-    var bg=info.length>0?"rgba(255,255,255,0.92)":"transparent";
-    var border=info.length>0?(_mob?"2px solid #e65100":"2px solid #e65100"):"none";
-    if(!_mob){_overlay.style.background=bg;_overlay.style.borderLeft=border;}
-    else{_overlay.style.background=bg;_overlay.style.borderTop=border;}
+    var total=0;for(var ti=0;ti<info.length;ti++)total+=info[ti].price;
+    var lh=_getLH();
 
-    _overlay.innerHTML="";_linesEls=[];var lh=_getLH();
-    for(var i=0;i<info.length;i++){
-      var ln=document.createElement("div");
-      var isZero=info[i].price===0;
-      var borderStyle=isZero?"border-left:3px solid #e65100;":"border-left:3px solid transparent;";
-      if(_mob){
-        ln.style.cssText="position:relative;display:inline-flex;align-items:center;height:"+lh+"px;padding:2px 6px;margin:1px;cursor:pointer;pointer-events:auto;"+borderStyle+"border-radius:4px;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis;font-size:11px;color:#333;background:rgba(255,255,255,0.95);";
-        var ns=document.createElement("span");ns.style.cssText="font-size:13px;overflow:hidden;text-overflow:ellipsis;max-width:120px;";
-        ns.textContent=(isZero?"✏️ ":"")+info[i].name;ln.appendChild(ns);
-        if(info[i].price>0){var ps=document.createElement("span");ps.style.cssText="font-size:13px;font-weight:700;color:#e65100;margin-left:4px;";ps.textContent=(info[i].price/100).toFixed(2)+"€";ln.appendChild(ps);}
+    // ── Desktop: sidebar panel with sticky total ──
+    if(!_mob){
+      if(info.length===0){
+        _overlay.innerHTML="";
+        var em=document.createElement("div");
+        em.style.cssText="pointer-events:auto;background:rgba(255,255,255,0.95);border-radius:10px;padding:16px;box-shadow:0 2px 8px rgba(0,0,0,0.1);border:1px solid #e0e0e0;text-align:center;color:#999;font-size:13px;";
+        em.textContent="🛒 Scanner un produit…";
+        _overlay.appendChild(em);
       }else{
-        ln.style.cssText="position:relative;height:"+lh+"px;padding:2px 8px;cursor:pointer;pointer-events:auto;"+borderStyle+"font-size:11px;display:flex;align-items:center;justify-content:space-between;color:#333;background:transparent;";
-        var ns=document.createElement("span");ns.style.cssText="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;";
-        ns.textContent=(isZero?"✏️ ":"")+info[i].name;ln.appendChild(ns);
-        if(info[i].price>0){var ps=document.createElement("span");ps.style.cssText="font-size:12px;font-weight:700;color:#e65100;margin-left:4px;";ps.textContent=(info[i].price/100).toFixed(2)+"€";ln.appendChild(ps);}
-        else{var ps=document.createElement("span");ps.style.cssText="font-size:11px;color:#e65100;margin-left:4px;";ps.textContent="✏️";ln.appendChild(ps);}
-        // ⟳ dupliquer
-        var dup=document.createElement("span");dup.textContent="⟳";dup.title="Ajouter encore";
-        dup.style.cssText="font-size:12px;cursor:pointer;margin-left:4px;color:#1a1a2e;opacity:0.4;";
-        dup.onmouseenter=function(){this.style.opacity="1";};
-        dup.onmouseleave=function(){this.style.opacity="0.4";};
-        ln.appendChild(dup);
+        // Build once if structure missing, or rebuild full
+        _overlay.innerHTML="";
+        var inner=document.createElement("div");
+        inner.style.cssText="pointer-events:auto;background:rgba(255,255,255,0.97);border-radius:10px;box-shadow:0 2px 12px rgba(0,0,0,0.18);border:1px solid #e0e0e0;display:flex;flex-direction:column;max-height:calc(100vh - 52px);overflow:hidden;";
+
+        // HEADER (sticky top)
+        var hd=document.createElement("div");
+        hd.style.cssText="padding:6px 10px;background:#1a1a2e;color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;";
+        hd.innerHTML='<span>🛒 Ticket</span><span>'+info.length+' lignes</span>';
+        inner.appendChild(hd);
+
+        // LIST (scrollable middle)
+        var lb=document.createElement("div");
+        lb.id="acim-list-area";
+        lb.style.cssText="flex:1 1 auto;overflow-y:auto;overflow-x:hidden;min-height:0;";
+        for(var i=0;i<info.length;i++){
+          var ln=document.createElement("div");
+          var isZero=info[i].price===0;
+          var borderStyle=isZero?"border-left:3px solid #e65100;":"border-left:3px solid transparent;";
+          ln.style.cssText="height:"+lh+"px;padding:2px 8px;cursor:pointer;pointer-events:auto;"+borderStyle+"font-size:11px;display:flex;align-items:center;justify-content:space-between;color:#333;background:transparent;";
+          var ns=document.createElement("span");ns.style.cssText="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;";
+          ns.textContent=(isZero?"✏️ ":"")+info[i].name;ln.appendChild(ns);
+          if(info[i].price>0){var ps=document.createElement("span");ps.style.cssText="font-size:12px;font-weight:700;color:#e65100;margin-left:4px;";ps.textContent=(info[i].price/100).toFixed(2)+"€";ln.appendChild(ps);}
+          else{var ps=document.createElement("span");ps.style.cssText="font-size:11px;color:#e65100;margin-left:4px;";ps.textContent="✏️";ln.appendChild(ps);}
+          var dup=document.createElement("span");dup.textContent="⟳";dup.title="Ajouter encore";
+          dup.style.cssText="font-size:12px;cursor:pointer;margin-left:4px;color:#1a1a2e;opacity:0.4;";
+          dup.onmouseenter=function(){this.style.opacity="1";};dup.onmouseleave=function(){this.style.opacity="0.4";};
+          ln.appendChild(dup);
+          ln.onmouseenter=function(){this.style.background="rgba(230,81,0,0.06)";};
+          ln.onmouseleave=function(){this.style.background="transparent";};
+          (function(idx,item){
+            ln.addEventListener("click",function(e){
+              if(e.target.textContent==="⟳"){e.stopPropagation();_addToCart(item.name,item.price,item.bc,item.cat);_toast("✅ "+item.name+" ajouté");return;}
+              e.stopPropagation();_inlineEdit(idx,e.clientX,e.clientY);
+            });
+          })(i,info[i]);
+          lb.appendChild(ln);
+        }
+        inner.appendChild(lb);
+
+        // FOOTER (sticky bottom — ALWAYS visible)
+        var foot=document.createElement("div");
+        foot.id="acim-total-bar";
+        foot.style.cssText="padding:8px 10px;display:flex;align-items:center;justify-content:space-between;background:#fff3e0;border-top:2px solid #e65100;flex-shrink:0;";
+        var totSpan=document.createElement("span");
+        totSpan.style.cssText="font-weight:700;font-size:15px;color:#1a1a2e;";
+        totSpan.textContent="Total: "+(total/100).toFixed(2)+"€";
+        foot.appendChild(totSpan);
+        var pay=document.createElement("button");pay.textContent="💰 Encaisser";
+        pay.style.cssText="padding:6px 12px;border:none;border-radius:6px;background:#e65100;color:#fff;font-size:14px;cursor:pointer;font-weight:700;";
+        pay.onclick=function(){_checkout();};foot.appendChild(pay);
+        inner.appendChild(foot);
+
+        _overlay.appendChild(inner);
       }
-      ln.onmouseenter=function(){this.style.background=_mob?"rgba(230,81,0,0.08)":"rgba(230,81,0,0.06)";this.style.borderRadius="4px";};
-      ln.onmouseleave=function(){this.style.background=_mob?"#fff":"transparent";this.style.borderRadius="0";};
-      (function(idx,item){
-        ln.addEventListener("click",function(e){
-          if(e.target.textContent==="⟳"){e.stopPropagation();_addToCart(item.name,item.price,item.bc,item.cat);_toast("✅ "+item.name+" ajouté");return;}
-          e.stopPropagation();_inlineEdit(idx,e.clientX,e.clientY);
-        });
-      })(i,info[i]);
-      _overlay.appendChild(ln);_linesEls.push(ln);
     }
-    // Desktop: inner panel
-    if(!_mob&&info.length>0){
-      var inner=document.createElement("div");
-      inner.style.cssText="pointer-events:auto;background:rgba(255,255,255,0.95);border-radius:10px;box-shadow:0 2px 12px rgba(0,0,0,0.15);border:1px solid #e0e0e0;overflow:hidden;";
-      var hd=document.createElement("div");hd.style.cssText="padding:6px 10px;background:#1a1a2e;color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:space-between;";
-      hd.innerHTML='<span>🛒 Ticket</span><span>'+info.length+' lignes</span>';inner.appendChild(hd);
-      var lb=document.createElement("div");lb.style.cssText="max-height:40vh;overflow-y:auto;";
-      for(var di=0;di<_linesEls.length;di++){lb.appendChild(_linesEls[di]);}
-      inner.appendChild(lb);
-      var total=0;for(var ti=0;ti<info.length;ti++)total+=info[ti].price;
-      var foot=document.createElement("div");foot.style.cssText="padding:6px 10px;display:flex;align-items:center;justify-content:space-between;background:#fff3e0;border-top:1px solid #e0e0e0;";
-      foot.innerHTML='<span style="font-weight:700;font-size:14px;color:#1a1a2e;">Total: '+((total/100).toFixed(2))+'€</span>';
-      var pay=document.createElement("button");pay.textContent="💰 Encaisser";
-      pay.style.cssText="padding:4px 10px;border:none;border-radius:6px;background:#e65100;color:#fff;font-size:13px;cursor:pointer;font-weight:700;";
-      pay.onclick=function(){_checkout();};foot.appendChild(pay);inner.appendChild(foot);
-      _overlay.innerHTML="";_overlay.appendChild(inner);
+
+    // ── Mobile: bottom strip ──
+    if(_mob){
+      if(info.length===0){
+        _overlay.innerHTML="";
+        var em=document.createElement("div");
+        em.style.cssText="pointer-events:auto;background:rgba(255,255,255,0.95);border-top:2px solid #e65100;border-radius:0;padding:10px;text-align:center;color:#999;font-size:14px;";
+        em.textContent="🛒 Scanner un produit…";
+        _overlay.appendChild(em);
+      }else{
+        _overlay.innerHTML="";
+        var strip=document.createElement("div");
+        strip.style.cssText="pointer-events:auto;background:rgba(255,255,255,0.97);border-top:2px solid #e65100;display:flex;flex-direction:column;max-height:180px;overflow:hidden;";
+        // Total bar (top, always visible)
+        var totBar=document.createElement("div");
+        totBar.style.cssText="padding:6px 10px;display:flex;align-items:center;justify-content:space-between;background:#fff3e0;font-size:13px;font-weight:700;";
+        totBar.innerHTML='<span style="color:#1a1a2e;">🛒 '+info.length+' · Total: '+((total/100).toFixed(2))+'€</span>';
+        var pay=document.createElement("button");pay.textContent="💰";
+        pay.style.cssText="padding:4px 8px;border:none;border-radius:6px;background:#e65100;color:#fff;font-size:12px;cursor:pointer;font-weight:700;";
+        pay.onclick=function(){_checkout();};totBar.appendChild(pay);
+        strip.appendChild(totBar);
+        // Scrollable list
+        var lb=document.createElement("div");
+        lb.style.cssText="flex:1;overflow-y:auto;overflow-x:hidden;";
+        for(var i=0;i<info.length;i++){
+          var ln=document.createElement("div");
+          var isZero=info[i].price===0;
+          ln.style.cssText="display:inline-flex;align-items:center;height:26px;padding:2px 6px;margin:1px;cursor:pointer;"+(isZero?"border-left:2px solid #e65100;":"")+"border-radius:4px;white-space:nowrap;font-size:11px;color:#333;background:rgba(255,255,255,0.95);";
+          var ns=document.createElement("span");ns.style.cssText="font-size:12px;overflow:hidden;text-overflow:ellipsis;max-width:100px;";
+          ns.textContent=(isZero?"✏️ ":"")+info[i].name;ln.appendChild(ns);
+          if(info[i].price>0){var ps=document.createElement("span");ps.style.cssText="font-size:12px;font-weight:700;color:#e65100;margin-left:4px;";ps.textContent=(info[i].price/100).toFixed(2)+"€";ln.appendChild(ps);}
+          (function(idx,item){
+            ln.addEventListener("click",function(e){
+              e.stopPropagation();_inlineEdit(idx,e.clientX,e.clientY);
+            });
+          })(i,info[i]);
+          lb.appendChild(ln);
+        }
+        strip.appendChild(lb);
+        _overlay.appendChild(strip);
+      }
     }
-    if(!_mob&&info.length===0){_overlay.innerHTML="";}
-    if(_mob&&info.length===0){var em=document.createElement("div");em.style.cssText="display:flex;align-items:center;justify-content:center;height:100%;color:#999;font-size:14px;";em.textContent="🛒 Scanner un produit…";_overlay.appendChild(em);}
+
     clearTimeout(_pollTimer);_pollTimer=setTimeout(_pollCart,2000);
   }
 
   // ═══════════════════════════════════════════════════════
-  //  SCANNER AUTO + CHAMP BARCODE (auto-focus permanent)
+  //  SCANNER — focus-forced (blur Flutter first)
   // ═══════════════════════════════════════════════════════
   var _bcInput=null,_autoFocusTimer=null;
+  function _forceFocus(){
+    if(!_bcInput||_dialogOpen())return;
+    // CRITICAL FIX: blur Flutter's focused element FIRST, then focus ours
+    if(document.activeElement&&document.activeElement!==_bcInput){
+      try{document.activeElement.blur();}catch(e){}
+    }
+    try{_bcInput.focus();}catch(e){}
+  }
   function _createBarcodeInput(){
     if(_bcInput)return;
     _bcInput=document.createElement("input");_bcInput.id="acim-bc-input";
-    _bcInput.type="text";_bcInput.placeholder="🔍 Scanner ou taper code...";
-    _bcInput.style.cssText="position:fixed;top:8px;left:8px;width:260px;padding:10px 14px;border:3px solid #e65100;border-radius:12px;font-size:16px;font-weight:700;font-family:Segoe UI,Arial,sans-serif;z-index:99999999;outline:none;background:#fff;box-shadow:0 4px 20px rgba(230,81,0,0.4);animation:acimPulse 2s ease-in-out infinite;";
-    // Pulsing animation stylesheet
-    var pulseStyle=document.createElement("style");pulseStyle.id="acim-pulse-style";
-    pulseStyle.textContent="@keyframes acimPulse{0%,100%{box-shadow:0 4px 20px rgba(230,81,0,0.4);}50%{box-shadow:0 4px 28px rgba(230,81,0,0.7);border-color:#ff6d00;}}";
-    document.head.appendChild(pulseStyle);
+    _bcInput.type="text";_bcInput.placeholder="🔍 Scanner / taper code...";
+    _bcInput.autocomplete="off";_bcInput.setAttribute("autofocus","");
+    _bcInput.style.cssText="position:fixed;top:8px;left:8px;width:260px;padding:10px 14px;border:3px solid #e65100;border-radius:12px;font-size:16px;font-weight:700;font-family:Segoe UI,Arial,sans-serif;z-index:99999999;outline:none;background:#fff;box-shadow:0 2px 8px rgba(230,81,0,0.4);";
     _bcInput.addEventListener("keydown",function(e){
       if(e.key==="Enter"){var bc=this.value.trim();this.value="";if(bc.length>=4)_processBarcode(bc);else _toast("❌ Code trop court");}
-      if(e.key==="Escape"){this.value="";this.blur();}
+      if(e.key==="Escape"){this.value="";}
     });
-    // Auto-focus permanent: reprend le focus après blur (si pas de dialog)
+    // When user clicks elsewhere, re-focus after short delay (unless dialog open)
     _bcInput.addEventListener("blur",function(){
       clearTimeout(_autoFocusTimer);
-      _autoFocusTimer=setTimeout(function(){
-        if(!_dialogOpen()&&_bcInput&&!_bcInput.value)_bcInput.focus();
-      },300);
+      _autoFocusTimer=setTimeout(function(){_forceFocus();},500);
     });
     document.body.appendChild(_bcInput);
-    // Focus immédiat
-    setTimeout(function(){if(_bcInput)_bcInput.focus();},100);
+    // Focus after Flutter loads
+    setTimeout(function(){_forceFocus();},300);
+    setTimeout(function(){_forceFocus();},1000);
+    setTimeout(function(){_forceFocus();},3000);
   }
 
-  // Auto-focus périodique (catch-all: si Flutter steal le focus)
-  function _keepBarcodeFocused(){
-    if(!_bcInput)return;
-    if(!_dialogOpen()&&!_bcInput.value&&document.activeElement!==_bcInput){
-      try{_bcInput.focus();}catch(e){}
-    }
-  }
-  setInterval(_keepBarcodeFocused,3000);
+  // Auto-focus periodic (catch-all for Flutter stealing focus)
+  setInterval(function(){_forceFocus();},2000);
 
-  // Scanner buffer: capture digits EVEN IF Flutter intercepts focus
+  // Scanner buffer: capture digits, force-focus, buffer
   var _scanBuf="",_scanTimer=null,_scanActive=false;
   document.addEventListener("keydown",function(e){
     if(_dialogOpen())return;
-    // Digit → auto-focus + buffer (même si Flutter a le focus)
     if(/^[0-9]$/.test(e.key)){
-      if(_bcInput&&document.activeElement!==_bcInput){
-        _bcInput.focus();
-        // Ajouter le digit au champ si Flutter ne l'a pas déjà mis
-        if(!_bcInput.value.endsWith(e.key))_bcInput.value+=e.key;
+      _scanBuf+=e.key;_scanActive=true;
+      // Force focus to barcode field
+      if(document.activeElement!==_bcInput){
+        _forceFocus();
+        if(_bcInput)_bcInput.value+=e.key;
         e.preventDefault();e.stopPropagation();
       }
-      _scanBuf+=e.key;_scanActive=true;
       clearTimeout(_scanTimer);_scanTimer=setTimeout(function(){
-        // Si le champ a du contenu, utiliser ça (priorité au champ visible)
         var bc=_bcInput?_bcInput.value.trim():_scanBuf;
         if(_bcInput)_bcInput.value="";
         if(bc.length>=4)_processBarcode(bc);
@@ -295,7 +345,7 @@
     var poidsRow=document.createElement("div");poidsRow.style.cssText="display:flex;align-items:center;gap:4px;margin-bottom:6px;";
     var exPoids="",exUnit="kg";
     var pm=item.name&&item.name.match(/ (\d+[.,]?\d*)\s*(kg|g|L|pc|pièce)/);
-    if(pm){exPoids=pm[1].replace(",",".");exUnit=pm[2]==='pièce'?'pc':pm[2];}
+    if(pm){exPoids=pm[1].replace(",",".");exUnit=pm[2]=='pièce'?'pc':pm[2];}
     var poidsIn=document.createElement("input");poidsIn.type="number";poidsIn.step="0.001";poidsIn.min="0";
     poidsIn.value=exPoids;poidsIn.placeholder="Poids";
     poidsIn.style.cssText="flex:1;font-size:12px;padding:6px 10px;border:2px solid #e0e0e0;border-radius:6px;outline:none;";
@@ -303,7 +353,7 @@
     var unitSel=document.createElement("select");unitSel.style.cssText="font-size:12px;padding:4px;border:2px solid #e0e0e0;border-radius:6px;outline:none;background:#fff;";
     [["kg","kg"],["g","g"],["L","L"],["pc","pièce"]].forEach(function(u){
       var o=document.createElement("option");o.value=u[0];o.textContent=u[1];
-      if(u[0]===exUnit)o.selected=true;unitSel.appendChild(o);});
+      if(u[0]==exUnit)o.selected=true;unitSel.appendChild(o);});
     poidsRow.appendChild(poidsIn);poidsRow.appendChild(unitSel);card.appendChild(poidsRow);
     // Catégories
     var cr=document.createElement("div");cr.style.cssText="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:8px;";
@@ -333,7 +383,7 @@
       if(pv>0){nn=nn+" "+pv+u;}
       if(!nn){ni.style.borderColor="#c62828";ni.focus();return;}
       var pc=isNaN(np)?_myCart[idx].priceCents:Math.round(np*100);
-      card.remove(); // fermer AVANT pollCart
+      card.remove();
       _myCart[idx].name=nn;_myCart[idx].priceCents=pc;_myCart[idx].cat=selCat;
       _dbPut({barcode:_myCart[idx].bc||_myCart[idx].myId,name:nn,sale_price_cents:pc,category:selCat,source:"edit",last_updated:Date.now()});
       _toast("✅ "+nn+(pc>0?" "+(pc/100).toFixed(2)+"€":""));
@@ -400,7 +450,7 @@
       if(pv>0){nn=nn+" "+pv+u;}
       if(!nn){ni.style.borderColor="#c62828";ni.focus();return;}
       var pc=isNaN(np)?0:Math.round(np*100);
-      ov.remove(); // fermer AVANT addToCart
+      ov.remove();
       _addToCart(nn,pc,autoBc,selCat);
       _dbPut({barcode:autoBc,name:nn,sale_price_cents:pc,category:selCat,source:"manual",last_updated:Date.now()});
       _toastWithPrint(nn,pc,autoBc);
@@ -481,13 +531,11 @@
     addBtn.onclick=function(){_quickCreate("",0);};document.body.appendChild(addBtn);
   }
 
-  function _createScanButton(){}
-
   // ═══════════════════════════════════════════════════════
   //  INIT
   // ═══════════════════════════════════════════════════════
   function init(){
-    _log("v28 — barcode auto-focus permanent, panier unique, scanner 120ms, _myCart only");
+    _log("v29 — scanner focus-forced (blur Flutter), total sticky, panier unique");
     _createOverlay();_createFloatingButtons();_createBarcodeInput();
   }
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",init);else init();
