@@ -1,4 +1,4 @@
-// ─── AcimCaisse v32 — POS UI complète ──
+// ─── AcimCaisse v33 — POS UI + Produits au Poids ──
 ;(function(){
   "use strict";
   var _log=function(m){console.log("[Acim] "+m);};
@@ -104,7 +104,15 @@
       if(!d)return;var tx=d.transaction("sales","readwrite");
       tx.objectStore("sales").put({
         timestamp:Date.now(),isoTime:new Date().toISOString(),
-        items:items.map(function(it){return{name:it.name,price:it.priceCents,barcode:it.bc||"",cat:it.cat};}),
+        items:items.map(function(it){return{
+          name:it.name,
+          price:it.priceCents,
+          barcode:it.bc||"",
+          cat:it.cat,
+          weight:it.weight||null,
+          unitType:it.unitType||null,
+          pricePerUnit:it.pricePerUnit||null
+        };}),
         totalCents:totalCents,itemCount:items.length
       });
     }).catch(function(e){_err("Sale persist failed:",e);});
@@ -112,7 +120,7 @@
 
   // ─── BACKUP IMPORT ───────────────────────────────────
   var _BACKUP_IMPORTED_KEY="acim-backup-imported-v1";
-  var _BACKUP_DATA={"format":1,"categories":[{"id":"13b06477","name":"Frais"},{"id":"562843c7","name":"Sec"},{"id":"adb67835","name":"Congele"},{"id":"0bfc0834","name":"Divers"},{"id":"a7a910fe","name":"Vin"},{"id":"16a4e603","name":"Alcool"}],"products":[{"n":"R#E_Gourmet# Viennoisses Volaille Mron","c":"0bfc0834","p":0,"s":80},{"n":"R[Guli] Mortadelle Volaille","c":"0bfc0834","p":0,"s":20},{"n":"R[Guli] Cabanossi Gendarme","c":"0bfc0834","p":0,"s":12},{"n":"R[Guli] Bavarois Mini Kabanos","c":"0bfc0834","p":0,"s":36},{"n":"R[Guli] Panais Entier","c":"0bfc0834","p":0,"s":60},{"n":"Bissli Falafel OSEM 100g","c":"16a4e603","p":400,"s":0},{"n":"Bissli Grill OSEM 100g","c":"16a4e603","p":400,"s":0},{"n":"Bissli Boulgar OSEM 100g","c":"16a4e603","p":400,"s":0},{"n":"Bissli Hot OSEM 100g","c":"16a4e603","p":400,"s":0},{"n":"Bamba OSEM 100g","c":"16a4e603","p":400,"s":0},{"n":"Bamba OSEM 70g","c":"16a4e603","p":300,"s":0},{"n":"Tapouk OSEM 100g","c":"16a4e603","p":400,"s":0},{"n":"Tapouk OSEM 70g","c":"16a4e603","p":300,"s":0},{"n":"Cracotte OSEM 100g","c":"16a4e603","p":400,"s":0},{"n":"Cracotte OSEM 70g","c":"16a4e603","p":300,"s":0},{"n":"Krembo OSEM Vanille","c":"16a4e603","p":500,"s":0},{"n":"Krembo OSEM Chocolat","c":"16a4e603","p":500,"s":0},{"n":"Aigle Noir Fumoir Saumon 200g","c":"13b06477","p":1200,"s":0},{"n":"Aigle Noir Fumoir Thon 200g","c":"13b06477","p":1000,"s":0},{"n":"Steak Hach\u00e9 5% 1kg","c":"13b06477","p":800,"s":0},{"n":"Steak Hach\u00e9 15% 1kg","c":"13b06477","p":750,"s":0},{"n":"Poulet Entier Frais","c":"13b06477","p":500,"s":0},{"n":"Cuisses de Poulet Frais 1kg","c":"13b06477","p":600,"s":0},{"n":"Blanc de Poulet Frais 1kg","c":"13b06477","p":900,"s":0},{"n":"Merguez Frais 1kg","c":"13b06477","p":700,"s":0},{"n":"Saucisse Frais 1kg","c":"13b06477","p":650,"s":0},{"n":"Escalope de Dinde Frais 1kg","c":"13b06477","p":1100,"s":0},{"n":"Agneau Hach\u00e9 1kg","c":"13b06477","p":1400,"s":0},{"n":"C\u00f4tes de Porc Frais 1kg","c":"13b06477","p":900,"s":0},{"n":"Filet de Poulet 1kg","c":"13b06477","p":1200,"s":0},{"n":"Boeuf Hach\u00e9 Surgel\u00e9 1kg","c":"adb67835","p":900,"s":0},{"n":"Nuggets Poulet Surgel\u00e9 1kg","c":"adb67835","p":700,"s":0},{"n":"Frites Surgel\u00e9es 2kg","c":"adb67835","p":600,"s":0},{"n":"Pizza Surgel\u00e9e","c":"adb67835","p":500,"s":0},{"n":"Eau Min\u00e9rale 1.5L","c":"a7a910fe","p":100,"s":0},{"n":"Coca-Cola 33cl","c":"a7a910fe","p":150,"s":0},{"n":"Jus d'Orange 1L","c":"a7a910fe","p":350,"s":0},{"n":"Vin Rouge 75cl","c":"a7a910fe","p":800,"s":0}]};
+  var _BACKUP_DATA={"format":1,"categories":[{"id":"13b06477","name":"Frais"},{"id":"562843c7","name":"Sec"},{"id":"adb67835","name":"Congele"},{"id":"0bfc0834","name":"Divers"},{"id":"a7a910fe","name":"Vin"},{"id":"16a4e603","name":"Alcool"}],"products":[{"n":"R#E_Gourmet# Viennoisses Volaille Mron","c":"0bfc0834","p":0,"s":80},{"n":"R[Guli] Mortadelle Volaille","c":"0bfc0834","p":0,"s":20},{"n":"R[Guli] Cabanossi Gendarme","c":"0bfc0834","p":0,"s":12},{"n":"R[Guli] Bavarois Mini Kabanos","c":"0bfc0834","p":0,"s":36},{"n":"R[Guli] Panais Entier","c":"0bfc0834","p":0,"s":60},{"n":"Bissli Falafel OSEM 100g","c":"16a4e603","p":400,"s":0},{"n":"Bissli Grill OSEM 100g","c":"16a4e603","p":400,"s":0},{"n":"Bissli Boulgar OSEM 100g","c":"16a4e603","p":400,"s":0},{"n":"Bissli Hot OSEM 100g","c":"16a4e603","p":400,"s":0},{"n":"Bamba OSEM 100g","c":"16a4e603","p":400,"s":0},{"n":"Bamba OSEM 70g","c":"16a4e603","p":300,"s":0},{"n":"Tapouk OSEM 100g","c":"16a4e603","p":400,"s":0},{"n":"Tapouk OSEM 70g","c":"16a4e603","p":300,"s":0},{"n":"Cracotte OSEM 100g","c":"16a4e603","p":400,"s":0},{"n":"Cracotte OSEM 70g","c":"16a4e603","p":300,"s":0},{"n":"Krembo OSEM Vanille","c":"16a4e603","p":500,"s":0},{"n":"Krembo OSEM Chocolat","c":"16a4e603","p":500,"s":0},{"n":"Aigle Noir Fumoir Saumon 200g","c":"13b06477","p":1200,"s":0},{"n":"Aigle Noir Fumoir Thon 200g","c":"13b06477","p":1000,"s":0},{"n":"Steak Hach\u00e9 5% 1kg","c":"13b06477","p":800,"s":0},{"n":"Steak Hach\u00e9 15% 1kg","c":"13b06477","p":750,"s":0},{"n":"Poulet Entier Frais","c":"13b06477","p":500,"s":0},{"n":"Cuisses de Poulet Frais 1kg","c":"13b06477","p":600,"s":0},{"n":"Blanc de Poulet Frais 1kg","c":"13b06477","p":900,"s":0},{"n":"Merguez Frais 1kg","c":"13b06477","p":700,"s":0},{"n":"Saucisse Frais 1kg","c":"13b06477","p":650,"s":0},{"n":"Escalope de Dinde Frais 1kg","c":"13b06477","p":1100,"s":0},{"n":"Agneau Hach\u00e9 1kg","c":"13b06477","p":1400,"s":0},{"n":"C\u00f4tes de Porc Frais 1kg","c":"13b06477","p":900,"s":0},{"n":"Lardons Fum\u00e9s 1kg","c":"13b06477","p":800,"s":0},{"n":"Jambon Bayonne 1kg","c":"13b06477","p":1200,"s":0},{"n":"Saumon Frais 1kg","c":"13b06477","p":1500,"s":0},{"n":"Crevettes 1kg","c":"13b06477","p":1800,"s":0},{"n":"Thon Frais 1kg","c":"13b06477","p":1600,"s":0},{"n":"Boeuf Hach\u00e9 1kg","c":"13b06477","p":1000,"s":0},{"n":"Veau Hach\u00e9 1kg","c":"13b06477","p":1200,"s":0},{"n":"Pain de Mie Complet","c":"562843c7","p":350,"s":0},{"n":"Baguette Tradition","c":"562843c7","p":120,"s":0}],"nextAutoId":38};
   function _importBackupFromEmbedded(){
     return _openMeta().then(function(d){
       if(!d)return false;
@@ -143,7 +151,7 @@
           var mapped=catName.toLowerCase();
           if(mapped==="frais")mapped="viande";
           else if(mapped==="sec")mapped="snack";
-          else if(mapped==="congele")mapped="surgel\u00e9";
+          else if(mapped==="congele")mapped="surgelé";
           else if(mapped==="alcool")mapped="vin";
           promises.push(_dbPut({barcode:barcode,name:p.n,sale_price_cents:p.p,category:mapped,stockQty:p.s,source:"backup-import",last_updated:Date.now()}));
         }
@@ -160,28 +168,70 @@
   }
 
   // ─── CART ────────────────────────────────────────────
+  // Cart item structure:
+  // {myId, name, priceCents, bc, cat, weight, unitType, pricePerUnit}
+  // - weight: numeric (e.g., 0.350) or null for fixed-price items
+  // - unitType: "kg"|"g"|"L"|"pc" or null
+  // - pricePerUnit: cents per unit (e.g., 2500 = 25.00€/kg) or null
+  // If weight && pricePerUnit: priceCents = weight * pricePerUnit (auto-calculated)
   var _myCart=[];
   var _realBcMap={};
-  function _addToCart(name,priceCents,barcode,categoryId){
+
+  function _addToCart(name,priceCents,barcode,categoryId,weight,unitType,pricePerUnit){
     if(!name){_toast("Nom manquant");return false;}
     var myId="M"+Date.now()+Math.floor(Math.random()*9999);
-    _myCart.push({myId:myId,name:name,priceCents:priceCents||0,bc:barcode||"",cat:categoryId||"autre"});
+    var item={myId:myId,name:name,priceCents:priceCents||0,bc:barcode||"",cat:categoryId||"autre",
+      weight:weight||null,unitType:unitType||null,pricePerUnit:pricePerUnit||null};
+    _myCart.push(item);
     _realBcMap[myId]=barcode||"";
-    _dbPut({barcode:barcode||myId,name:name,sale_price_cents:priceCents||0,category:categoryId||"autre",source:"add",last_updated:Date.now()});
-    try{document.dispatchEvent(new CustomEvent("acim:add",{detail:{name:name,price:priceCents,barcode:barcode,cat:categoryId}}));}catch(e){}
+    _dbPut({barcode:barcode||myId,name:name,sale_price_cents:priceCents||0,category:categoryId||"autre",
+      weight:weight||null,unitType:unitType||null,pricePerUnit:pricePerUnit||null,
+      source:"add",last_updated:Date.now()});
+    try{document.dispatchEvent(new CustomEvent("acim:add",{detail:{name:name,price:priceCents,barcode:barcode,cat:categoryId,weight:weight,unitType:unitType}}));}catch(e){}
     _renderPOS();return true;
   }
+
   function _cartInfo(){
     var info=[];
     for(var i=0;i<_myCart.length;i++){var e=_myCart[i];
-      info.push({idx:i,myId:e.myId,name:e.name,price:e.priceCents,bc:_realBcMap[e.myId]||e.bc,cat:e.cat});
+      info.push({idx:i,myId:e.myId,name:e.name,price:e.priceCents,bc:_realBcMap[e.myId]||e.bc,cat:e.cat,
+        weight:e.weight,unitType:e.unitType,pricePerUnit:e.pricePerUnit});
     }return info;
   }
+
   function _removeFromCart(idx){
     _myCart.splice(idx,1);_renderPOS();_broadcastCart();
   }
+
   function _cartTotal(){
     var t=0;for(var i=0;i<_myCart.length;i++)t+=_myCart[i].priceCents;return t;
+  }
+
+  // ─── WEIGHT HELPERS ──────────────────────────────────
+  function _isWeightProduct(item){
+    return item.weight!=null&&item.unitType!=null&&item.pricePerUnit!=null;
+  }
+  function _formatWeight(w,unit){
+    if(w==null||!unit)return "";
+    if(unit==="kg")return w.toFixed(3)+" kg";
+    if(unit==="g")return w.toFixed(0)+" g";
+    if(unit==="L")return w.toFixed(2)+" L";
+    if(unit==="pc")return w.toFixed(0)+" pc";
+    return w+" "+unit;
+  }
+  function _formatPricePerUnit(ppu,unit){
+    if(!ppu||!unit)return "";
+    var p=(ppu/100).toFixed(2);
+    if(unit==="kg")return p+"€/kg";
+    if(unit==="g")return p+"€/kg";
+    if(unit==="L")return p+"€/L";
+    if(unit==="pc")return p+"€/pc";
+    return p+"€/u";
+  }
+  function _calcWeightPrice(weight,unit,ppu){
+    if(!weight||!unit||!ppu)return 0;
+    if(unit==="g")return Math.round(ppu*(weight/1000));
+    return Math.round(ppu*weight);
   }
 
   // ─── BROADCAST (écran client) ────────────────────────
@@ -387,9 +437,10 @@
     _filteredProducts.forEach(function(p){
       var card=document.createElement("div");
       var hasPrice=p.sale_price_cents>0;
-      card.style.cssText="background:#fff;border-radius:10px;padding:10px;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,0.08);border:2px solid "+(hasPrice?"transparent":"#ffe082")+";transition:all .15s;display:flex;flex-direction:column;align-items:center;text-align:center;";
+      var isWeighable=p.pricePerUnit>0&&p.unitType;
+      card.style.cssText="background:#fff;border-radius:10px;padding:10px;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,0.08);border:2px solid "+(hasPrice||isWeighable?"transparent":"#ffe082")+";transition:all .15s;display:flex;flex-direction:column;align-items:center;text-align:center;";
       card.onmouseenter=function(){this.style.boxShadow="0 3px 12px rgba(0,0,0,0.15)";this.style.borderColor="#e65100";};
-      card.onmouseleave=function(){this.style.boxShadow="0 1px 3px rgba(0,0,0,0.08)";this.style.borderColor=hasPrice?"transparent":"#ffe082";};
+      card.onmouseleave=function(){this.style.boxShadow="0 1px 3px rgba(0,0,0,0.08)";this.style.borderColor=(hasPrice||isWeighable)?"transparent":"#ffe082";};
 
       var ic=document.createElement("span");
       ic.textContent=_catIcon(p.category||"autre");
@@ -400,7 +451,16 @@
       nm.style.cssText="font-size:12px;font-weight:600;color:#1a1a2e;line-height:1.2;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;";
       nm.textContent=p.name||"?";card.appendChild(nm);
 
-      if(hasPrice){
+      if(isWeighable){
+        var badge=document.createElement("div");
+        badge.style.cssText="font-size:10px;color:#fff;background:#2196f3;border-radius:8px;padding:2px 6px;margin-top:4px;font-weight:600;";
+        badge.textContent="⚖️ Au poids";
+        card.appendChild(badge);
+        var ppu=document.createElement("div");
+        ppu.style.cssText="font-size:13px;font-weight:700;color:#e65100;margin-top:4px;";
+        ppu.textContent=_formatPricePerUnit(p.pricePerUnit,p.unitType);
+        card.appendChild(ppu);
+      }else if(hasPrice){
         var pr=document.createElement("div");
         pr.style.cssText="font-size:15px;font-weight:700;color:#e65100;margin-top:4px;";
         pr.textContent=(p.sale_price_cents/100).toFixed(2)+"€";
@@ -413,7 +473,9 @@
       }
 
       card.onclick=function(){
-        if(hasPrice){
+        if(isWeighable){
+          _weighProduct(p);
+        }else if(hasPrice){
           _addToCart(p.name,p.sale_price_cents,p.barcode,p.category);
           _toast("✅ "+p.name);
         }else{
@@ -423,6 +485,64 @@
       };
       _posGrid.appendChild(card);
     });
+  }
+
+  // ─── WEIGH PRODUCT MODAL ─────────────────────────────
+  function _weighProduct(product){
+    if(_dialogOpen())return;
+    var ov=document.createElement("div");ov.id="acim-weigh";
+    ov.style.cssText="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:10000001;display:flex;align-items:center;justify-content:center;";
+    var card=document.createElement("div");
+    card.style.cssText="background:#fff;border-radius:14px;padding:20px;width:340px;max-width:95vw;box-shadow:0 8px 24px rgba(0,0,0,0.3);font-family:Segoe UI,Arial,sans-serif;";
+    var ti=document.createElement("div");ti.style.cssText="font-size:16px;font-weight:700;margin-bottom:4px;color:#1a1a2e;";
+    ti.textContent="⚖️ Peser — "+product.name;card.appendChild(ti);
+    var unitLabel=document.createElement("div");
+    unitLabel.style.cssText="font-size:12px;color:#666;margin-bottom:12px;";
+    unitLabel.textContent="Prix unitaire: "+_formatPricePerUnit(product.pricePerUnit,product.unitType);
+    card.appendChild(unitLabel);
+
+    var row=document.createElement("div");row.style.cssText="display:flex;align-items:center;gap:8px;margin-bottom:12px;";
+    var wi=document.createElement("input");wi.type="number";wi.step="0.001";wi.min="0";
+    wi.placeholder="Poids";
+    wi.style.cssText="flex:1;font-size:24px;font-weight:700;padding:12px 14px;border:3px solid #e65100;border-radius:10px;outline:none;text-align:center;";
+    wi.onfocus=function(){this.select();};
+    var unitSpan=document.createElement("span");
+    unitSpan.style.cssText="font-size:18px;font-weight:700;color:#e65100;min-width:40px;";
+    unitSpan.textContent=product.unitType||"kg";
+    row.appendChild(wi);row.appendChild(unitSpan);card.appendChild(row);
+
+    var pricePreview=document.createElement("div");
+    pricePreview.style.cssText="font-size:28px;font-weight:700;color:#e65100;text-align:center;margin-bottom:16px;min-height:40px;";
+    pricePreview.textContent="0,00 €";
+    card.appendChild(pricePreview);
+
+    wi.addEventListener("input",function(){
+      var w=parseFloat(wi.value);
+      if(isNaN(w)||w<=0){pricePreview.textContent="0,00 €";return;}
+      var total=_calcWeightPrice(w,product.unitType,product.pricePerUnit);
+      pricePreview.textContent=(total/100).toFixed(2).replace(".",",")+" €";
+    });
+
+    var br=document.createElement("div");br.style.cssText="display:flex;gap:8px;";
+    var bCancel=document.createElement("button");bCancel.textContent="Annuler";
+    bCancel.style.cssText="flex:1;padding:10px;border:2px solid #e0e0e0;border-radius:8px;background:#fff;font-size:14px;cursor:pointer;";
+    bCancel.onclick=function(){ov.remove();};
+    var bOk=document.createElement("button");bOk.textContent="✅ Ajouter au ticket";
+    bOk.style.cssText="flex:2;padding:10px;border:none;border-radius:8px;background:#e65100;color:#fff;font-size:14px;cursor:pointer;font-weight:700;";
+    bOk.onclick=function(){
+      var w=parseFloat(wi.value);
+      if(isNaN(w)||w<=0){wi.style.borderColor="#c62828";wi.focus();return;}
+      var total=_calcWeightPrice(w,product.unitType,product.pricePerUnit);
+      var displayName=product.name+" "+_formatWeight(w,product.unitType);
+      _addToCart(displayName,total,product.barcode,product.category,w,product.unitType,product.pricePerUnit);
+      ov.remove();
+      _toast("✅ "+displayName+" = "+(total/100).toFixed(2)+"€");
+    };
+    br.appendChild(bCancel);br.appendChild(bOk);card.appendChild(br);
+    ov.appendChild(card);
+    ov.onclick=function(e){if(e.target===ov)ov.remove();};
+    document.body.appendChild(ov);
+    setTimeout(function(){wi.focus();},100);
   }
 
   function _renderCart(){
@@ -441,12 +561,13 @@
     info.forEach(function(item){
       var row=document.createElement("div");
       var isZero=item.price===0;
+      var isWeighed=_isWeightProduct(item);
       row.style.cssText="display:flex;align-items:center;padding:8px 10px;border-bottom:1px solid #f0f0f0;transition:background .15s;";
       row.onmouseenter=function(){this.style.background="#fafafa";};
       row.onmouseleave=function(){this.style.background="transparent";};
 
       var icon=document.createElement("span");
-      icon.textContent=_catIcon(item.cat||"autre");
+      icon.textContent=isWeighed?"⚖️":_catIcon(item.cat||"autre");
       icon.style.cssText="font-size:16px;margin-right:8px;flex-shrink:0;";
       row.appendChild(icon);
 
@@ -456,6 +577,13 @@
       nm.style.cssText="font-size:12px;font-weight:600;color:"+(isZero?"#e65100":"#1a1a2e")+";overflow:hidden;text-overflow:ellipsis;white-space:nowrap;";
       nm.textContent=isZero?"✏️ "+item.name:item.name;
       infoDiv.appendChild(nm);
+
+      if(isWeighed&&item.weight!=null){
+        var wLine=document.createElement("div");
+        wLine.style.cssText="font-size:11px;color:#666;";
+        wLine.textContent=_formatWeight(item.weight,item.unitType)+" × "+_formatPricePerUnit(item.pricePerUnit,item.unitType);
+        infoDiv.appendChild(wLine);
+      }
 
       if(item.price>0){
         var pr=document.createElement("div");
@@ -474,7 +602,7 @@
       dupBtn.style.cssText="font-size:14px;cursor:pointer;padding:4px 6px;border-radius:4px;color:#1a1a2e;opacity:0.4;";
       dupBtn.onmouseenter=function(){this.style.opacity="1";this.style.background="#f0f0f0";};
       dupBtn.onmouseleave=function(){this.style.opacity="0.4";this.style.background="transparent";};
-      dupBtn.onclick=function(e){e.stopPropagation();_addToCart(item.name,item.price,item.bc,item.cat);_toast("✅ "+item.name);};
+      dupBtn.onclick=function(e){e.stopPropagation();_addToCart(item.name,item.price,item.bc,item.cat,item.weight,item.unitType,item.pricePerUnit);_toast("✅ "+item.name);};
       actions.appendChild(dupBtn);
 
       var editBtn=document.createElement("span");
@@ -529,6 +657,10 @@
     _log("Scanner: "+bc);
     try{document.dispatchEvent(new CustomEvent("acim:scan",{detail:{barcode:bc}}));}catch(e){}
     _dbGet(bc).then(function(local){
+      if(local&&local.pricePerUnit>0&&local.unitType){
+        _weighProduct({name:local.name,barcode:bc,category:local.category,pricePerUnit:local.pricePerUnit,unitType:local.unitType,sale_price_cents:local.sale_price_cents});
+        return;
+      }
       if(local&&local.sale_price_cents>0){
         _addToCart(local.name,local.sale_price_cents,bc,local.category);
         _toast("✅ "+local.name+" "+(local.sale_price_cents/100).toFixed(2)+"€");return;
@@ -564,32 +696,83 @@
     var oldCard=document.getElementById("acim-inline-edit");if(oldCard)oldCard.remove();
     var card=document.createElement("div");card.id="acim-inline-edit";
     var left=Math.max(10,(window.innerWidth-280)/2);
-    var top=Math.max(10,(window.innerHeight-400)/2);
-    card.style.cssText="position:fixed;left:"+left+"px;top:"+top+"px;width:280px;background:#fff;border-radius:12px;padding:14px;box-shadow:0 6px 20px rgba(0,0,0,0.25);z-index:10000001;font-family:Segoe UI,Arial,sans-serif;";
+    var top=Math.max(10,(window.innerHeight-450)/2);
+    card.style.cssText="position:fixed;left:"+left+"px;top:"+top+"px;width:280px;max-height:80vh;overflow-y:auto;background:#fff;border-radius:12px;padding:14px;box-shadow:0 6px 20px rgba(0,0,0,0.25);z-index:10000001;font-family:Segoe UI,Arial,sans-serif;";
     var ti=document.createElement("div");ti.style.cssText="font-size:13px;font-weight:700;margin-bottom:8px;color:#1a1a2e;";ti.textContent=_catIcon(item.cat||"autre")+" Modifier";card.appendChild(ti);
     var ni=document.createElement("input");ni.type="text";ni.value=item.name||"";ni.placeholder="Nom";
     ni.style.cssText="width:100%;font-size:14px;padding:8px 12px;border:2px solid #e0e0e0;border-radius:8px;outline:none;box-sizing:border-box;margin-bottom:6px;";
     ni.onfocus=function(){this.style.borderColor="#e65100";this.select();};ni.onblur=function(){this.style.borderColor="#e0e0e0";};card.appendChild(ni);
+
+    // Fixed price row
     var row=document.createElement("div");row.style.cssText="display:flex;align-items:center;gap:4px;margin-bottom:6px;";
     var pi=document.createElement("input");pi.type="number";pi.step="0.01";pi.min="0";
-    pi.value=item.priceCents>0?(item.priceCents/100).toFixed(2):"";pi.placeholder="Prix";
+    pi.value=item.priceCents>0?(item.priceCents/100).toFixed(2):"";pi.placeholder="Prix fixe";
     pi.style.cssText="flex:1;font-size:16px;font-weight:700;padding:8px 12px;border:2px solid #e0e0e0;border-radius:8px;outline:none;";
     pi.onfocus=function(){this.style.borderColor="#e65100";this.select();};pi.onblur=function(){this.style.borderColor="#e0e0e0";};
     var eu=document.createElement("span");eu.style.cssText="font-size:16px;font-weight:700;color:#e65100;";eu.textContent="€";
     row.appendChild(pi);row.appendChild(eu);card.appendChild(row);
+
+    // Weight section (only if product has pricePerUnit)
+    var hasWeightMode=item.pricePerUnit!=null&&item.unitType!=null;
     var poidsRow=document.createElement("div");poidsRow.style.cssText="display:flex;align-items:center;gap:4px;margin-bottom:6px;";
-    var exPoids="",exUnit="kg";
-    var pm=item.name&&item.name.match(/ (\d+[.,]?\d*)\s*(kg|g|L|pc|pièce)/);
-    if(pm){exPoids=pm[1].replace(",",".");exUnit=pm[2]=='pièce'?'pc':pm[2];}
     var poidsIn=document.createElement("input");poidsIn.type="number";poidsIn.step="0.001";poidsIn.min="0";
-    poidsIn.value=exPoids;poidsIn.placeholder="Poids";
+    poidsIn.value=item.weight!=null?item.weight:"";poidsIn.placeholder="Poids";
     poidsIn.style.cssText="flex:1;font-size:12px;padding:6px 10px;border:2px solid #e0e0e0;border-radius:6px;outline:none;";
     poidsIn.onfocus=function(){this.style.borderColor="#e65100";};poidsIn.onblur=function(){this.style.borderColor="#e0e0e0";};
     var unitSel=document.createElement("select");unitSel.style.cssText="font-size:12px;padding:4px;border:2px solid #e0e0e0;border-radius:6px;outline:none;background:#fff;";
     [["kg","kg"],["g","g"],["L","L"],["pc","pièce"]].forEach(function(u){
       var o=document.createElement("option");o.value=u[0];o.textContent=u[1];
-      if(u[0]==exUnit)o.selected=true;unitSel.appendChild(o);});
+      if(item.unitType&&u[0]===item.unitType)o.selected=true;
+      poidsRow.appendChild(unitSel);
+    });
+    // Fix: build options properly
+    unitSel.innerHTML="";
+    [["kg","kg"],["g","g"],["L","L"],["pc","pièce"]].forEach(function(u){
+      var o=document.createElement("option");o.value=u[0];o.textContent=u[1];
+      if(item.unitType&&u[0]===item.unitType)o.selected=true;
+      unitSel.appendChild(o);
+    });
+
+    // Price per unit row
+    var ppuRow=document.createElement("div");ppuRow.style.cssText="display:flex;align-items:center;gap:4px;margin-bottom:6px;";
+    var ppuIn=document.createElement("input");ppuIn.type="number";ppuIn.step="0.01";ppuIn.min="0";
+    ppuIn.value=item.pricePerUnit!=null?(item.pricePerUnit/100).toFixed(2):"";ppuIn.placeholder="Prix unitaire (€/kg)";
+    ppuIn.style.cssText="flex:1;font-size:12px;padding:6px 10px;border:2px solid #e0e0e0;border-radius:6px;outline:none;";
+    ppuIn.onfocus=function(){this.style.borderColor="#e65100";};ppuIn.onblur=function(){this.style.borderColor="#e0e0e0";};
+    var ppuUnit=document.createElement("span");ppuUnit.style.cssText="font-size:11px;color:#666;min-width:40px;";
+    ppuUnit.textContent="/kg";
+    ppuRow.appendChild(ppuIn);ppuRow.appendChild(ppuUnit);card.appendChild(ppuRow);
+
+    // Update unit label when unit changes
+    unitSel.onchange=function(){ppuUnit.textContent="/"+unitSel.value;};
+
     poidsRow.appendChild(poidsIn);poidsRow.appendChild(unitSel);card.appendChild(poidsRow);
+
+    // Real-time price preview when weight mode active
+    var preview=document.createElement("div");preview.style.cssText="font-size:14px;font-weight:700;color:#e65100;text-align:center;margin-bottom:8px;min-height:20px;";
+    card.appendChild(preview);
+
+    function _updatePreview(){
+      var w=parseFloat(poidsIn.value);
+      var ppu=parseFloat(ppuIn.value);
+      var u=unitSel.value;
+      if(!isNaN(w)&&w>0&&!isNaN(ppu)&&ppu>0){
+        var ppuCents=Math.round(ppu*100);
+        var total=_calcWeightPrice(w,u,ppuCents);
+        preview.textContent="⚖️ "+_formatWeight(w,u)+" × "+_formatPricePerUnit(ppuCents,u)+" = "+(total/100).toFixed(2)+"€";
+        pi.value=(total/100).toFixed(2);
+        pi.style.borderColor="#2196f3";
+      }else{
+        preview.textContent="";
+        pi.style.borderColor="#e0e0e0";
+      }
+    }
+    poidsIn.addEventListener("input",_updatePreview);
+    ppuIn.addEventListener("input",_updatePreview);
+    unitSel.addEventListener("change",_updatePreview);
+    if(hasWeightMode)setTimeout(_updatePreview,50);
+
+    // Category pills
     var cr=document.createElement("div");cr.style.cssText="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:8px;";
     var selCat=item.cat||"autre";
     for(var ci=0;ci<CATS.length;ci++){(function(cat){
@@ -611,12 +794,25 @@
     bOk.onclick=function(){
       var nn=ni.value.trim(),np=parseFloat(pi.value);
       var pv=parseFloat(poidsIn.value),u=unitSel.value;
-      if(pv>0){nn=nn+" "+pv+u;}
+      var ppu=parseFloat(ppuIn.value);
       if(!nn){ni.style.borderColor="#c62828";ni.focus();return;}
       var pc=isNaN(np)?_myCart[idx].priceCents:Math.round(np*100);
+      var weight=null,unitType=null,pricePerUnit=null;
+      if(!isNaN(pv)&&pv>0&&u){
+        weight=pv;unitType=u;
+        if(!isNaN(ppu)&&ppu>0)pricePerUnit=Math.round(ppu*100);
+        if(!pricePerUnit&&item.pricePerUnit)pricePerUnit=item.pricePerUnit;
+        if(weight&&unitType&&pricePerUnit){
+          pc=_calcWeightPrice(weight,unitType,pricePerUnit);
+          nn=ni.value.trim()+" "+_formatWeight(weight,unitType);
+        }
+      }
       card.remove();
       _myCart[idx].name=nn;_myCart[idx].priceCents=pc;_myCart[idx].cat=selCat;
-      _dbPut({barcode:_myCart[idx].bc||_myCart[idx].myId,name:nn,sale_price_cents:pc,category:selCat,source:"edit",last_updated:Date.now()});
+      _myCart[idx].weight=weight;_myCart[idx].unitType=unitType;_myCart[idx].pricePerUnit=pricePerUnit;
+      _dbPut({barcode:_myCart[idx].bc||_myCart[idx].myId,name:nn,sale_price_cents:pc,category:selCat,
+        weight:weight,unitType:unitType,pricePerUnit:pricePerUnit,
+        source:"edit",last_updated:Date.now()});
       _toast("✅ "+nn+(pc>0?" "+(pc/100).toFixed(2)+"€":""));
       _renderPOS();
     };
@@ -635,12 +831,48 @@
     var ni=document.createElement("input");ni.type="text";ni.placeholder="Nom du produit";ni.value=name||"";
     ni.style.cssText="width:100%;font-size:15px;padding:10px 14px;border:3px solid #e0e0e0;border-radius:10px;outline:none;box-sizing:border-box;margin-bottom:8px;";
     ni.onfocus=function(){this.style.borderColor="#e65100";};ni.onblur=function(){this.style.borderColor="#e0e0e0";};card.appendChild(ni);
-    var row=document.createElement("div");row.style.cssText="display:flex;align-items:center;gap:4px;margin-bottom:8px;";
+
+    // Weight mode toggle
+    var toggleRow=document.createElement("div");toggleRow.style.cssText="display:flex;align-items:center;gap:8px;margin-bottom:8px;";
+    var toggleLabel=document.createElement("label");toggleLabel.style.cssText="font-size:13px;color:#1a1a2e;cursor:pointer;display:flex;align-items:center;gap:6px;";
+    var toggle=document.createElement("input");toggle.type="checkbox";
+    toggle.style.cssText="width:18px;height:18px;accent-color:#e65100;cursor:pointer;";
+    toggleLabel.appendChild(toggle);toggleLabel.appendChild(document.createTextNode("⚖️ Produit au poids"));toggleRow.appendChild(toggleLabel);
+    card.appendChild(toggleRow);
+
+    // Fixed price row
+    var fixedRow=document.createElement("div");fixedRow.style.cssText="display:flex;align-items:center;gap:4px;margin-bottom:8px;";
     var pi=document.createElement("input");pi.type="number";pi.step="0.01";pi.min="0";pi.value=priceCents>0?(priceCents/100).toFixed(2):"";
     pi.placeholder="Prix de vente";pi.style.cssText="flex:1;font-size:16px;font-weight:700;padding:10px 14px;border:3px solid #e0e0e0;border-radius:10px;outline:none;";
     pi.onfocus=function(){this.style.borderColor="#e65100";};pi.onblur=function(){this.style.borderColor="#e0e0e0";};
     var eu=document.createElement("span");eu.style.cssText="font-size:18px;font-weight:700;color:#e65100;";eu.textContent="€";
-    row.appendChild(pi);row.appendChild(eu);card.appendChild(row);
+    fixedRow.appendChild(pi);fixedRow.appendChild(eu);card.appendChild(fixedRow);
+
+    // Weight mode fields (hidden by default)
+    var weighSection=document.createElement("div");weighSection.style.cssText="display:none;";
+    var ppuRow=document.createElement("div");ppuRow.style.cssText="display:flex;align-items:center;gap:4px;margin-bottom:8px;";
+    var ppuIn=document.createElement("input");ppuIn.type="number";ppuIn.step="0.01";ppuIn.min="0";
+    ppuIn.placeholder="Prix unitaire (ex: 25,00€/kg)";ppuIn.style.cssText="flex:1;font-size:16px;font-weight:700;padding:10px 14px;border:3px solid #e0e0e0;border-radius:10px;outline:none;";
+    ppuIn.onfocus=function(){this.style.borderColor="#e65100";};ppuIn.onblur=function(){this.style.borderColor="#e0e0e0";};
+    var ppuUnitSel=document.createElement("select");ppuUnitSel.style.cssText="font-size:14px;padding:8px;border:3px solid #e0e0e0;border-radius:10px;outline:none;background:#fff;";
+    [["kg","€/kg"],["g","€/kg (g)"],["L","€/L"],["pc","€/pièce"]].forEach(function(u){
+      var o=document.createElement("option");o.value=u[0];o.textContent=u[1];ppuUnitSel.appendChild(o);});
+    ppuRow.appendChild(ppuIn);ppuRow.appendChild(ppuUnitSel);weighSection.appendChild(ppuRow);
+    card.appendChild(weighSection);
+
+    toggle.onchange=function(){
+      if(toggle.checked){
+        fixedRow.style.display="none";
+        weighSection.style.display="block";
+        ppuIn.focus();
+      }else{
+        fixedRow.style.display="flex";
+        weighSection.style.display="none";
+        pi.focus();
+      }
+    };
+
+    // Category pills
     var cr=document.createElement("div");cr.style.cssText="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:12px;";
     var selCat=category||"autre";
     for(var ci=0;ci<CATS.length;ci++){(function(cat){
@@ -656,14 +888,30 @@
     var bOk=document.createElement("button");bOk.textContent="Ajouter au ticket";
     bOk.style.cssText="flex:2;padding:10px;border:none;border-radius:8px;background:#e65100;color:#fff;font-size:14px;cursor:pointer;font-weight:700;";
     bOk.onclick=function(){
-      var nn=ni.value.trim(),np=parseFloat(pi.value);
+      var nn=ni.value.trim();
       if(!nn){ni.style.borderColor="#c62828";ni.focus();return;}
-      var pc=isNaN(np)?0:Math.round(np*100);
       var autoBc=_nextBarcode();
-      _addToCart(nn,pc,autoBc,selCat);
-      _dbPut({barcode:autoBc,name:nn,sale_price_cents:pc,category:selCat,source:"manual",last_updated:Date.now()});
-      ov.remove();
-      _toast("✅ "+nn+(pc>0?" "+(pc/100).toFixed(2)+"€":""));
+      if(toggle.checked){
+        // Weight mode product
+        var ppu=parseFloat(ppuIn.value);
+        var unitType=ppuUnitSel.value;
+        if(isNaN(ppu)||ppu<=0){ppuIn.style.borderColor="#c62828";ppuIn.focus();return;}
+        var ppuCents=Math.round(ppu*100);
+        _addToCart(nn,0,autoBc,selCat,null,unitType,ppuCents);
+        _dbPut({barcode:autoBc,name:nn,sale_price_cents:0,category:selCat,
+          pricePerUnit:ppuCents,unitType:unitType,
+          source:"manual-weight",last_updated:Date.now()});
+        ov.remove();
+        _toast("⚖️ "+nn+" — "+_formatPricePerUnit(ppuCents,unitType));
+      }else{
+        // Fixed price product
+        var np=parseFloat(pi.value);
+        var pc=isNaN(np)?0:Math.round(np*100);
+        _addToCart(nn,pc,autoBc,selCat);
+        _dbPut({barcode:autoBc,name:nn,sale_price_cents:pc,category:selCat,source:"manual",last_updated:Date.now()});
+        ov.remove();
+        _toast("✅ "+nn+(pc>0?" "+(pc/100).toFixed(2)+"€":""));
+      }
     };
     br.appendChild(bCancel);br.appendChild(bOk);card.appendChild(br);
     ov.appendChild(card);
@@ -672,7 +920,7 @@
     setTimeout(function(){ni.focus();},100);
   }
 
-  function _dialogOpen(){return !!document.getElementById("acim-inline-edit")||!!document.getElementById("acim-quick");}
+  function _dialogOpen(){return !!document.getElementById("acim-inline-edit")||!!document.getElementById("acim-quick")||!!document.getElementById("acim-weigh");}
 
   // ─── TOAST ────────────────────────────────────────────
   function _toast(msg){
@@ -686,7 +934,7 @@
   function init(){
     if(!_acquireTabLock()){_toast("⚠ Caisse déjà ouverte dans un autre onglet");return;}
     _loadBcSeq().then(function(){
-      _log("v32.2 — POS UI + robust search");
+      _log("v33 — POS UI + Produits au Poids");
       _importBackupFromEmbedded().then(function(imported){
         if(imported)_toast("✅ Catalogue importé (38 produits)");
         return _dbGetAll();
@@ -715,5 +963,6 @@
   window._acimDebug=function(){return{cart:_myCart.length};};
   window._acimProcessBarcode=_processBarcode;
   window._acimAddToCart=function(name,price,cat){_addToCart(name,price,"",cat);};
+  window._acimWeighProduct=_weighProduct;
 })();
-// ─── FIN AcimCaisse v32 ───
+// ─── FIN AcimCaisse v33 ───
