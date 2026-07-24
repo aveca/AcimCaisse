@@ -109,10 +109,10 @@ function escapeHtml(s) {
 bc.onmessage = function(event) {
   var msg = event.data;
   if (msg.type === "cart-update") {
-    render(msg.data);
-    lastData = msg.data;
+    var data = { items: msg.lines || [], total: msg.total || 0 };
+    render(data);
+    lastData = data;
   } else if (msg.type === "cart-clear") {
-    // Panier vidé → paiement terminé
     var total = lastData ? lastData.total : 0;
     document.getElementById("content").innerHTML =
       '<div class="payment-msg">✅ Merci !<br>Total : ' + (total / 100).toFixed(2) + "€</div>";
@@ -121,29 +121,6 @@ bc.onmessage = function(event) {
         '<div class="waiting"><div class="waiting-dots"><span>●</span><span>●</span><span>●</span></div></div>';
       lastData = null;
     }, 5000);
-  } else if (msg.type === "item-new") {
-    // Nouveau item → flash animé
-    if (lastData) {
-      lastData.items.push(msg.item);
-      lastData.total = msg.total || lastData.total + msg.item.price;
-      lastData.newestIdx = lastData.items.length - 1;
-      render(lastData);
-    }
-  } else if (msg.type === "item-edit") {
-    // Item modifié
-    if (lastData && msg.idx >= 0 && msg.idx < lastData.items.length) {
-      lastData.items[msg.idx] = msg.item;
-      lastData.total = msg.total || lastData.total;
-      render(lastData);
-    }
-  } else if (msg.type === "item-remove") {
-    // Item supprimé
-    if (lastData && msg.idx >= 0 && msg.idx < lastData.items.length) {
-      lastData.items.splice(msg.idx, 1);
-      lastData.total = msg.total || lastData.total;
-      lastData.newestIdx = -1;
-      render(lastData);
-    }
   }
 };
 

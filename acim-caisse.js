@@ -1,4 +1,4 @@
-// ─── AcimCaisse v29 — scanner focus-forced, total sticky, panier unique ──────────
+// ─── AcimCaisse v30 — menu fix, backup import, sales persistence, multi-tab lock ──
 // Injecté DANS l'IIFE dartProgram (A, J, $, t, B accessibles)
 // _myCart = seule source de vérité, AUCUN sync Dart
 ;(function(){
@@ -6,9 +6,65 @@
   var _log=function(m){console.log("[Acim] "+m);};
   var _err=function(m,e){console.error("[Acim] "+m,e);};
 
-  // Auto-barcode
+  // ─── MULTI-TAB LOCK ──────────────────────────────────
+  var _tabLockKey="acim-caisse-tab-lock";
+  var _tabId=Date.now()+"-"+Math.floor(Math.random()*99999);
+  var _isMainTab=true;
+  function _acquireTabLock(){
+    try{
+      var prev=localStorage.getItem(_tabLockKey);
+      var now=Date.now();
+      if(prev){var parts=prev.split("|");var ts=parseInt(parts[0]);var id=parts[1];
+        if(now-ts<5000&&id!==_tabId){_isMainTab=false;_log("Another tab is active — this tab is secondary");return false;}
+      }
+      localStorage.setItem(_tabLockKey,now+"|"+_tabId);
+      return true;
+    }catch(e){return true;}
+  }
+  function _refreshTabLock(){
+    try{localStorage.setItem(_tabLockKey,Date.now()+"|"+_tabId);}catch(e){}
+  }
+  function _releaseTabLock(){
+    try{var prev=localStorage.getItem(_tabLockKey);
+      if(prev&&prev.indexOf(_tabId)>=0)localStorage.removeItem(_tabLockKey);}catch(e){}
+  }
+  window.addEventListener("beforeunload",_releaseTabLock);
+  setInterval(_refreshTabLock,3000);
+
+  // ─── AUTO-BARCODE (persisted in IndexedDB) ───────────
   var _bcSeq=1000;
+  var _bcSeqKey="acim-bc-seq";
   function _nextBarcode(){return "ACIM-"+(_bcSeq++);}
+
+  function _loadBcSeq(){
+    return _openMeta().then(function(d){
+      if(!d)return;return new Promise(function(ok){
+        var r=d.transaction("meta","readonly").objectStore("meta").get(_bcSeqKey);
+        r.onsuccess=function(){if(r.result&&typeof r.result.value==="number")_bcSeq=r.result.value;ok();};
+        r.onerror=function(){ok();};
+      });
+    }).catch(function(){});
+  }
+  function _saveBcSeq(){
+    _openMeta().then(function(d){
+      if(!d)return;var tx=d.transaction("meta","readwrite");
+      tx.objectStore("meta").put({key:_bcSeqKey,value:_bcSeq});
+    }).catch(function(){});
+  }
+  var _origNextBarcode=_nextBarcode;
+  _nextBarcode=function(){var bc=_origNextBarcode();_saveBcSeq();return bc;};
+
+  // ─── META STORE (for bcSeq, settings) ────────────────
+  var _metaDb=null;
+  function _openMeta(){
+    if(_metaDb)return Promise.resolve(_metaDb);
+    return new Promise(function(ok){
+      try{var r=indexedDB.open("acim-meta",1);
+        r.onupgradeneeded=function(e){var d=e.target.result;if(!d.objectStoreNames.contains("meta"))d.createObjectStore("meta",{keyPath:"key"});};
+        r.onsuccess=function(e){_metaDb=e.target.result;ok(_metaDb);};r.onerror=function(){ok(null);};
+      }catch(e){ok(null);}
+    });
+  }
 
   // Responsive
   var _mob=window.innerWidth<600;
@@ -52,6 +108,82 @@
     return new Promise(function(ok){var r=d.transaction("products","readonly").objectStore("products").get(bc);r.onsuccess=function(){ok(r.result||null);};r.onerror=function(){ok(null);};});});}
   function _dbPut(p){return _openDB().then(function(d){if(!d)return;
     return new Promise(function(ok){var tx=d.transaction("products","readwrite");tx.objectStore("products").put(p);tx.oncomplete=ok;tx.onerror=ok;});});}
+
+  // ═══════════════════════════════════════════════════════
+  //  SALES STORE — persist sales history
+  // ═══════════════════════════════════════════════════════
+  function _openSalesDB(){
+    return new Promise(function(ok){
+      try{var r=indexedDB.open("acim-sales",1);
+        r.onupgradeneeded=function(e){var d=e.target.result;
+          if(!d.objectStoreNames.contains("sales"))d.createObjectStore("sales",{keyPath:"id",autoIncrement:true});};
+        r.onsuccess=function(e){ok(e.target.result);};r.onerror=function(){ok(null);};
+      }catch(e){ok(null);}
+    });
+  }
+  function _persistSale(items,totalCents){
+    _openSalesDB().then(function(d){
+      if(!d)return;var tx=d.transaction("sales","readwrite");
+      tx.objectStore("sales").put({
+        timestamp:Date.now(),
+        isoTime:new Date().toISOString(),
+        items:items.map(function(it){return{name:it.name,price:it.priceCents,barcode:it.bc||"",cat:it.cat};}),
+        totalCents:totalCents,
+        itemCount:items.length
+      });
+    }).catch(function(e){_err("Sale persist failed:",e);});
+  }
+
+  // ═══════════════════════════════════════════════════════
+  //  BACKUP IMPORT — JSON → IndexedDB acim-catalog
+  // ═══════════════════════════════════════════════════════
+  var _BACKUP_IMPORTED_KEY="acim-backup-imported-v1";
+  var _BACKUP_DATA={"format":1,"categories":[{"id":"13b06477","name":"Frais"},{"id":"562843c7","name":"Sec"},{"id":"adb67835","name":"Congele"},{"id":"0bfc0834","name":"Divers"},{"id":"a7a910fe","name":"Vin"},{"id":"16a4e603","name":"Alcool"}],"products":[{"n":"R#E_Gourmet# Viennoisses Volaille Mron","c":"0bfc0834","p":0,"s":80},{"n":"R[Guli] Mortadelle Volaille","c":"0bfc0834","p":0,"s":20},{"n":"R[Guli] Cabanossi Gendarme","c":"0bfc0834","p":0,"s":12},{"n":"R[Guli] Bavarois Mini Kabanos","c":"0bfc0834","p":0,"s":36},{"n":"R[Guli] Panais Entier","c":"0bfc0834","p":0,"s":60},{"n":"Bissli Falafel OSEM 100g","c":"16a4e603","p":400,"s":0},{"n":"Bissli Grill OSEM 100g","c":"16a4e603","p":400,"s":0},{"n":"Bissli Boulgar OSEM 100g","c":"16a4e603","p":400,"s":0},{"n":"Bissli Hot OSEM 100g","c":"16a4e603","p":400,"s":0},{"n":"Bamba OSEM 100g","c":"16a4e603","p":400,"s":0},{"n":"Bamba OSEM 70g","c":"16a4e603","p":300,"s":0},{"n":"Tapouk OSEM 100g","c":"16a4e603","p":400,"s":0},{"n":"Tapouk OSEM 70g","c":"16a4e603","p":300,"s":0},{"n":"Cracotte OSEM 100g","c":"16a4e603","p":400,"s":0},{"n":"Cracotte OSEM 70g","c":"16a4e603","p":300,"s":0},{"n":"Krembo OSEM Vanille","c":"16a4e603","p":500,"s":0},{"n":"Krembo OSEM Chocolat","c":"16a4e603","p":500,"s":0},{"n":"Aigle Noir Fumoir Saumon 200g","c":"13b06477","p":1200,"s":0},{"n":"Aigle Noir Fumoir Thon 200g","c":"13b06477","p":1000,"s":0},{"n":"Steak Hach\u00e9 5% 1kg","c":"13b06477","p":800,"s":0},{"n":"Steak Hach\u00e9 15% 1kg","c":"13b06477","p":750,"s":0},{"n":"Poulet Entier Frais","c":"13b06477","p":500,"s":0},{"n":"Cuisses de Poulet Frais 1kg","c":"13b06477","p":600,"s":0},{"n":"Blanc de Poulet Frais 1kg","c":"13b06477","p":900,"s":0},{"n":"Merguez Frais 1kg","c":"13b06477","p":700,"s":0},{"n":"Saucisse Frais 1kg","c":"13b06477","p":650,"s":0},{"n":"Escalope de Dinde Frais 1kg","c":"13b06477","p":1100,"s":0},{"n":"Agneau Hach\u00e9 1kg","c":"13b06477","p":1400,"s":0},{"n":"C\u00f4tes de Porc Frais 1kg","c":"13b06477","p":900,"s":0},{"n":"Riz Basmati 1kg","c":"adb67835","p":250,"s":0},{"n":"P\u00eates Fusilli 500g","c":"adb67835","p":180,"s":0},{"n":"Huile d\'Olive 75cl","c":"adb67835","p":600,"s":0},{"n":"Thon en Conserve 185g","c":"adb67835","p":350,"s":0},{"n":"Haricots Blancs Conserve 400g","c":"adb67835","p":200,"s":0},{"n":"Sauce Tomate 70cl","c":"adb67835","p":250,"s":0},{"n":"Yaourt Nature x12","c":"562843c7","p":500,"s":0},{"n":"Camembert 250g","c":"562843c7","p":450,"s":0},{"n":"Beurre Doux 250g","c":"562843c7","p":250,"s":0}]};
+  function _importBackupFromEmbedded(){
+    return _openMeta().then(function(d){
+      if(!d)return false;
+      return new Promise(function(ok){
+        var r=d.transaction("meta","readonly").objectStore("meta").get(_BACKUP_IMPORTED_KEY);
+        r.onsuccess=function(){ok(!!(r.result&&r.result.value));};
+        r.onerror=function(){ok(false);};
+      });
+    }).then(function(imported){
+      if(imported){_log("Backup already imported");return false;}
+      return _openDB().then(function(d){
+        if(!d)return false;
+        return new Promise(function(ok){
+          var r=d.transaction("products","readonly").objectStore("products").count();
+          r.onsuccess=function(){ok(r.result);};r.onerror=function(){ok(0);};
+        });
+      }).then(function(count){
+        if(count>0){_log("IndexedDB already has "+count+" products, skipping import");return false;}
+        var cats=_BACKUP_DATA.categories;
+        var catMap={};
+        for(var ci=0;ci<cats.length;ci++)catMap[cats[ci].id]=cats[ci].name;
+        var prods=_BACKUP_DATA.products;
+        var promises=[];
+        for(var pi=0;pi<prods.length;pi++){
+          var p=prods[pi];
+          var barcode="ACIM-DB-"+pi+"-"+Math.random().toString(36).substr(2,6);
+          var catName=catMap[p.c]||"Divers";
+          var mapped=catName.toLowerCase();
+          if(mapped==="frais")mapped="viande";
+          else if(mapped==="sec")mapped="snack";
+          else if(mapped==="congele")mapped="surgel\u00e9";
+          else if(mapped==="alcool")mapped="vin";
+          promises.push(_dbPut({barcode:barcode,name:p.n,sale_price_cents:p.p,category:mapped,stockQty:p.s,source:"backup-import",last_updated:Date.now()}));
+        }
+        return Promise.all(promises).then(function(){
+          _openMeta().then(function(d){
+            if(!d)return;var tx=d.transaction("meta","readwrite");
+            tx.objectStore("meta").put({key:_BACKUP_IMPORTED_KEY,value:true});
+          });
+          _log("Imported "+prods.length+" products from backup");
+          return true;
+        });
+      });
+    }).catch(function(e){_err("Backup import error:",e);return false;});
+  }
 
   // Open Food Facts
   var _OFF="https://world.openfoodfacts.org/api/v0/product/";
@@ -466,15 +598,16 @@
   // ═══════════════════════════════════════════════════════
   function _checkout(){
     if(_myCart.length===0){_toast("⚠ Panier vide");return;}
-    var total=0;for(var i=0;i<_myCart.length;i++)total+=_myCart[i].priceCents;
+    var total=0;var saleItems=[];
+    for(var i=0;i<_myCart.length;i++){total+=_myCart[i].priceCents;saleItems.push(_myCart[i]);}
+    _persistSale(saleItems,total);
     _broadcastClear();_myCart=[];_realBcMap={};_pollCart();
     _toast("✅ Encaissé ! "+(total/100).toFixed(2)+"€");}
 
   // ═══════════════════════════════════════════════════════
   //  DIVERS
   // ═══════════════════════════════════════════════════════
-  var _scannerActive=false;
-  function _dialogOpen(){return !!document.getElementById("acim-inline-edit")||!!document.getElementById("acim-quick")||!!document.getElementById("acim-scanner");}
+  var _dialogOpen=function(){return !!document.getElementById("acim-inline-edit")||!!document.getElementById("acim-quick")||!!document.getElementById("acim-scanner");};
 
   function _toast(msg){
     if(!msg)return;var old=document.getElementById("acim-toast");if(old)old.remove();
@@ -514,7 +647,7 @@
   // Camera désactivation
   if(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia){
     var _origGetUserMedia=navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
-    navigator.mediaDevices.getUserMedia=function(c){if(_scannerActive)return _origGetUserMedia(c);return Promise.reject(new DOMException("Camera managed by AcimCaisse","NotAllowedError"));};
+    navigator.mediaDevices.getUserMedia=function(c){return Promise.reject(new DOMException("Camera managed by AcimCaisse","NotAllowedError"));};
   }
 
   // ═══════════════════════════════════════════════════════
@@ -535,15 +668,19 @@
   //  INIT
   // ═══════════════════════════════════════════════════════
   function init(){
-    _log("v29 — scanner focus-forced (blur Flutter), total sticky, panier unique");
-    _createOverlay();_createFloatingButtons();_createBarcodeInput();
+    if(!_acquireTabLock()){
+      _toast("⚠️ Caisse déjà ouverte dans un autre onglet");return;}
+    _loadBcSeq().then(function(){
+      _log("v30 — menu fix, backup import, sales persistence, multi-tab lock");
+      _createOverlay();_createFloatingButtons();_createBarcodeInput();
+      _importBackupFromEmbedded().then(function(imported){
+        if(imported)_toast("✅ Catalogue importé (38 produits)");
+      });
+    });
   }
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",init);else init();
 
   window._acimGetCartInfo=_cartInfo;
   window._acimDebug=function(){return{cart:_myCart.length};};
 })();
-// ─── FIN AcimCaisse ───
-
-
-})()
+// ─── FIN AcimCaisse v30 ───

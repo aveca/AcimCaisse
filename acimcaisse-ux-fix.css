@@ -244,17 +244,13 @@
 }
 
 /* ============================================
-   5. FLUTTER-VIEW - ÉVITER LES CLIQUES VIDES
+   5. FLUTTER-VIEW — pointer-events géré par shadow DOM injection
    ============================================ */
-flutter-view {
-  /* Désactiver le pointer-events pour éviter les clics accidentels */
-  pointer-events: none !important;
-}
-
-/* Sauf pour les éléments enfants qui doivent être cliquables */
-flutter-view * {
-  pointer-events: auto !important;
-}
+/* La règle flutter-view { pointer-events:none } a été supprimée.
+   Elle bloquait TOUS les clics sur l'UI Flutter (menu, boutons, navigation)
+   car les styles CSS du document principal ne pénètrent pas dans le shadow DOM.
+   Les styles dans index.html shadow DOM injection gèrent correctement
+   :host { pointer-events:auto } + * { pointer-events:auto }. */
 
 /* ============================================
    6. BOUTONS GÉNÉRAUX - STYLE COHÉRENT

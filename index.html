@@ -29,6 +29,13 @@
   <!-- Bouton Valider (ajouté pour clarifier le workflow) -->
   <button id="acim-validate-btn" data-tooltip="Valider le produit (Entrée)" style="display: none;">✓ Valider</button>
   
+  <!-- Bouton Télécharger l'app Windows -->
+  <a id="acim-download-btn" href="https://github.com/aveca/AcimCaisse/releases/latest/download/AcimCaisse-Setup.exe" 
+     style="position:fixed;bottom:20px;right:20px;z-index:999998;display:flex;align-items:center;gap:8px;padding:12px 20px;background:#e65100;color:#fff;text-decoration:none;border-radius:12px;font-family:Segoe UI,Arial,sans-serif;font-size:14px;font-weight:700;box-shadow:0 4px 16px rgba(230,81,0,0.4);transition:all 0.3s;"
+     onmouseenter="this.style.background='#c43e00';this.style.transform='translateY(-2px)'"
+     onmouseleave="this.style.background='#e65100';this.style.transform='none'"
+     title="Télécharger AcimCaisse pour Windows">📥 App Windows</a>
+  
   <!--
     INJECTION DANS LE SHADOW DOM DE FLUTTER
     C'est la solution définitive pour que les styles CSS pénètrent dans flutter-view
@@ -238,50 +245,6 @@
     setTimeout(addTooltips, 3000);
     
     // ============================================
-    // FORCER LE FOCUS SUR LE CHAMP CODE-BARRES
-    // Solution au problème: "Autofocus processing was blocked"
-    // ============================================
-    function forceFocusOnBarcodeInput() {
-      const bcInput = document.getElementById('acim-bc-input');
-      if (bcInput) {
-        // Flouter tous les éléments Flutter d'abord
-        const flutterElements = document.querySelectorAll('flutter-view, flutter-view *');
-        flutterElements.forEach(el => {
-          try { el.blur(); } catch(e) {}
-        });
-        
-        // Puis faire le focus sur le champ
-        setTimeout(() => {
-          bcInput.focus();
-        }, 100);
-      }
-    }
-    
-    // Forcer le focus toutes les 2 secondes
-    setInterval(forceFocusOnBarcodeInput, 2000);
-    
-    // ============================================
-    // AFFICHER UN MESSAGE SI AUCUN PRODUIT N'EST VISIBLE
-    // ============================================
-    function checkCartVisibility() {
-      const cartItems = document.querySelectorAll('.acim-cart-item, .acim-ticket-item');
-      const overlay = document.getElementById('acim-ticket-overlay');
-      
-      if (cartItems.length === 0 && overlay) {
-        // Vérifier si l'overlay est visible
-        const overlayStyle = window.getComputedStyle(overlay);
-        if (overlayStyle.display === 'none' || overlayStyle.visibility === 'hidden') {
-          console.log('[AcimCaisse] PROBLÈME: Le panier est masqué!');
-          // Forcer l'affichage
-          overlay.style.display = 'block' !important;
-          overlay.style.visibility = 'visible' !important;
-        }
-      }
-    }
-    
-    setInterval(checkCartVisibility, 1000);
-    
-    // ============================================
     // INITIALISATION DES NOUVEAUX MODULES
     // ============================================
     
@@ -294,51 +257,6 @@
     
     // Initialiser l'autocomplétion (démarre automatiquement)
     // Le script barcode-autocomplete.js s'initialise lui-même
-    
-    // ============================================
-    // FEEDBACK VISUEL POUR LA SAISIE
-    // ============================================
-    function addInputFeedback() {
-      const bcInput = document.getElementById('acim-bc-input');
-      if (!bcInput) {
-        setTimeout(addInputFeedback, 500);
-        return;
-      }
-      
-      // Ajouter un indicateur de chargement/recherche
-      const feedbackDiv = document.createElement('div');
-      feedbackDiv.id = 'acim-input-feedback';
-      feedbackDiv.style.cssText = `
-        position: absolute;
-        left: 0;
-        top: -30px;
-        font-size: 12px;
-        color: #666;
-        height: 20px;
-        display: none;
-      `;
-      bcInput.parentNode.insertBefore(feedbackDiv, bcInput);
-      
-      // Mettre à jour le feedback lors de la saisie
-      bcInput.addEventListener('input', (e) => {
-        const value = e.target.value;
-        if (value.length >= 2) {
-          feedbackDiv.textContent = '🔍 Recherche en cours...';
-          feedbackDiv.style.display = 'block';
-        } else {
-          feedbackDiv.style.display = 'none';
-        }
-      });
-      
-      // Masquer le feedback après 1 seconde
-      bcInput.addEventListener('blur', () => {
-        setTimeout(() => {
-          feedbackDiv.style.display = 'none';
-        }, 1000);
-      });
-    }
-    
-    setTimeout(addInputFeedback, 1000);
   </script>
 </body>
 </html>

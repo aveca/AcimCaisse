@@ -413,7 +413,7 @@
     debugBtn.onclick = () => {
       window.AcimCaisseTracker.export();
     };
-    document.body.appendChild(debugBtn);
+    if (document.body) document.body.appendChild(debugBtn);
   }
 
 })();

@@ -10,7 +10,7 @@ const DATA = INST;
 
 console.log("");
 console.log("  =============================================");
-console.log("    AcimCaisse v1.8.0 - Installation");
+console.log("    AcimCaisse v2.0.0 - Installation");
 console.log("  =============================================");
 console.log("");
 
@@ -262,13 +262,28 @@ function step3_electronFiles() {
   console.log("    Electron     : " + electronVer);
   console.log("    Architecture : " + arch);
   const pkg = {
-    name: "acimcaisse", version: "1.7.0", main: "main.js",
+    name: "acimcaisse", version: "2.0.0", main: "main.js",
     scripts: { start: "electron ." },
     build: {
       appId: "com.acimcaisse.app", productName: "AcimCaisse",
       directories: { output: "dist" },
       files: ["main.js", "preload.js", "icon.png", "www/**/*"],
-      win: { target: [{ target: "dir", arch: [arch] }], icon: "icon.png" },
+      win: {
+        target: [{ target: "nsis", arch: [arch] }],
+        icon: "icon.png"
+      },
+      nsis: {
+        oneClick: false,
+        allowToChangeInstallationDirectory: true,
+        installerIcon: "icon.png",
+        uninstallerIcon: "icon.png",
+        installerHeaderIcon: "icon.png",
+        createDesktopShortcut: true,
+        createStartMenuShortcut: true,
+        shortcutName: "AcimCaisse",
+        installerLanguages: ["french"],
+        language: "2060"
+      },
       asar: false
     },
     devDependencies: { electron: electronVer, "electron-builder": "^26.15.3" }
@@ -290,7 +305,7 @@ async function step5_build() {
   console.log("  [5/7] Build AcimCaisse (2-5 min)...");
   const appDir = path.join(WORK, "app");
   try {
-    const out = exec("npx electron-builder --win dir", { cwd: appDir, timeout: 600000 });
+    const out = exec("npx electron-builder --win nsis", { cwd: appDir, timeout: 600000 });
     // Afficher la sortie pour debug
     if (out && out.length > 0) {
       const lines = out.toString().split("\n").filter(l => l.trim());
@@ -320,51 +335,60 @@ async function step5_build() {
 
 function step6_install() {
   console.log("  [6/7] Installation...");
-  const unpackedDir = path.join(WORK, "app", "dist", "win-unpacked");
-  if (!fs.existsSync(unpackedDir)) throw new Error("win-unpacked introuvable");
+  const distDir = path.join(WORK, "app", "dist");
+  
+  // Trouver l'installeur NSIS
+  let installerPath = null;
+  if (fs.existsSync(distDir)) {
+    const files = fs.readdirSync(distDir);
+    for (const f of files) {
+      if (f.endsWith('.exe') && f.includes('Setup')) {
+        installerPath = path.join(distDir, f);
+        break;
+      }
+    }
+  }
+  
+  // Fallback: chercher win-unpacked pour copie directe
+  const unpackedDir = path.join(distDir, "win-unpacked");
+  if (!installerPath && !fs.existsSync(unpackedDir)) throw new Error("Aucun installeur ni dossier win-unpacked trouvé");
   
   // Tuer le processus AcimCaisse.exe s'il est en cours d'execution
   try {
     execSync("taskkill /F /IM AcimCaisse.exe 2>nul");
-    console.log("    -> AcimCaisse.exe ferme");
+    console.log("    -> AcimCaisse.exe fermé");
   } catch (e) {
-    console.log("    -> AcimCaisse.exe non trouve (OK)");
+    console.log("    -> AcimCaisse.exe non trouvé (OK)");
   }
   
-  // Attendre 2 secondes pour liberer les fichiers (compatible Win10 LTSB 1607)
-  try {
-    execSync("ping -n 2 127.0.0.1 >nul 2>&1");
-  } catch (e) {
-    // Fallback pour systemes sans ping
-    try { execSync("timeout /t 2 >nul 2>&1"); } catch (e2) {}
-  }
+  try { execSync("ping -n 2 127.0.0.1 >nul 2>&1"); } catch (e) {}
   
-  // Supprimer l'ancien dossier avec retries (3 tentatives)
-  let retries = 3;
-  while (retries > 0) {
-    try {
-      rmDir(INST);
-      break;
-    } catch (e) {
-      if (retries > 1) {
-        console.log("    -> Suppression echouee, attente... (" + retries + " tentatives restantes)");
-        try { execSync("ping -n 2 127.0.0.1 >nul 2>&1"); } catch (e2) {}
+  if (installerPath) {
+    // Copier l'installeur NSIS vers le dossier d'installation
+    const destInstaller = path.join(INST, "AcimCaisse-Setup.exe");
+    if (!fs.existsSync(INST)) fs.mkdirSync(INST, { recursive: true });
+    fs.copyFileSync(installerPath, destInstaller);
+    console.log("    -> Installeur NSIS copié: " + destInstaller);
+    console.log("    -> Exécutez AcimCaisse-Setup.exe pour installer");
+    global.exePath = destInstaller;
+  } else {
+    // Copie directe du dossier unpacked (fallback)
+    let retries = 3;
+    while (retries > 0) {
+      try { rmDir(INST); break; } catch (e) {
+        if (retries > 1) try { execSync("ping -n 2 127.0.0.1 >nul 2>&1"); } catch (e2) {}
+        retries--;
       }
-      retries--;
     }
+    cpDir(unpackedDir, INST);
+    const exePath = path.join(INST, "AcimCaisse.exe");
+    if (!fs.existsSync(exePath)) throw new Error("AcimCaisse.exe introuvable");
+    global.exePath = exePath;
+    console.log("    -> Dossier copié (pas d'installeur NSIS)");
   }
-  
-  cpDir(unpackedDir, INST);
-  console.log("    -> Dossier copie");
-
-  const exePath = path.join(INST, "AcimCaisse.exe");
-  if (!fs.existsSync(exePath)) throw new Error("AcimCaisse.exe introuvable");
-  console.log("    -> AcimCaisse.exe OK");
 
   if (!fs.existsSync(path.join(DATA, "sauvegardes"))) fs.mkdirSync(path.join(DATA, "sauvegardes"), { recursive: true });
   if (!fs.existsSync(path.join(DATA, ".appdata"))) fs.mkdirSync(path.join(DATA, ".appdata"), { recursive: true });
-
-  global.exePath = exePath;
   console.log("  [6/7] OK");
 }
 
@@ -403,7 +427,7 @@ function log(msg) {
 }
 
 log("=== AcimCaisse demarrage ===");
-log("version : 1.8.0");
+log("version : 2.0.0");
 log("DATA    : " + DATA);
 log("__dirname : " + __dirname);
 
