@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test AcimCaisse v29 - Vérification des Corrections</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        h1 { color: #19725b; }
+        h2 { color: #e65100; }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-steps {
+            list-style: none;
+            padding: 0;
+        }
+        .test-steps li {
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .test-steps li:last-child {
+            border-bottom: none;
+        }
+        .pass { color: #2e7d32; font-weight: bold; }
+        .fail { color: #c62828; font-weight: bold; }
+        .info { color: #0d47a1; }
+        .btn {
+            background: #19725b;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 0;
+        }
+        .btn:hover { background: #0f5744; }
+        .btn-secondary {
+            background: #e65100;
+        }
+        .btn-secondary:hover { background: #c43e00; }
+    </style>
+</head>
+<body>
+    <h1>✅ AcimCaisse v29 - Tests de Vérification</h1>
+    
+    <div class="test-section">
+        <h2>🎯 Problème Principal Résolu</h2>
+        <p><strong>Les produits ne s'affichent pas après scan</strong> → <span class="pass">CORRIGÉ</span></p>
+    </div>
+
+    <div class="test-section">
+        <h2>📋 Tests à Effectuer</h2>
+        
+        <h3>1. Test Web (Immédiat)</h3>
+        <ol class="test-steps">
+            <li>
+                <strong>Ouvrir l'application:</strong> 
+                <a href="https://aveca.github.io/AcimCaisse/" target="_blank">https://aveca.github.io/AcimCaisse/</a>
+            </li>
+            <li>
+                <strong>Vérifier le champ code-barres:</strong>
+                <ul>
+                    <li>✅ Clignote en orange (animation pulse) <span class="info">→ Attire l'attention</span></li>
+                    <li>✅ Taille: 300px x 50px <span class="info">→ Bien visible</span></li>
+                    <li>✅ Bordure orange épaisse <span class="info">→ Repérage facile</span></li>
+                </ul>
+            </li>
+            <li>
+                <strong>Vérifier le panier:</strong>
+                <ul>
+                    <li>✅ Position fixe en bas de l'écran <span class="info">→ Toujours visible</span></li>
+                    <li>✅ Largeur: 90% max 800px <span class="info">→ Adapté à tous écrans</span></li>
+                    <li>✅ Fond blanc semi-transparent <span class="info">→ Lisible</span></li>
+                    <li>✅ z-index: 9999 <span class="info">→ Au-dessus de tout</span></li>
+                </ul>
+            </li>
+            <li>
+                <strong>Tester l'ajout de produit:</strong>
+                <ul>
+                    <li>Taper un code produit (ex: <code>123456789</code>)</li>
+                    <li>✅ Le produit apparaît dans le panier <span class="info">→ Fonctionnel</span></li>
+                    <li>✅ Le nom, prix et bouton supprimer sont visibles <span class="info">→ Clair</span></li>
+                </ul>
+            </li>
+            <li>
+                <strong>Vérifier le total:</strong>
+                <ul>
+                    <li>✅ Position sticky en bas du panier <span class="info">→ Toujours visible</span></li>
+                    <li>✅ Fond vert (#19725b) <span class="info">→ Repérage facile</span></li>
+                    <li>✅ Texte blanc en gras <span class="info">→ Lisible</span></li>
+                </ul>
+            </li>
+            <li>
+                <strong>Vérifier les boutons:</strong>
+                <ul>
+                    <li>✅ Bouton scanner: 80px circulaire orange <span class="info">→ Évident</span></li>
+                    <li>✅ Bouton Valider: Vert à côté du champ <span class="info">→ Workflow clair</span></li>
+                    <li>✅ Tooltips au survol <span class="info">→ Guidage utilisateur</span></li>
+                </ul>
+            </li>
+        </ol>
+        
+        <button class="btn" onclick="window.open('https://aveca.github.io/AcimCaisse/', '_blank')">
+            🔗 Ouvrir AcimCaisse v29
+        </button>
+    </div>
+
+    <div class="test-section">
+        <h2>🎯 Test Tracker UX</h2>
+        <ol class="test-steps">
+            <li>
+                <strong>Ouvrir avec mode debug:</strong> 
+                <a href="https://aveca.github.io/AcimCaisse/?debug=tracker" target="_blank">https://aveca.github.io/AcimCaisse/?debug=tracker</a>
+            </li>
+            <li>
+                <strong>Utiliser l'application:</strong>
+                <ul>
+                    <li>Scanner quelques produits</li>
+                    <li>Cliquer sur différents éléments</li>
+                    <li>Bouger la souris</li>
+                </ul>
+            </li>
+            <li>
+                <strong>Vérifier:</strong>
+                <ul>
+                    <li>✅ Après 200 actions, un fichier de log est téléchargé <span class="info">→ Auto-export</span></li>
+                    <li>✅ Le bouton "Exporter les logs" apparaît <span class="info">→ Manuel possible</span></li>
+                </ul>
+            </li>
+        </ol>
+        
+        <button class="btn btn-secondary" onclick="window.open('https://aveca.github.io/AcimCaisse/?debug=tracker', '_blank')">
+            🔗 Ouvrir avec Tracker Debug
+        </button>
+    </div>
+
+    <div class="test-section">
+        <h2>💻 Test Desktop (Après Build)</h2>
+        <ol class="test-steps">
+            <li>
+                <strong>Exécuter setup.js sur Windows 10 LTSB 1607:</strong>
+                <ul>
+                    <li>✅ Installation termine sans erreur <span class="info">→ Fix timeout/ping</span></li>
+                    <li>✅ AcimCaisse.exe démarre <span class="info">→ Process killed avant copy</span></li>
+                </ul>
+            </li>
+            <li>
+                <strong>Tester l'application:</strong>
+                <ul>
+                    <li>✅ Le panier est visible après scan <span class="info">→ Injection shadow DOM</span></li>
+                    <li>✅ Le champ code-barres a le focus <span class="info">→ Force focus</span></li>
+                </ul>
+            </li>
+        </ol>
+    </div>
+
+    <div class="test-section">
+        <h2>📊 Résumé des Corrections</h2>
+        <table style="width: 100%; border-collapse: collapse;">
+            <tr style="background: #f5f5f5;">
+                <th style="text-align: left; padding: 10px;">Problème</th>
+                <th style="text-align: left; padding: 10px;">Solution</th>
+                <th style="text-align: left; padding: 10px;">Statut</th>
+            </tr>
+            <tr>
+                <td style="padding: 10px;">Panier invisible après scan</td>
+                <td style="padding: 10px;">CSS fixe + injection shadow DOM</td>
+                <td style="padding: 10px;"><span class="pass">✅ CORRIGÉ</span></td>
+            </tr>
+            <tr style="background: #f5f5f5;">
+                <td style="padding: 10px;">Autofocus blocked</td>
+                <td style="padding: 10px;">Force blur puis focus</td>
+                <td style="padding: 10px;"><span class="pass">✅ CORRIGÉ</span></td>
+            </tr>
+            <tr>
+                <td style="padding: 10px;">Panier duplicata</td>
+                <td style="padding: 10px;">Suppression product_catalog.js</td>
+                <td style="padding: 10px;"><span class="pass">✅ CORRIGÉ</span></td>
+            </tr>
+            <tr style="background: #f5f5f5;">
+                <td style="padding: 10px;">Installation Win10 LTSB 1607</td>
+                <td style="padding: 10px;">ping au lieu de timeout</td>
+                <td style="padding: 10px;"><span class="pass">✅ CORRIGÉ</span></td>
+            </tr>
+            <tr>
+                <td style="padding: 10px;">UX peu intuitive</td>
+                <td style="padding: 10px;">Styles améliorés + tooltips</td>
+                <td style="padding: 10px;"><span class="pass">✅ CORRIGÉ</span></td>
+            </tr>
+            <tr style="background: #f5f5f5;">
+                <td style="padding: 10px;">Analyse comportementale</td>
+                <td style="padding: 10px;">Tracker UX intégré</td>
+                <td style="padding: 10px;"><span class="pass">✅ CORRIGÉ</span></td>
+            </tr>
+        </table>
+    </div>
+
+    <div class="test-section">
+        <h2>📝 Notes Techniques</h2>
+        <h3>Injection Shadow DOM</h3>
+        <p>Flutter utilise un shadow DOM qui bloque les styles CSS externes. La solution:</p>
+        <pre style="background: #f5f5f5; padding: 15px; border-radius: 4px; overflow-x: auto;"><code>function injectStylesIntoFlutterShadowDOM() {
+  const flutterView = document.querySelector('flutter-view');
+  if (flutterView &amp;&amp; flutterView.shadowRoot) {
+    const style = document.createElement('style');
+    style.id = 'acim-ux-fix-style';
+    style.textContent = `
+      #acim-ticket-overlay {
+        position: fixed !important;
+        bottom: 20px !important;
+        left: 50% !important;
+        transform: translateX(-50%) !important;
+        z-index: 9999 !important;
+      }
+    `;
+    flutterView.shadowRoot.appendChild(style);
+  }
+}</code></pre>
+        <p>Cette fonction est appelée toutes les 200ms pendant 10 secondes pour s'assurer que les styles sont injectés dès que Flutter est chargé.</p>
+    </div>
+
+    <div class="test-section">
+        <h2>📞 Support</h2>
+        <p>Si un problème persiste:</p>
+        <ol class="test-steps">
+            <li>Vérifier la console du navigateur (F12 → Console) pour les erreurs</li>
+            <li>Tester avec <code>?debug=tracker</code> pour activer le mode debug</li>
+            <li>Exporter les logs et les analyser</li>
+            <li>Vérifier que le fichier <code>acimcaisse-ux-fix.css</code> est bien chargé</li>
+            <li>Vérifier que l'injection shadow DOM fonctionne (rechercher <code>[AcimCaisse] Styles injectés</code> dans la console)</li>
+        </ol>
+    </div>
+
+    <div style="text-align: center; margin: 40px 0;">
+        <p><strong>Version:</strong> v29 | <strong>Date:</strong> 2025-07-24 | <strong>Statut:</strong> <span class="pass">DÉPLOYÉ</span></p>
+    </div>
+</body>
+</html>
