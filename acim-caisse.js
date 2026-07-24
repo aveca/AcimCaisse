@@ -176,16 +176,32 @@
   }
 
   // ═══════════════════════════════════════════════════════
-  //  SCANNER AUTO
+  //  SCANNER AUTO + CHAMP BARCODE
   // ═══════════════════════════════════════════════════════
   var _scanBuf="",_scanTimer=null,_scanActive=false;
   function _onScanKey(e){
+    // Allow scan even when in INPUT (scanner sends fast digits)
+    // But skip if user is typing manually (slow, with letters)
     if(_dialogOpen())return;
-    if(e.target&&e.target.tagName==='INPUT')return;
     if(/^[0-9]$/.test(e.key)){_scanBuf+=e.key;_scanActive=true;e.preventDefault();
-      clearTimeout(_scanTimer);_scanTimer=setTimeout(function(){if(_scanBuf.length>=6)_processBarcode(_scanBuf);_scanBuf="";_scanActive=false;},80);
+      clearTimeout(_scanTimer);_scanTimer=setTimeout(function(){if(_scanBuf.length>=4)_processBarcode(_scanBuf);_scanBuf="";_scanActive=false;},120);
     }else if(_scanActive){e.preventDefault();_scanBuf="";_scanActive=false;}}
   document.addEventListener("keydown",_onScanKey,true);
+
+  // Barcode input field (taper un code manuellement)
+  var _bcInput=null;
+  function _createBarcodeInput(){
+    if(_bcInput)return;
+    _bcInput=document.createElement("input");_bcInput.id="acim-bc-input";
+    _bcInput.type="text";_bcInput.placeholder="🔍 Scanner ou taper code...";
+    _bcInput.style.cssText="position:fixed;top:8px;left:8px;width:200px;padding:6px 10px;border:2px solid #e0e0e0;border-radius:8px;font-size:13px;font-family:Segoe UI,Arial,sans-serif;z-index:99999998;outline:none;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,0.1);";
+    _bcInput.onfocus=function(){this.style.borderColor="#e65100";};
+    _bcInput.onblur=function(){this.style.borderColor="#e0e0e0";};
+    _bcInput.addEventListener("keydown",function(e){
+      if(e.key==="Enter"){var bc=this.value.trim();if(bc.length>=4){_processBarcode(bc);this.value="";}else{_toast("❌ Code trop court");}}
+    });
+    document.body.appendChild(_bcInput);
+  }
 
   function _processBarcode(bc){
     _log("Scanner: "+bc);
@@ -438,8 +454,8 @@
   //  INIT
   // ═══════════════════════════════════════════════════════
   function init(){
-    _log("v25 — _myCart only, no Dart sync, dup ⟳, inline edit, quick create");
-    _createOverlay();_createFloatingButtons();
+    _log("v26 — barcode input field, scanner 120ms, _myCart only");
+    _createOverlay();_createFloatingButtons();_createBarcodeInput();
   }
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",init);else init();
 
