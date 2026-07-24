@@ -204,6 +204,7 @@
     _myCart.push({myId:myId,name:name,priceCents:priceCents||0,bc:barcode||"",cat:categoryId||"autre"});
     _realBcMap[myId]=barcode||"";
     _dbPut({barcode:barcode||myId,name:name,sale_price_cents:priceCents||0,category:categoryId||"autre",source:"add",last_updated:Date.now()});
+    try{document.dispatchEvent(new CustomEvent("acim:add",{detail:{name:name,price:priceCents,barcode:barcode,cat:categoryId}}));}catch(e){}
     _pollCart();_broadcastCart();return true;}
 
   function _cartInfo(){
@@ -420,6 +421,7 @@
 
   function _processBarcode(bc){
     _log("Scanner: "+bc);
+    try{document.dispatchEvent(new CustomEvent("acim:scan",{detail:{barcode:bc}}));}catch(e){}
     _dbGet(bc).then(function(local){
       if(local&&local.sale_price_cents>0){
         _addToCart(local.name,local.sale_price_cents,bc,local.category);
@@ -601,6 +603,7 @@
     var total=0;var saleItems=[];
     for(var i=0;i<_myCart.length;i++){total+=_myCart[i].priceCents;saleItems.push(_myCart[i]);}
     _persistSale(saleItems,total);
+    try{document.dispatchEvent(new CustomEvent("acim:checkout",{detail:{total:total,count:saleItems.length}}));}catch(e){}
     _broadcastClear();_myCart=[];_realBcMap={};_pollCart();
     _toast("✅ Encaissé ! "+(total/100).toFixed(2)+"€");}
 

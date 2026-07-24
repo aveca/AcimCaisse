@@ -5,8 +5,6 @@
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="description" content="AcimCaisse - caisse hors-ligne pour epicerie">
-  
-  <!-- product_catalog.js, pdf.min.js, pdf_extract.js REMOVED — conflit panier duplicata -->
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <meta name="apple-mobile-web-app-title" content="AcimCaisse">
@@ -14,249 +12,35 @@
   <link rel="icon" type="image/png" href="favicon.png"/>
   <title>AcimCaisse</title>
   <link rel="manifest" href="manifest.json">
-  <!-- Tracker UX pour analyse des parcours utilisateurs -->
-  <script src="tracker.js"></script>
-  <!-- CSS pour fixer l'UX/UI -->
   <link rel="stylesheet" href="acimcaisse-ux-fix.css">
-  <!-- Correction des stocks négatifs -->
   <script src="fix-negative-stock.js"></script>
-  <!-- Autocomplétion pour la saisie manuelle -->
   <script src="barcode-autocomplete.js"></script>
 </head>
 <body>
   <script src="flutter_bootstrap.js?v=30" async></script>
-  
-  <!-- Bouton Valider (ajouté pour clarifier le workflow) -->
-  <button id="acim-validate-btn" data-tooltip="Valider le produit (Entrée)" style="display: none;">✓ Valider</button>
-  
-  <!-- Bouton Télécharger l'app Windows -->
-  <a id="acim-download-btn" href="https://github.com/aveca/AcimCaisse/releases/latest/download/AcimCaisse-Setup.exe" 
-     style="position:fixed;bottom:20px;right:20px;z-index:999998;display:flex;align-items:center;gap:8px;padding:12px 20px;background:#e65100;color:#fff;text-decoration:none;border-radius:12px;font-family:Segoe UI,Arial,sans-serif;font-size:14px;font-weight:700;box-shadow:0 4px 16px rgba(230,81,0,0.4);transition:all 0.3s;"
-     onmouseenter="this.style.background='#c43e00';this.style.transform='translateY(-2px)'"
-     onmouseleave="this.style.background='#e65100';this.style.transform='none'"
-     title="Télécharger AcimCaisse pour Windows">📥 App Windows</a>
-  
-  <!--
-    INJECTION DANS LE SHADOW DOM DE FLUTTER
-    C'est la solution définitive pour que les styles CSS pénètrent dans flutter-view
-    -->
+
+  <!-- Download button — desktop only, hidden on mobile -->
   <script>
-    // ============================================
-    // INJECTION DES STYLES DANS LE SHADOW DOM
-    // ============================================
-    function injectStylesIntoFlutterShadowDOM() {
-      const flutterView = document.querySelector('flutter-view');
-      
-      if (flutterView && flutterView.shadowRoot) {
-        // Vérifier si on a déjà injecté les styles
-        if (flutterView.shadowRoot.querySelector('#acim-ux-fix-style')) {
-          return;
-        }
-        
-        // Créer un élément style pour le shadow DOM
-        const style = document.createElement('style');
-        style.id = 'acim-ux-fix-style';
-        style.textContent = `
-          /* ============================================
-             STYLES POUR LE SHADOW DOM DE FLUTTER
-             Solution au problème: panier non visible après scan
-             ============================================ */
-          
-          /* Forcer le panier à être visible et fixe en bas */
-          #acim-ticket-overlay {
-            position: fixed !important;
-            bottom: 20px !important;
-            left: 50% !important;
-            transform: translateX(-50%) !important;
-            width: 90% !important;
-            max-width: 800px !important;
-            z-index: 9999 !important;
-            background: rgba(255, 255, 255, 0.98) !important;
-            border-radius: 12px !important;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.3) !important;
-            padding: 20px !important;
-          }
-          
-          /* Style des éléments dans le panier */
-          #acim-ticket-overlay > div {
-            display: block !important;
-            width: 100% !important;
-            overflow-y: auto !important;
-            max-height: 300px !important;
-          }
-          
-          /* Style des produits dans le panier */
-          .acim-cart-item,
-          .acim-ticket-item {
-            display: flex !important;
-            justify-content: space-between !important;
-            align-items: center !important;
-            padding: 10px !important;
-            border-bottom: 1px solid #eee !important;
-            background: white !important;
-            margin: 5px 0 !important;
-            border-radius: 6px !important;
-          }
-          
-          /* Style du total */
-          .acim-cart-total,
-          .acim-ticket-total {
-            position: sticky !important;
-            bottom: 0 !important;
-            background: #19725b !important;
-            color: white !important;
-            padding: 15px !important;
-            font-size: 20px !important;
-            font-weight: bold !important;
-            border-radius: 0 0 12px 12px !important;
-            margin-top: 10px !important;
-          }
-          
-          /* Rendre le champ code-barres ultra-visible */
-          #acim-bc-input {
-            width: 300px !important;
-            height: 50px !important;
-            font-size: 24px !important;
-            padding: 0 15px !important;
-            border: 3px solid #e65100 !important;
-            border-radius: 8px !important;
-            background: white !important;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.2) !important;
-            animation: pulse-glow 2s infinite alternate !important;
-            outline: none !important;
-          }
-          
-          #acim-bc-input:focus {
-            border-color: #19725b !important;
-            box-shadow: 0 0 0 4px rgba(25, 114, 91, 0.3) !important;
-            animation: none !important;
-          }
-          
-          @keyframes pulse-glow {
-            from {
-              box-shadow: 0 0 0 0 rgba(230, 81, 0, 0.4) !important;
-            }
-            to {
-              box-shadow: 0 0 0 10px rgba(230, 81, 0, 0) !important;
-            }
-          }
-          
-          /* Bouton scanner */
-          #acim-barcode-btn {
-            width: 80px !important;
-            height: 80px !important;
-            position: absolute !important;
-            right: 10px !important;
-            top: 50% !important;
-            transform: translateY(-50%) !important;
-            background: #e65100 !important;
-            border: none !important;
-            border-radius: 50% !important;
-            cursor: pointer !important;
-            box-shadow: 0 4px 12px rgba(230, 81, 0, 0.4) !important;
-            transition: all 0.3s ease !important;
-            font-size: 30px !important;
-            color: white !important;
-            display: flex !important;
-            align-items: center !important;
-            justify-content: center !important;
-          }
-          
-          #acim-barcode-btn:hover {
-            background: #c43e00 !important;
-            transform: translateY(-50%) scale(1.1) !important;
-            box-shadow: 0 6px 16px rgba(230, 81, 0, 0.6) !important;
-          }
-          
-          /* Désactiver pointer-events sur flutter-view mais pas sur les enfants */
-          :host {
-            pointer-events: auto !important;
-          }
-          
-          /* Rendre tous les éléments enfants cliquables */
-          * {
-            pointer-events: auto !important;
-          }
-        `;
-        
-        // Injecter dans le shadow DOM
-        flutterView.shadowRoot.appendChild(style);
-        
-        console.log('[AcimCaisse] Styles injectés dans le shadow DOM de Flutter');
-      }
-    }
-    
-    // Essayer d'injecter immédiatement
-    injectStylesIntoFlutterShadowDOM();
-    
-    // Réessayer toutes les 200ms pendant 10 secondes (le temps que Flutter charge)
-    let retryCount = 0;
-    const maxRetries = 50; // 10 secondes
-    const retryInterval = setInterval(() => {
-      retryCount++;
-      injectStylesIntoFlutterShadowDOM();
-      
-      if (retryCount >= maxRetries) {
-        clearInterval(retryInterval);
-        console.log('[AcimCaisse] Arrêt des tentatives d\'injection après ' + maxRetries + ' essais');
-      }
-    }, 200);
-    
-    // ============================================
-    // GESTION DU BOUTON VALIDER
-    // ============================================
-    function checkAndShowValidateBtn() {
-      const bcInput = document.getElementById('acim-bc-input');
-      const validateBtn = document.getElementById('acim-validate-btn');
-      
-      if (bcInput && validateBtn) {
-        validateBtn.style.display = 'block';
-        
-        // Positionner le bouton à côté du champ
-        const bcRect = bcInput.getBoundingClientRect();
-        validateBtn.style.position = 'absolute';
-        validateBtn.style.left = (bcRect.left + bcRect.width + 10) + 'px';
-        validateBtn.style.top = (bcRect.top + window.scrollY) + 'px';
-        
-        // Gérer le clic sur Valider
-        validateBtn.onclick = function() {
-          const event = new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter' });
-          bcInput.dispatchEvent(event);
-        };
-      }
-    }
-    
-    // Vérifier toutes les 500ms si le champ existe
-    setInterval(checkAndShowValidateBtn, 500);
-    
-    // ============================================
-    // TOOLTIPS
-    // ============================================
-    function addTooltips() {
-      const barcodeBtn = document.getElementById('acim-barcode-btn');
-      if (barcodeBtn) {
-        barcodeBtn.setAttribute('data-tooltip', 'Ouvrir le scanner de code-barres');
-      }
-    }
-    
-    // Ajouter les tooltips après le chargement
-    window.addEventListener('load', addTooltips);
-    setTimeout(addTooltips, 1000);
-    setTimeout(addTooltips, 3000);
-    
-    // ============================================
-    // INITIALISATION DES NOUVEAUX MODULES
-    // ============================================
-    
-    // Initialiser la correction des stocks négatifs
-    setTimeout(() => {
-      if (window.AcimCaisseStockFix) {
-        window.AcimCaisseStockFix.fix();
-      }
-    }, 3000);
-    
-    // Initialiser l'autocomplétion (démarre automatiquement)
-    // Le script barcode-autocomplete.js s'initialise lui-même
+    (function() {
+      var isDesktop = window.innerWidth > 768 && !('ontouchstart' in window);
+      if (!isDesktop) return;
+      var a = document.createElement('a');
+      a.id = 'acim-download-btn';
+      a.href = 'https://github.com/aveca/AcimCaisse/releases';
+      a.target = '_blank';
+      a.textContent = '\uD83D\uDCE5 App Windows';
+      a.style.cssText = 'position:fixed;bottom:16px;right:16px;z-index:999998;padding:10px 18px;background:#e65100;color:#fff;text-decoration:none;border-radius:10px;font:bold 13px/1 Segoe UI,Arial,sans-serif;box-shadow:0 3px 12px rgba(230,81,0,0.35);transition:background .2s,transform .2s;';
+      a.onmouseenter = function() { this.style.background = '#c43e00'; this.style.transform = 'translateY(-1px)'; };
+      a.onmouseleave = function() { this.style.background = '#e65100'; this.style.transform = 'none'; };
+      document.body.appendChild(a);
+    })();
+  </script>
+
+  <!-- Stock fix — runs once, deferred -->
+  <script>
+    setTimeout(function() {
+      if (window.AcimCaisseStockFix) window.AcimCaisseStockFix.fix();
+    }, 4000);
   </script>
 </body>
 </html>

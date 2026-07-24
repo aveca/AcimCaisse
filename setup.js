@@ -207,14 +207,6 @@ function step2_patch() {
   fs.writeFileSync(path.join(WORK, "app", "www", "acim-shell.js"), ""/* merged into EMBED_ACIM_CAISSE */);
   console.log("    -> acim-shell.js ecrit");
   
-  // Copier tracker.js pour le tracking UX
-  const trackerSrc = path.join(__dirname, "tracker.js");
-  const trackerDest = path.join(WORK, "app", "www", "tracker.js");
-  if (fs.existsSync(trackerSrc)) {
-    fs.copyFileSync(trackerSrc, trackerDest);
-    console.log("    -> tracker.js copié");
-  }
-  
   // Copier le CSS de fix UX
   const cssSrc = path.join(__dirname, "acimcaisse-ux-fix.css");
   const cssDest = path.join(WORK, "app", "www", "acimcaisse-ux-fix.css");
