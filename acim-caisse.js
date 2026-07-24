@@ -176,32 +176,36 @@
   }
 
   // ═══════════════════════════════════════════════════════
-  //  SCANNER AUTO + CHAMP BARCODE
+  //  SCANNER AUTO + CHAMP BARCODE (auto-focus)
   // ═══════════════════════════════════════════════════════
-  var _scanBuf="",_scanTimer=null,_scanActive=false;
-  function _onScanKey(e){
-    // Allow scan even when in INPUT (scanner sends fast digits)
-    // But skip if user is typing manually (slow, with letters)
-    if(_dialogOpen())return;
-    if(/^[0-9]$/.test(e.key)){_scanBuf+=e.key;_scanActive=true;e.preventDefault();
-      clearTimeout(_scanTimer);_scanTimer=setTimeout(function(){if(_scanBuf.length>=4)_processBarcode(_scanBuf);_scanBuf="";_scanActive=false;},120);
-    }else if(_scanActive){e.preventDefault();_scanBuf="";_scanActive=false;}}
-  document.addEventListener("keydown",_onScanKey,true);
-
-  // Barcode input field (taper un code manuellement)
   var _bcInput=null;
   function _createBarcodeInput(){
     if(_bcInput)return;
     _bcInput=document.createElement("input");_bcInput.id="acim-bc-input";
-    _bcInput.type="text";_bcInput.placeholder="🔍 Scanner ou taper code...";
-    _bcInput.style.cssText="position:fixed;top:8px;left:8px;width:200px;padding:6px 10px;border:2px solid #e0e0e0;border-radius:8px;font-size:13px;font-family:Segoe UI,Arial,sans-serif;z-index:99999998;outline:none;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,0.1);";
-    _bcInput.onfocus=function(){this.style.borderColor="#e65100";};
-    _bcInput.onblur=function(){this.style.borderColor="#e0e0e0";};
+    _bcInput.type="text";_bcInput.placeholder="🔍 Scanner ou taper code-barres...";
+    _bcInput.style.cssText="position:fixed;top:8px;left:8px;width:220px;padding:8px 12px;border:2px solid #e65100;border-radius:10px;font-size:14px;font-weight:700;font-family:Segoe UI,Arial,sans-serif;z-index:99999999;outline:none;background:#fff;box-shadow:0 4px 16px rgba(230,81,0,0.3);";
     _bcInput.addEventListener("keydown",function(e){
-      if(e.key==="Enter"){var bc=this.value.trim();if(bc.length>=4){_processBarcode(bc);this.value="";}else{_toast("❌ Code trop court");}}
+      if(e.key==="Enter"){var bc=this.value.trim();this.value="";if(bc.length>=4)_processBarcode(bc);else _toast("❌ Code trop court");}
+      if(e.key==="Escape"){this.value="";this.blur();}
     });
     document.body.appendChild(_bcInput);
   }
+
+  // Auto-focus barcode field on first digit (scanner signature)
+  var _scanBuf="",_scanTimer=null,_scanActive=false;
+  document.addEventListener("keydown",function(e){
+    if(_dialogOpen())return;
+    // Si c'est un digit et pas déjà dans notre champ → auto-focus + buffer
+    if(/^[0-9]$/.test(e.key)&&e.target!==_bcInput){
+      // Signature scanner: digit rapide → focus le champ et transférer
+      if(_bcInput){_bcInput.focus();_bcInput.value+=e.key;e.preventDefault();}
+      _scanBuf+=e.key;_scanActive=true;
+      clearTimeout(_scanTimer);_scanTimer=setTimeout(function(){
+        if(_scanBuf.length>=4)_processBarcode(_scanBuf);
+        _scanBuf="";_scanActive=false;
+      },120);
+    }
+  },true);
 
   function _processBarcode(bc){
     _log("Scanner: "+bc);
