@@ -518,7 +518,7 @@
 
       var delBtn=document.createElement("span");
       delBtn.textContent="✕";delBtn.title="Supprimer ce produit";
-      delBtn.style.cssText="position:absolute;top:4px;right:6px;font-size:14px;color:#c62828;cursor:pointer;opacity:0.5;padding:2px 5px;border-radius:4px;background:rgba(255,255,255,0.9);z-index:2;";
+      delBtn.style.cssText="position:absolute;top:2px;right:2px;font-size:18px;color:#c62828;cursor:pointer;opacity:1;padding:4px 8px;border-radius:6px;background:rgba(255,255,255,0.95);z-index:5;border:1px solid #ffcdd2;box-shadow:0 1px 4px rgba(0,0,0,0.15);";
       delBtn.onclick=function(e){e.stopPropagation();_confirmDeleteProduct(_cardP);};
       card.appendChild(delBtn);
 
