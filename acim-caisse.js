@@ -1319,10 +1319,14 @@
       var promises=[];
       products.forEach(function(p){
         promises.push(_dbGet(p.barcode).then(function(existing){
-          if(!existing){
+          if(existing){
+            existing.stockQty=(existing.stockQty||0)+(p.qty||0);
+            existing.last_updated=Date.now();
+            _dbPut(existing);
+          }else{
             _dbPut({barcode:p.barcode,name:p.name,sale_price_cents:Math.round(p.unitPrice*100)||0,category:"epicerie",stockQty:p.qty||0,source:"invoice-import",last_updated:Date.now()});
-            count++;
           }
+          count++;
         }));
       });
       Promise.all(promises).then(function(){
