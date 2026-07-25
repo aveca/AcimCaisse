@@ -122,6 +122,10 @@
     return new Promise(function(ok){var tx=d.transaction("products","readwrite");tx.objectStore("products").put(p);tx.oncomplete=ok;tx.onerror=ok;});});}
   function _dbGetAll(){return _openDB().then(function(d){if(!d)return[];
     return new Promise(function(ok){var r=d.transaction("products","readonly").objectStore("products").getAll();r.onsuccess=function(){ok(r.result||[]);};r.onerror=function(){ok([]);};});});}
+  function _dbDelete(bc){return _openDB().then(function(d){if(!d)return;
+    return new Promise(function(ok){var tx=d.transaction("products","readwrite");tx.objectStore("products").delete(bc);tx.oncomplete=ok;tx.onerror=ok;});});}
+  function _dbDeleteAll(){return _openDB().then(function(d){if(!d)return;
+    return new Promise(function(ok){var tx=d.transaction("products","readwrite");tx.objectStore("products").clear();tx.oncomplete=ok;tx.onerror=ok;});});}
 
   // ─── SALES STORE ─────────────────────────────────────
   function _openSalesDB(){
@@ -328,13 +332,13 @@
     var topBar=document.createElement("div");
     topBar.style.cssText="display:flex;align-items:center;padding:8px 12px;background:#1a1a2e;gap:8px;flex-shrink:0;";
     var logo=document.createElement("span");
-    logo.textContent="🏪 AcimCaisse";logo.style.cssText="color:#fff;font-size:15px;font-weight:700;margin-right:4px;flex-shrink:0;cursor:pointer;";
+    logo.textContent="🏪 AcimCaisse";logo.style.cssText="color:#fff;font-size:20px;font-weight:700;margin-right:4px;flex-shrink:0;cursor:pointer;";
     logo.onclick=function(){_showMainMenu();};
     topBar.appendChild(logo);
 
     _posSearch=document.createElement("input");_posSearch.id="acim-pos-search";
     _posSearch.type="text";_posSearch.placeholder="Rechercher un produit (nom ou code-barres)...";
-    _posSearch.style.cssText="flex:1;padding:8px 14px;border:none;border-radius:8px;font-size:14px;outline:none;background:#2a2a4e;color:#fff;min-width:0;";
+        _posSearch.style.cssText="flex:1;padding:8px 14px;border:none;border-radius:8px;font-size:17px;outline:none;background:#2a2a4e;color:#fff;min-width:0;";
     _posSearch.addEventListener("input",function(){
       if(_allProducts.length===0){_refreshAndFilter();return;}
       _filterProducts();
@@ -347,13 +351,13 @@
 
     var newBtn=document.createElement("button");
     newBtn.textContent="➕";newBtn.title="Nouveau produit (Ctrl+N)";
-    newBtn.style.cssText="padding:6px 10px;border:none;border-radius:6px;background:#2a2a4e;color:#fff;font-size:16px;cursor:pointer;flex-shrink:0;";
+    newBtn.style.cssText="padding:6px 10px;border:none;border-radius:6px;background:#2a2a4e;color:#fff;font-size:20px;cursor:pointer;flex-shrink:0;";
     newBtn.onclick=function(){_quickCreate("",0);};
     topBar.appendChild(newBtn);
 
     var closeBtn=document.createElement("button");
     closeBtn.textContent="✕ Factures";closeBtn.title="Fermer la caisse — accéder aux factures Flutter";
-    closeBtn.style.cssText="padding:6px 12px;border:1px solid rgba(255,255,255,0.3);border-radius:6px;background:transparent;color:#fff;font-size:12px;cursor:pointer;flex-shrink:0;white-space:nowrap;";
+    closeBtn.style.cssText="padding:6px 12px;border:1px solid rgba(255,255,255,0.3);border-radius:6px;background:transparent;color:#fff;font-size:15px;cursor:pointer;flex-shrink:0;white-space:nowrap;";
     closeBtn.onmouseenter=function(){this.style.background="rgba(255,255,255,0.1)";};
     closeBtn.onmouseleave=function(){this.style.background="transparent";};
     closeBtn.onclick=function(){_togglePOS(false);};
@@ -387,7 +391,7 @@
     right.style.cssText="width:320px;display:flex;flex-direction:column;background:#fff;border-left:2px solid #e0e0e0;flex-shrink:0;";
 
     var cartHd=document.createElement("div");
-    cartHd.style.cssText="padding:10px 14px;background:#1a1a2e;color:#fff;font-size:13px;font-weight:700;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;";
+    cartHd.style.cssText="padding:10px 14px;background:#1a1a2e;color:#fff;font-size:16px;font-weight:700;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;";
     cartHd.innerHTML='<span>🛒 Ticket</span><span id="acim-pos-count">0 article</span>';
     right.appendChild(cartHd);
 
@@ -401,10 +405,10 @@
 
     // Discount row
     var discRow=document.createElement("div");
-    discRow.style.cssText="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;font-size:12px;color:#666;";
+    discRow.style.cssText="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;font-size:15px;color:#666;";
     discRow.innerHTML='<span>Remise ticket</span>';
     var discBtn=document.createElement("button");
-    discBtn.textContent="Appliquer";discBtn.style.cssText="padding:3px 8px;border:1px solid #e0e0e0;border-radius:4px;background:#fff;font-size:11px;cursor:pointer;";
+    discBtn.textContent="Appliquer";discBtn.style.cssText="padding:3px 8px;border:1px solid #e0e0e0;border-radius:4px;background:#fff;font-size:14px;cursor:pointer;";
     discBtn.onclick=function(){_applyTicketDiscount();};
     discRow.appendChild(discBtn);
     cartFoot.appendChild(discRow);
@@ -412,9 +416,9 @@
     var totalRow=document.createElement("div");
     totalRow.style.cssText="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;";
     var totalLabel=document.createElement("span");
-    totalLabel.style.cssText="font-size:14px;color:#1a1a2e;";totalLabel.textContent="Sous-total";
+    totalLabel.style.cssText="font-size:17px;color:#1a1a2e;";totalLabel.textContent="Sous-total";
     _posSubtotal=document.createElement("span");
-    _posSubtotal.style.cssText="font-size:14px;color:#666;";_posSubtotal.textContent="0,00 €";
+    _posSubtotal.style.cssText="font-size:17px;color:#666;";_posSubtotal.textContent="0,00 €";
     totalRow.appendChild(totalLabel);totalRow.appendChild(_posSubtotal);
     cartFoot.appendChild(totalRow);
 
@@ -422,26 +426,26 @@
     discTotalRow.style.cssText="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;display:none;";
     discTotalRow.id="acim-disc-row";
     var discLabel=document.createElement("span");
-    discLabel.style.cssText="font-size:12px;color:#2e7d32;";discLabel.textContent="Remise";
+    discLabel.style.cssText="font-size:15px;color:#2e7d32;";discLabel.textContent="Remise";
     _posDiscount=document.createElement("span");
-    _posDiscount.style.cssText="font-size:12px;color:#2e7d32;font-weight:700;";_posDiscount.textContent="-0,00 €";
+    _posDiscount.style.cssText="font-size:15px;color:#2e7d32;font-weight:700;";_posDiscount.textContent="-0,00 €";
     discTotalRow.appendChild(discLabel);discTotalRow.appendChild(_posDiscount);
     cartFoot.appendChild(discTotalRow);
 
     var finalTotalRow=document.createElement("div");
     finalTotalRow.style.cssText="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;";
     var finalLabel=document.createElement("span");
-    finalLabel.style.cssText="font-size:16px;font-weight:700;color:#1a1a2e;";finalLabel.textContent="TOTAL";
+    finalLabel.style.cssText="font-size:20px;font-weight:700;color:#1a1a2e;";finalLabel.textContent="TOTAL";
     _posTotal=document.createElement("span");
     _posTotal.id="acim-pos-total";
-    _posTotal.style.cssText="font-size:22px;font-weight:700;color:#e65100;";_posTotal.textContent="0,00 €";
+    _posTotal.style.cssText="font-size:28px;font-weight:700;color:#e65100;";_posTotal.textContent="0,00 €";
     finalTotalRow.appendChild(finalLabel);finalTotalRow.appendChild(_posTotal);
     cartFoot.appendChild(finalTotalRow);
 
     _posCheckout=document.createElement("button");
     _posCheckout.id="acim-pos-checkout";
     _posCheckout.textContent="💰 Encaisser";
-    _posCheckout.style.cssText="width:100%;padding:12px;border:none;border-radius:10px;background:#e65100;color:#fff;font-size:16px;font-weight:700;cursor:pointer;transition:background .15s;";
+    _posCheckout.style.cssText="width:100%;padding:14px;border:none;border-radius:10px;background:#e65100;color:#fff;font-size:20px;font-weight:700;cursor:pointer;transition:background .15s;";
     _posCheckout.onmouseenter=function(){this.style.background="#c43e00";};
     _posCheckout.onmouseleave=function(){this.style.background="#e65100";};
     _posCheckout.onclick=function(){_startPayment();};
@@ -458,12 +462,12 @@
   function _buildCatPills(){
     _posCats.innerHTML="";
     var all=document.createElement("button");
-    all.textContent="Tous";all.style.cssText="padding:5px 12px;border:2px solid #e65100;border-radius:16px;background:#fff3e0;font-size:12px;cursor:pointer;font-weight:700;flex-shrink:0;";
+    all.textContent="Tous";all.style.cssText="padding:5px 12px;border:2px solid #e65100;border-radius:16px;background:#fff3e0;font-size:15px;cursor:pointer;font-weight:700;flex-shrink:0;";
     all.onclick=function(){_activeCat="";_refreshCatPills();_filterProducts();};
     _posCats.appendChild(all);
     CATS.forEach(function(cat){
       var b=document.createElement("button");
-      b.textContent=cat.ic+" "+cat.id;b.style.cssText="padding:5px 12px;border:2px solid #e0e0e0;border-radius:16px;background:#fff;font-size:12px;cursor:pointer;flex-shrink:0;transition:all .15s;";
+      b.textContent=cat.ic+" "+cat.id;b.style.cssText="padding:5px 12px;border:2px solid #e0e0e0;border-radius:16px;background:#fff;font-size:15px;cursor:pointer;flex-shrink:0;transition:all .15s;";
       b.onmouseenter=function(){this.style.borderColor="#e65100";};
       b.onmouseleave=function(){this.style.borderColor=_activeCat===cat.id?"#e65100":"#e0e0e0";};
       b.onclick=function(){_activeCat=(_activeCat===cat.id)?"":cat.id;_refreshCatPills();_filterProducts();};
@@ -500,47 +504,54 @@
   function _renderGrid(){
     _posGrid.innerHTML="";
     if(_filteredProducts.length===0){
-      _posGrid.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:40px;color:#999;font-size:14px;">Aucun produit trouvé</div>';
+      _posGrid.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:40px;color:#999;font-size:17px;">Aucun produit trouvé</div>';
       return;
     }
     _filteredProducts.forEach(function(p){
       var card=document.createElement("div");
       var hasPrice=p.sale_price_cents>0;
       var isWeighable=p.pricePerUnit>0&&p.unitType;
-      card.style.cssText="background:#fff;border-radius:10px;padding:10px;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,0.08);border:2px solid "+(hasPrice||isWeighable?"transparent":"#ffe082")+";transition:all .15s;display:flex;flex-direction:column;align-items:center;text-align:center;";
+      card.style.cssText="position:relative;background:#fff;border-radius:10px;padding:10px;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,0.08);border:2px solid "+(hasPrice||isWeighable?"transparent":"#ffe082")+";transition:all .15s;display:flex;flex-direction:column;align-items:center;text-align:center;";
+      var _cardP=p,_cardHP=hasPrice,_cardW=isWeighable;
       card.onmouseenter=function(){this.style.boxShadow="0 3px 12px rgba(0,0,0,0.15)";this.style.borderColor="#e65100";};
-      card.onmouseleave=function(){this.style.boxShadow="0 1px 3px rgba(0,0,0,0.08)";this.style.borderColor=(hasPrice||isWeighable)?"transparent":"#ffe082";};
+      card.onmouseleave=function(){this.style.boxShadow="0 1px 3px rgba(0,0,0,0.08)";this.style.borderColor=(_cardHP||_cardW)?"transparent":"#ffe082";};
+
+      var delBtn=document.createElement("span");
+      delBtn.textContent="✕";delBtn.title="Supprimer ce produit";
+      delBtn.style.cssText="position:absolute;top:4px;right:6px;font-size:14px;color:#c62828;cursor:pointer;opacity:0.5;padding:2px 5px;border-radius:4px;background:rgba(255,255,255,0.9);z-index:2;";
+      delBtn.onclick=function(e){e.stopPropagation();_confirmDeleteProduct(_cardP);};
+      card.appendChild(delBtn);
 
       var ic=document.createElement("span");
       ic.textContent=_catIcon(p.category||"autre");
-      ic.style.cssText="font-size:28px;margin-bottom:4px;";
+      ic.style.cssText="font-size:40px;margin-bottom:4px;";
       card.appendChild(ic);
 
       var nm=document.createElement("div");
-      nm.style.cssText="font-size:12px;font-weight:600;color:#1a1a2e;line-height:1.2;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;";
+      nm.style.cssText="font-size:15px;font-weight:600;color:#1a1a2e;line-height:1.2;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;";
       nm.textContent=p.name||"?";card.appendChild(nm);
 
       if(isWeighable){
         var badge=document.createElement("div");
-        badge.style.cssText="font-size:10px;color:#fff;background:#2196f3;border-radius:8px;padding:2px 6px;margin-top:4px;font-weight:600;";
+        badge.style.cssText="font-size:13px;color:#fff;background:#2196f3;border-radius:8px;padding:2px 6px;margin-top:4px;font-weight:600;";
         badge.textContent="⚖️ Au poids";card.appendChild(badge);
         var ppu=document.createElement("div");
-        ppu.style.cssText="font-size:13px;font-weight:700;color:#e65100;margin-top:4px;";
+        ppu.style.cssText="font-size:16px;font-weight:700;color:#e65100;margin-top:4px;";
         ppu.textContent=_formatPricePerUnit(p.pricePerUnit,p.unitType);card.appendChild(ppu);
       }else if(hasPrice){
         var pr=document.createElement("div");
-        pr.style.cssText="font-size:15px;font-weight:700;color:#e65100;margin-top:4px;";
+        pr.style.cssText="font-size:20px;font-weight:700;color:#e65100;margin-top:4px;";
         pr.textContent=(p.sale_price_cents/100).toFixed(2)+"€";card.appendChild(pr);
       }else{
         var noPr=document.createElement("div");
-        noPr.style.cssText="font-size:11px;color:#e65100;margin-top:4px;font-weight:600;";
+        noPr.style.cssText="font-size:14px;color:#e65100;margin-top:4px;font-weight:600;";
         noPr.textContent="✏️ Sans prix";card.appendChild(noPr);
       }
 
       // Stock badge
       if(p.stockQty!=null&&p.stockQty!==0){
         var stBadge=document.createElement("div");
-        stBadge.style.cssText="font-size:10px;color:"+(p.stockQty<5?"#c62828":"#666")+";margin-top:2px;";
+        stBadge.style.cssText="font-size:13px;color:"+(p.stockQty<5?"#c62828":"#666")+";margin-top:2px;";
         stBadge.textContent="Stock: "+p.stockQty;card.appendChild(stBadge);
       }
 
@@ -566,7 +577,7 @@
 
     _posItems.innerHTML="";
     if(info.length===0){
-      _posItems.innerHTML='<div style="text-align:center;padding:40px;color:#999;font-size:13px;">Aucun produit dans le ticket</div>';
+      _posItems.innerHTML='<div style="text-align:center;padding:40px;color:#999;font-size:16px;">Aucun produit dans le ticket</div>';
       _posCheckout.textContent="💰 Encaisser (0,00 €)";
       _posCheckout.style.opacity="0.5";
       return;
@@ -589,20 +600,20 @@
       var infoDiv=document.createElement("div");
       infoDiv.style.cssText="flex:1;min-width:0;";
       var nm=document.createElement("div");
-      nm.style.cssText="font-size:12px;font-weight:600;color:"+(isZero?"#e65100":"#1a1a2e")+";overflow:hidden;text-overflow:ellipsis;white-space:nowrap;";
+      nm.style.cssText="font-size:15px;font-weight:600;color:"+(isZero?"#e65100":"#1a1a2e")+";overflow:hidden;text-overflow:ellipsis;white-space:nowrap;";
       nm.textContent=isZero?"✏️ "+item.name:item.name;
       infoDiv.appendChild(nm);
 
       if(isWeighed&&item.weight!=null){
         var wLine=document.createElement("div");
-        wLine.style.cssText="font-size:11px;color:#666;";
+        wLine.style.cssText="font-size:14px;color:#666;";
         wLine.textContent=_formatWeight(item.weight,item.unitType)+" × "+_formatPricePerUnit(item.pricePerUnit,item.unitType);
         infoDiv.appendChild(wLine);
       }
 
       if(item.price>0){
         var pr=document.createElement("div");
-        pr.style.cssText="font-size:13px;font-weight:700;color:#e65100;";
+        pr.style.cssText="font-size:16px;font-weight:700;color:#e65100;";
         pr.textContent=(item.price/100).toFixed(2).replace(".",",")+" €";
         infoDiv.appendChild(pr);
       }
@@ -614,7 +625,7 @@
 
       var dupBtn=document.createElement("span");
       dupBtn.textContent="⟳";dupBtn.title="Ajouter encore";
-      dupBtn.style.cssText="font-size:14px;cursor:pointer;padding:4px 6px;border-radius:4px;color:#1a1a2e;opacity:0.4;";
+      dupBtn.style.cssText="font-size:16px;cursor:pointer;padding:4px 6px;border-radius:4px;color:#1a1a2e;opacity:0.4;";
       dupBtn.onmouseenter=function(){this.style.opacity="1";this.style.background="#f0f0f0";};
       dupBtn.onmouseleave=function(){this.style.opacity="0.4";this.style.background="transparent";};
       dupBtn.onclick=function(e){e.stopPropagation();_addToCart(item.name,item.price,item.bc,item.cat,item.weight,item.unitType,item.pricePerUnit);};
@@ -622,7 +633,7 @@
 
       var editBtn=document.createElement("span");
       editBtn.textContent="✏️";editBtn.title="Modifier";
-      editBtn.style.cssText="font-size:12px;cursor:pointer;padding:4px 6px;border-radius:4px;color:#1a1a2e;opacity:0.4;";
+      editBtn.style.cssText="font-size:15px;cursor:pointer;padding:4px 6px;border-radius:4px;color:#1a1a2e;opacity:0.4;";
       editBtn.onmouseenter=function(){this.style.opacity="1";this.style.background="#f0f0f0";};
       editBtn.onmouseleave=function(){this.style.opacity="0.4";this.style.background="transparent";};
       editBtn.onclick=function(e){e.stopPropagation();_inlineEdit(item.idx,50,50);};
@@ -630,7 +641,7 @@
 
       var delBtn=document.createElement("span");
       delBtn.textContent="✕";delBtn.title="Supprimer";
-      delBtn.style.cssText="font-size:13px;cursor:pointer;padding:4px 6px;border-radius:4px;color:#c62828;opacity:0.4;";
+      delBtn.style.cssText="font-size:16px;cursor:pointer;padding:4px 6px;border-radius:4px;color:#c62828;opacity:0.4;";
       delBtn.onmouseenter=function(){this.style.opacity="1";this.style.background="#ffebee";};
       delBtn.onmouseleave=function(){this.style.opacity="0.4";this.style.background="transparent";};
       delBtn.onclick=function(e){e.stopPropagation();_removeFromCart(item.idx);_toast("Supprimé");};
@@ -703,10 +714,10 @@
     var card=document.createElement("div");
     card.style.cssText="background:#fff;border-radius:14px;padding:20px;width:380px;max-width:95vw;box-shadow:0 8px 24px rgba(0,0,0,0.3);font-family:Segoe UI,Arial,sans-serif;";
 
-    var ti=document.createElement("div");ti.style.cssText="font-size:18px;font-weight:700;margin-bottom:4px;color:#1a1a2e;text-align:center;";
+    var ti=document.createElement("div");ti.style.cssText="font-size:22px;font-weight:700;margin-bottom:4px;color:#1a1a2e;text-align:center;";
     ti.textContent="💰 Paiement";card.appendChild(ti);
     var totalLine=document.createElement("div");
-    totalLine.style.cssText="font-size:28px;font-weight:700;color:#e65100;text-align:center;margin-bottom:16px;";
+    totalLine.style.cssText="font-size:36px;font-weight:700;color:#e65100;text-align:center;margin-bottom:16px;";
     totalLine.textContent=(total/100).toFixed(2).replace(".",",")+" €";card.appendChild(totalLine);
 
     // Mode selector
@@ -716,7 +727,7 @@
     var modeBtns=[];
     modes.forEach(function(m){
       var b=document.createElement("button");b.textContent=m.label;
-      b.style.cssText="flex:1;padding:10px;border:2px solid "+(m.id==="especes"?"#e65100":"#e0e0e0")+";border-radius:8px;background:"+(m.id==="especes"?"#fff3e0":"#fff")+";font-size:13px;cursor:pointer;font-weight:"+(m.id==="especes"?"700":"normal")+";";
+      b.style.cssText="flex:1;padding:12px;border:2px solid "+(m.id==="especes"?"#e65100":"#e0e0e0")+";border-radius:8px;background:"+(m.id==="especes"?"#fff3e0":"#fff")+";font-size:16px;cursor:pointer;font-weight:"+(m.id==="especes"?"700":"normal")+";";
       b.onclick=function(){
         selectedMode=m.id;
         modeBtns.forEach(function(x,i){x.style.borderColor=modes[i].id===m.id?"#e65100":"#e0e0e0";x.style.background=modes[i].id===m.id?"#fff3e0":"#fff";x.style.fontWeight=modes[i].id===m.id?"700":"normal";});
@@ -728,10 +739,10 @@
 
     // Cash section
     var cashSection=document.createElement("div");cashSection.id="acim-cash-section";
-    var cashLabel=document.createElement("div");cashLabel.style.cssText="font-size:12px;color:#666;margin-bottom:4px;";
+    var cashLabel=document.createElement("div");cashLabel.style.cssText="font-size:15px;color:#666;margin-bottom:4px;";
     cashLabel.textContent="Montant reçu:";cashSection.appendChild(cashLabel);
     var cashInput=document.createElement("input");cashInput.type="number";cashInput.step="0.01";cashInput.min="0";
-    cashInput.placeholder="0,00";cashInput.style.cssText="width:100%;font-size:22px;font-weight:700;padding:12px;border:3px solid #e65100;border-radius:10px;outline:none;text-align:center;box-sizing:border-box;";
+    cashInput.placeholder="0,00";cashInput.style.cssText="width:100%;font-size:28px;font-weight:700;padding:12px;border:3px solid #e65100;border-radius:10px;outline:none;text-align:center;box-sizing:border-box;";
     cashInput.onfocus=function(){this.select();};
     cashSection.appendChild(cashInput);
 
@@ -740,7 +751,7 @@
     var quickAmounts=[{label:"Exact",val:total},{label:"5€",val:500},{label:"10€",val:1000},{label:"20€",val:2000},{label:"50€",val:5000},{label:"100€",val:10000}];
     quickAmounts.forEach(function(qa){
       var qb=document.createElement("button");qb.textContent=qa.label;
-      qb.style.cssText="padding:6px 10px;border:1px solid #e0e0e0;border-radius:6px;background:#fff;font-size:12px;cursor:pointer;";
+      qb.style.cssText="padding:8px 12px;border:1px solid #e0e0e0;border-radius:6px;background:#fff;font-size:15px;cursor:pointer;";
       qb.onclick=function(){cashInput.value=(qa.val/100).toFixed(2);_updateChange();};
       quickRow.appendChild(qb);
     });
@@ -748,22 +759,22 @@
     card.appendChild(cashSection);
 
     // Change display
-    var changeLine=document.createElement("div");changeLine.style.cssText="font-size:16px;font-weight:700;color:#2e7d32;text-align:center;margin:12px 0;min-height:24px;";
+    var changeLine=document.createElement("div");changeLine.style.cssText="font-size:20px;font-weight:700;color:#2e7d32;text-align:center;margin:12px 0;min-height:24px;";
     changeLine.id="acim-change-line";card.appendChild(changeLine);
 
     // Split section (hidden by default)
     var splitSection=document.createElement("div");splitSection.id="acim-split-section";splitSection.style.cssText="display:none;";
-    var splitLabel=document.createElement("div");splitLabel.style.cssText="font-size:12px;color:#666;margin-bottom:4px;";
+    var splitLabel=document.createElement("div");splitLabel.style.cssText="font-size:15px;color:#666;margin-bottom:4px;";
     splitLabel.textContent="Part espèces:";splitSection.appendChild(splitLabel);
     var splitInput=document.createElement("input");splitInput.type="number";splitInput.step="0.01";splitInput.min="0";
-    splitInput.placeholder="0,00";splitInput.style.cssText="width:100%;font-size:18px;font-weight:700;padding:10px;border:3px solid #e0e0e0;border-radius:8px;outline:none;text-align:center;box-sizing:border-box;";
+    splitInput.placeholder="0,00";splitInput.style.cssText="width:100%;font-size:22px;font-weight:700;padding:10px;border:3px solid #e0e0e0;border-radius:8px;outline:none;text-align:center;box-sizing:border-box;";
     splitSection.appendChild(splitInput);
-    var splitRemainder=document.createElement("div");splitRemainder.style.cssText="font-size:14px;color:#1565c0;text-align:center;margin-top:6px;min-height:20px;";
+    var splitRemainder=document.createElement("div");splitRemainder.style.cssText="font-size:17px;color:#1565c0;text-align:center;margin-top:6px;min-height:20px;";
     splitSection.appendChild(splitRemainder);
     card.appendChild(splitSection);
 
     // Error line
-    var errorLine=document.createElement("div");errorLine.style.cssText="font-size:13px;color:#c62828;text-align:center;min-height:20px;margin-bottom:8px;";
+    var errorLine=document.createElement("div");errorLine.style.cssText="font-size:16px;color:#c62828;text-align:center;min-height:20px;margin-bottom:8px;";
     card.appendChild(errorLine);
 
     function _updatePaymentFields(){
@@ -805,10 +816,10 @@
     // Buttons
     var br=document.createElement("div");br.style.cssText="display:flex;gap:8px;margin-top:12px;";
     var bCancel=document.createElement("button");bCancel.textContent="Annuler";
-    bCancel.style.cssText="flex:1;padding:12px;border:2px solid #e0e0e0;border-radius:8px;background:#fff;font-size:14px;cursor:pointer;";
+    bCancel.style.cssText="flex:1;padding:12px;border:2px solid #e0e0e0;border-radius:8px;background:#fff;font-size:17px;cursor:pointer;";
     bCancel.onclick=function(){ov.remove();};
     var bOk=document.createElement("button");bOk.textContent="✅ Valider le paiement";
-    bOk.style.cssText="flex:2;padding:12px;border:none;border-radius:8px;background:#2e7d32;color:#fff;font-size:14px;cursor:pointer;font-weight:700;";
+    bOk.style.cssText="flex:2;padding:12px;border:none;border-radius:8px;background:#2e7d32;color:#fff;font-size:17px;cursor:pointer;font-weight:700;";
     bOk.onclick=function(){
       var payments=[];
       if(selectedMode==="especes"){
@@ -914,21 +925,21 @@
     var ti=document.createElement("div");ti.style.cssText="font-size:16px;font-weight:700;margin-bottom:4px;color:#1a1a2e;";
     ti.textContent="⚖️ Peser — "+product.name;card.appendChild(ti);
     var unitLabel=document.createElement("div");
-    unitLabel.style.cssText="font-size:12px;color:#666;margin-bottom:12px;";
+    unitLabel.style.cssText="font-size:16px;color:#666;margin-bottom:12px;";
     unitLabel.textContent="Prix unitaire: "+_formatPricePerUnit(product.pricePerUnit,product.unitType);
     card.appendChild(unitLabel);
 
     var row=document.createElement("div");row.style.cssText="display:flex;align-items:center;gap:8px;margin-bottom:12px;";
     var wi=document.createElement("input");wi.type="number";wi.step="0.001";wi.min="0";
-    wi.placeholder="Poids";wi.style.cssText="flex:1;font-size:24px;font-weight:700;padding:12px 14px;border:3px solid #e65100;border-radius:10px;outline:none;text-align:center;";
+    wi.placeholder="Poids";wi.style.cssText="flex:1;font-size:28px;font-weight:700;padding:12px 14px;border:3px solid #e65100;border-radius:10px;outline:none;text-align:center;";
     wi.onfocus=function(){this.select();};
     var unitSpan=document.createElement("span");
-    unitSpan.style.cssText="font-size:18px;font-weight:700;color:#e65100;min-width:40px;";
+    unitSpan.style.cssText="font-size:22px;font-weight:700;color:#e65100;min-width:40px;";
     unitSpan.textContent=product.unitType||"kg";
     row.appendChild(wi);row.appendChild(unitSpan);card.appendChild(row);
 
     var pricePreview=document.createElement("div");
-    pricePreview.style.cssText="font-size:28px;font-weight:700;color:#e65100;text-align:center;margin-bottom:16px;min-height:40px;";
+    pricePreview.style.cssText="font-size:36px;font-weight:700;color:#e65100;text-align:center;margin-bottom:16px;min-height:40px;";
     pricePreview.textContent="0,00 €";
     card.appendChild(pricePreview);
 
@@ -941,10 +952,10 @@
 
     var br=document.createElement("div");br.style.cssText="display:flex;gap:8px;";
     var bCancel=document.createElement("button");bCancel.textContent="Annuler";
-    bCancel.style.cssText="flex:1;padding:10px;border:2px solid #e0e0e0;border-radius:8px;background:#fff;font-size:14px;cursor:pointer;";
+    bCancel.style.cssText="flex:1;padding:10px;border:2px solid #e0e0e0;border-radius:8px;background:#fff;font-size:17px;cursor:pointer;";
     bCancel.onclick=function(){ov.remove();};
     var bOk=document.createElement("button");bOk.textContent="✅ Ajouter au ticket";
-    bOk.style.cssText="flex:2;padding:10px;border:none;border-radius:8px;background:#e65100;color:#fff;font-size:14px;cursor:pointer;font-weight:700;";
+    bOk.style.cssText="flex:2;padding:10px;border:none;border-radius:8px;background:#e65100;color:#fff;font-size:17px;cursor:pointer;font-weight:700;";
     bOk.onclick=function(){
       var w=parseFloat(wi.value);
       if(isNaN(w)||w<=0){wi.style.borderColor="#c62828";wi.focus();return;}
@@ -968,7 +979,7 @@
     ov.style.cssText="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.3);z-index:10000002;display:flex;align-items:center;justify-content:center;";
     var card=document.createElement("div");
     card.style.cssText="background:#fff;border-radius:14px;padding:20px;width:300px;box-shadow:0 8px 24px rgba(0,0,0,0.2);font-family:Segoe UI,Arial,sans-serif;";
-    var ti=document.createElement("div");ti.style.cssText="font-size:16px;font-weight:700;margin-bottom:12px;color:#1a1a2e;";
+    var ti=document.createElement("div");ti.style.cssText="font-size:20px;font-weight:700;margin-bottom:12px;color:#1a1a2e;";
     ti.textContent="🏷️ Remise sur ticket";card.appendChild(ti);
     var subtotal=_cartSubtotal();
     var info=document.createElement("div");info.style.cssText="font-size:12px;color:#666;margin-bottom:8px;";
@@ -1003,10 +1014,10 @@
     });
     var br=document.createElement("div");br.style.cssText="display:flex;gap:8px;";
     var bCancel=document.createElement("button");bCancel.textContent="Annuler";
-    bCancel.style.cssText="flex:1;padding:8px;border:2px solid #e0e0e0;border-radius:6px;background:#fff;font-size:13px;cursor:pointer;";
+    bCancel.style.cssText="flex:1;padding:8px;border:2px solid #e0e0e0;border-radius:6px;background:#fff;font-size:16px;cursor:pointer;";
     bCancel.onclick=function(){ov.remove();};
     var bOk=document.createElement("button");bOk.textContent="✓ Appliquer";
-    bOk.style.cssText="flex:1;padding:8px;border:none;border-radius:6px;background:#2e7d32;color:#fff;font-size:13px;cursor:pointer;font-weight:700;";
+    bOk.style.cssText="flex:1;padding:8px;border:none;border-radius:6px;background:#2e7d32;color:#fff;font-size:16px;cursor:pointer;font-weight:700;";
     bOk.onclick=function(){
       var v=parseFloat(valInput.value)||0;
       if(v<=0){valInput.style.borderColor="#c62828";return;}
@@ -1028,7 +1039,7 @@
     ov.style.cssText="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:10000002;display:flex;align-items:center;justify-content:center;";
     var card=document.createElement("div");
     card.style.cssText="background:#fff;border-radius:14px;padding:20px;width:340px;box-shadow:0 8px 24px rgba(0,0,0,0.3);font-family:Segoe UI,Arial,sans-serif;";
-    var ti=document.createElement("div");ti.style.cssText="font-size:18px;font-weight:700;margin-bottom:16px;color:#1a1a2e;text-align:center;";
+    var ti=document.createElement("div");ti.style.cssText="font-size:22px;font-weight:700;margin-bottom:16px;color:#1a1a2e;text-align:center;";
     ti.textContent="🏪 Menu";card.appendChild(ti);
 
     var btns=[
@@ -1037,18 +1048,19 @@
       {label:"🏷️ Imprimer codes-barres",fn:function(){window.open("barcode.html","_blank");}},
       {label:"📤 Exporter mes données",fn:function(){ov.remove();_showExportDialog();}},
       {label:"📥 Importer des données (JSON)",fn:function(){ov.remove();_showImportDialog();}},
+      {label:"🖥️ Écran client (2e écran)",fn:function(){window.open("customer-display.html","_blank");}},
       {label:"🔄 Migrer depuis l'ancienne version",fn:function(){window.open("migration.html","_blank");}},
       {label:"⚙️ Paramètres",fn:function(){ov.remove();_showSettings();}},
     ];
     btns.forEach(function(b){
       var btn=document.createElement("button");btn.textContent=b.label;
-      btn.style.cssText="width:100%;padding:12px;border:2px solid #e0e0e0;border-radius:8px;background:#fff;font-size:14px;cursor:pointer;text-align:left;margin-bottom:8px;";
+      btn.style.cssText="width:100%;padding:14px;border:2px solid #e0e0e0;border-radius:8px;background:#fff;font-size:17px;cursor:pointer;text-align:left;margin-bottom:8px;";
       btn.onmouseenter=function(){this.style.borderColor="#e65100";this.style.background="#fff3e0";};
       btn.onmouseleave=function(){this.style.borderColor="#e0e0e0";this.style.background="#fff";};
       btn.onclick=b.fn;card.appendChild(btn);
     });
     var bClose=document.createElement("button");bClose.textContent="✕ Fermer";
-    bClose.style.cssText="width:100%;padding:10px;border:none;border-radius:8px;background:#f5f5f5;font-size:13px;cursor:pointer;margin-top:4px;";
+    bClose.style.cssText="width:100%;padding:12px;border:none;border-radius:8px;background:#f5f5f5;font-size:16px;cursor:pointer;margin-top:4px;";
     bClose.onclick=function(){ov.remove();};card.appendChild(bClose);
     ov.appendChild(card);
     ov.onclick=function(e){if(e.target===ov)ov.remove();};
@@ -1062,7 +1074,7 @@
     ov.style.cssText="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:10000002;display:flex;align-items:center;justify-content:center;";
     var card=document.createElement("div");
     card.style.cssText="background:#fff;border-radius:14px;padding:20px;width:500px;max-width:95vw;max-height:80vh;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,0.3);font-family:Segoe UI,Arial,sans-serif;";
-    var ti=document.createElement("div");ti.style.cssText="font-size:18px;font-weight:700;margin-bottom:12px;color:#1a1a2e;";
+    var ti=document.createElement("div");ti.style.cssText="font-size:22px;font-weight:700;margin-bottom:12px;color:#1a1a2e;";
     ti.textContent="📋 Historique des ventes";card.appendChild(ti);
 
     var listDiv=document.createElement("div");listDiv.style.cssText="max-height:50vh;overflow-y:auto;";
@@ -1112,7 +1124,7 @@
     ov.style.cssText="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:10000002;display:flex;align-items:center;justify-content:center;";
     var card=document.createElement("div");
     card.style.cssText="background:#fff;border-radius:14px;padding:20px;width:420px;max-width:95vw;max-height:80vh;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,0.3);font-family:Segoe UI,Arial,sans-serif;";
-    var ti=document.createElement("div");ti.style.cssText="font-size:18px;font-weight:700;margin-bottom:12px;color:#1a1a2e;";
+    var ti=document.createElement("div");ti.style.cssText="font-size:22px;font-weight:700;margin-bottom:12px;color:#1a1a2e;";
     ti.textContent="📄 Importer une facture fournisseur";card.appendChild(ti);
     var desc=document.createElement("div");desc.style.cssText="font-size:12px;color:#666;margin-bottom:12px;";
     desc.textContent="Sélectionnez un fichier PDF de facture fournisseur. Le texte sera extrait (OCR si nécessaire) puis vérifiable avant import.";
@@ -1308,10 +1320,10 @@
 
     var br=document.createElement("div");br.style.cssText="display:flex;gap:8px;margin-top:12px;";
     var bClose=document.createElement("button");bClose.textContent="Fermer";
-    bClose.style.cssText="flex:1;padding:10px;border:2px solid #e0e0e0;border-radius:8px;background:#fff;font-size:14px;cursor:pointer;";
+    bClose.style.cssText="flex:1;padding:10px;border:2px solid #e0e0e0;border-radius:8px;background:#fff;font-size:16px;cursor:pointer;";
     bClose.onclick=function(){ov.remove();};
     var bImport=document.createElement("button");bImport.textContent="📥 Importer dans le catalogue";
-    bImport.style.cssText="flex:2;padding:10px;border:none;border-radius:8px;background:#e65100;color:#fff;font-size:14px;cursor:pointer;font-weight:700;";
+    bImport.style.cssText="flex:2;padding:10px;border:none;border-radius:8px;background:#e65100;color:#fff;font-size:16px;cursor:pointer;font-weight:700;";
     bImport.onclick=function(){
       var products=window._acimParsedProducts;
       if(!products||products.length===0){statusDiv.textContent="❌ Aucun produit à importer.";return;}
@@ -1342,6 +1354,65 @@
     document.body.appendChild(ov);
   }
 
+  // ─── DELETE PRODUCT CONFIRM ────────────────────────────
+  function _confirmDeleteProduct(product){
+    var old=document.getElementById("acim-del-confirm");if(old)old.remove();
+    var ov=document.createElement("div");ov.id="acim-del-confirm";
+    ov.style.cssText="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);z-index:10000003;display:flex;align-items:center;justify-content:center;";
+    var card=document.createElement("div");
+    card.style.cssText="background:#fff;border-radius:14px;padding:20px;width:320px;box-shadow:0 8px 24px rgba(0,0,0,0.3);font-family:Segoe UI,Arial,sans-serif;";
+    var ti=document.createElement("div");ti.style.cssText="font-size:16px;font-weight:700;margin-bottom:8px;color:#c62828;";
+    ti.textContent="🗑️ Supprimer ce produit ?";card.appendChild(ti);
+    var info=document.createElement("div");info.style.cssText="font-size:13px;color:#666;margin-bottom:16px;";
+    info.innerHTML="<strong>"+esc(product.name)+"</strong><br>Code: "+esc(product.barcode)+"<br>Stock: "+(product.stockQty||0);
+    card.appendChild(info);
+    var br=document.createElement("div");br.style.cssText="display:flex;gap:8px;";
+    var bCancel=document.createElement("button");bCancel.textContent="Annuler";
+    bCancel.style.cssText="flex:1;padding:10px;border:2px solid #e0e0e0;border-radius:8px;background:#fff;font-size:14px;cursor:pointer;";
+    bCancel.onclick=function(){ov.remove();};
+    var bDel=document.createElement("button");bDel.textContent="🗑️ Supprimer";
+    bDel.style.cssText="flex:1;padding:10px;border:none;border-radius:8px;background:#c62828;color:#fff;font-size:14px;cursor:pointer;font-weight:700;";
+    bDel.onclick=function(){
+      _dbDelete(product.barcode).then(function(){
+        ov.remove();_toast("🗑️ "+product.name+" supprimé");
+        _refreshAndFilter();
+      });
+    };
+    br.appendChild(bCancel);br.appendChild(bDel);card.appendChild(br);
+    ov.appendChild(card);ov.onclick=function(e){if(e.target===ov)ov.remove();};
+    document.body.appendChild(ov);
+  }
+
+  function _confirmDeleteAll(){
+    var old=document.getElementById("acim-delall");if(old)old.remove();
+    var ov=document.createElement("div");ov.id="acim-delall";
+    ov.style.cssText="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);z-index:10000003;display:flex;align-items:center;justify-content:center;";
+    var card=document.createElement("div");
+    card.style.cssText="background:#fff;border-radius:14px;padding:20px;width:340px;box-shadow:0 8px 24px rgba(0,0,0,0.3);font-family:Segoe UI,Arial,sans-serif;";
+    var ti=document.createElement("div");ti.style.cssText="font-size:16px;font-weight:700;margin-bottom:8px;color:#c62828;";
+    ti.textContent="🗑️ Supprimer TOUS les produits ?";card.appendChild(ti);
+    var info=document.createElement("div");info.style.cssText="font-size:13px;color:#666;margin-bottom:16px;";
+    info.textContent="Cette action est irréversible. Tous les produits du catalogue seront supprimés.";
+    card.appendChild(info);
+    var br=document.createElement("div");br.style.cssText="display:flex;gap:8px;";
+    var bCancel=document.createElement("button");bCancel.textContent="Annuler";
+    bCancel.style.cssText="flex:1;padding:10px;border:2px solid #e0e0e0;border-radius:8px;background:#fff;font-size:14px;cursor:pointer;";
+    bCancel.onclick=function(){ov.remove();};
+    var bDel=document.createElement("button");bDel.textContent="🗑️ Tout supprimer";
+    bDel.style.cssText="flex:1;padding:10px;border:none;border-radius:8px;background:#c62828;color:#fff;font-size:14px;cursor:pointer;font-weight:700;";
+    bDel.onclick=function(){
+      _dbDeleteAll().then(function(){
+        ov.remove();_toast("🗑️ Tous les produits supprimés");
+        _allProducts=[];_filterProducts();
+      });
+    };
+    br.appendChild(bCancel);br.appendChild(bDel);card.appendChild(br);
+    ov.appendChild(card);ov.onclick=function(e){if(e.target===ov)ov.remove();};
+    document.body.appendChild(ov);
+  }
+
+  function esc(s){return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+
   // ─── SETTINGS ────────────────────────────────────────
   function _showSettings(){
     var old=document.getElementById("acim-settings");if(old)old.remove();
@@ -1349,7 +1420,7 @@
     ov.style.cssText="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:10000002;display:flex;align-items:center;justify-content:center;";
     var card=document.createElement("div");
     card.style.cssText="background:#fff;border-radius:14px;padding:20px;width:340px;box-shadow:0 8px 24px rgba(0,0,0,0.3);font-family:Segoe UI,Arial,sans-serif;";
-    var ti=document.createElement("div");ti.style.cssText="font-size:18px;font-weight:700;margin-bottom:12px;color:#1a1a2e;";
+    var ti=document.createElement("div");ti.style.cssText="font-size:22px;font-weight:700;margin-bottom:12px;color:#1a1a2e;";
     ti.textContent="⚙️ Paramètres";card.appendChild(ti);
 
     var nameInput=document.createElement("input");nameInput.type="text";nameInput.value=_settings.storeName;
@@ -1359,12 +1430,17 @@
     footerInput.placeholder="Footer ticket";footerInput.style.cssText="width:100%;font-size:14px;padding:10px;border:2px solid #e0e0e0;border-radius:8px;outline:none;box-sizing:border-box;margin-bottom:12px;";
     card.appendChild(footerInput);
 
+    var dangerBtn=document.createElement("button");dangerBtn.textContent="🗑️ Supprimer tous les produits";
+    dangerBtn.style.cssText="width:100%;padding:10px;border:2px solid #ffcdd2;border-radius:8px;background:#fff;color:#c62828;font-size:13px;cursor:pointer;margin-bottom:12px;font-weight:600;";
+    dangerBtn.onclick=function(){ov.remove();_confirmDeleteAll();};
+    card.appendChild(dangerBtn);
+
     var br=document.createElement("div");br.style.cssText="display:flex;gap:8px;";
     var bCancel=document.createElement("button");bCancel.textContent="Annuler";
-    bCancel.style.cssText="flex:1;padding:10px;border:2px solid #e0e0e0;border-radius:8px;background:#fff;font-size:14px;cursor:pointer;";
+    bCancel.style.cssText="flex:1;padding:10px;border:2px solid #e0e0e0;border-radius:8px;background:#fff;font-size:16px;cursor:pointer;";
     bCancel.onclick=function(){ov.remove();};
     var bOk=document.createElement("button");bOk.textContent="Enregistrer";
-    bOk.style.cssText="flex:1;padding:10px;border:none;border-radius:8px;background:#e65100;color:#fff;font-size:14px;cursor:pointer;font-weight:700;";
+    bOk.style.cssText="flex:1;padding:10px;border:none;border-radius:8px;background:#e65100;color:#fff;font-size:16px;cursor:pointer;font-weight:700;";
     bOk.onclick=function(){
       _settings.storeName=nameInput.value.trim()||"AcimCaisse";
       _settings.footer=footerInput.value.trim()||"Merci de votre visite !";
@@ -1384,26 +1460,26 @@
     var left=Math.max(10,(window.innerWidth-280)/2);
     var top=Math.max(10,(window.innerHeight-450)/2);
     card.style.cssText="position:fixed;left:"+left+"px;top:"+top+"px;width:280px;max-height:80vh;overflow-y:auto;background:#fff;border-radius:12px;padding:14px;box-shadow:0 6px 20px rgba(0,0,0,0.25);z-index:10000003;font-family:Segoe UI,Arial,sans-serif;";
-    var ti=document.createElement("div");ti.style.cssText="font-size:13px;font-weight:700;margin-bottom:8px;color:#1a1a2e;";ti.textContent=_catIcon(item.cat||"autre")+" Modifier";card.appendChild(ti);
+    var ti=document.createElement("div");ti.style.cssText="font-size:16px;font-weight:700;margin-bottom:8px;color:#1a1a2e;";ti.textContent=_catIcon(item.cat||"autre")+" Modifier";card.appendChild(ti);
     var ni=document.createElement("input");ni.type="text";ni.value=item.name||"";ni.placeholder="Nom";
-    ni.style.cssText="width:100%;font-size:14px;padding:8px 12px;border:2px solid #e0e0e0;border-radius:8px;outline:none;box-sizing:border-box;margin-bottom:6px;";
+    ni.style.cssText="width:100%;font-size:17px;padding:8px 12px;border:2px solid #e0e0e0;border-radius:8px;outline:none;box-sizing:border-box;margin-bottom:6px;";
     ni.onfocus=function(){this.style.borderColor="#e65100";this.select();};ni.onblur=function(){this.style.borderColor="#e0e0e0";};card.appendChild(ni);
 
     var row=document.createElement("div");row.style.cssText="display:flex;align-items:center;gap:4px;margin-bottom:6px;";
     var pi=document.createElement("input");pi.type="number";pi.step="0.01";pi.min="0";
     pi.value=item.priceCents>0?(item.priceCents/100).toFixed(2):"";pi.placeholder="Prix fixe";
-    pi.style.cssText="flex:1;font-size:16px;font-weight:700;padding:8px 12px;border:2px solid #e0e0e0;border-radius:8px;outline:none;";
+    pi.style.cssText="flex:1;font-size:20px;font-weight:700;padding:8px 12px;border:2px solid #e0e0e0;border-radius:8px;outline:none;";
     pi.onfocus=function(){this.style.borderColor="#e65100";this.select();};pi.onblur=function(){this.style.borderColor="#e0e0e0";};
-    var eu=document.createElement("span");eu.style.cssText="font-size:16px;font-weight:700;color:#e65100;";eu.textContent="€";
+    var eu=document.createElement("span");eu.style.cssText="font-size:20px;font-weight:700;color:#e65100;";eu.textContent="€";
     row.appendChild(pi);row.appendChild(eu);card.appendChild(row);
 
     // Weight section
     var poidsRow=document.createElement("div");poidsRow.style.cssText="display:flex;align-items:center;gap:4px;margin-bottom:6px;";
     var poidsIn=document.createElement("input");poidsIn.type="number";poidsIn.step="0.001";poidsIn.min="0";
     poidsIn.value=item.weight!=null?item.weight:"";poidsIn.placeholder="Poids";
-    poidsIn.style.cssText="flex:1;font-size:12px;padding:6px 10px;border:2px solid #e0e0e0;border-radius:6px;outline:none;";
+    poidsIn.style.cssText="flex:1;font-size:16px;padding:6px 10px;border:2px solid #e0e0e0;border-radius:6px;outline:none;";
     poidsIn.onfocus=function(){this.style.borderColor="#e65100";};poidsIn.onblur=function(){this.style.borderColor="#e0e0e0";};
-    var unitSel=document.createElement("select");unitSel.style.cssText="font-size:12px;padding:4px;border:2px solid #e0e0e0;border-radius:6px;outline:none;background:#fff;";
+    var unitSel=document.createElement("select");    unitSel.style.cssText="font-size:16px;padding:4px;border:2px solid #e0e0e0;border-radius:6px;outline:none;background:#fff;";
     unitSel.innerHTML="";
     [["kg","kg"],["g","g"],["L","L"],["pc","pièce"]].forEach(function(u){
       var o=document.createElement("option");o.value=u[0];o.textContent=u[1];
@@ -1414,7 +1490,7 @@
     var ppuRow=document.createElement("div");ppuRow.style.cssText="display:flex;align-items:center;gap:4px;margin-bottom:6px;";
     var ppuIn=document.createElement("input");ppuIn.type="number";ppuIn.step="0.01";ppuIn.min="0";
     ppuIn.value=item.pricePerUnit!=null?(item.pricePerUnit/100).toFixed(2):"";ppuIn.placeholder="Prix unitaire (€/kg)";
-    ppuIn.style.cssText="flex:1;font-size:12px;padding:6px 10px;border:2px solid #e0e0e0;border-radius:6px;outline:none;";
+    ppuIn.style.cssText="flex:1;font-size:16px;padding:6px 10px;border:2px solid #e0e0e0;border-radius:6px;outline:none;";
     ppuIn.onfocus=function(){this.style.borderColor="#e65100";};ppuIn.onblur=function(){this.style.borderColor="#e0e0e0";};
     var ppuUnit=document.createElement("span");ppuUnit.style.cssText="font-size:11px;color:#666;min-width:40px;";
     ppuUnit.textContent="/"+(item.unitType||"kg");
@@ -1423,7 +1499,7 @@
     unitSel.onchange=function(){ppuUnit.textContent="/"+unitSel.value;};
     poidsRow.appendChild(poidsIn);poidsRow.appendChild(unitSel);card.appendChild(poidsRow);
 
-    var preview=document.createElement("div");preview.style.cssText="font-size:14px;font-weight:700;color:#e65100;text-align:center;margin-bottom:8px;min-height:20px;";
+    var preview=document.createElement("div");preview.style.cssText="font-size:17px;font-weight:700;color:#e65100;text-align:center;margin-bottom:8px;min-height:20px;";
     card.appendChild(preview);
 
     function _updatePreview(){
@@ -1446,7 +1522,7 @@
     var selCat=item.cat||"autre";
     for(var ci=0;ci<CATS.length;ci++){(function(cat){
       var b=document.createElement("button");b.textContent=cat.ic;b.title=cat.id;
-      b.style.cssText="padding:4px 6px;border:2px solid #e0e0e0;border-radius:6px;background:#fff;font-size:14px;cursor:pointer;"+(cat.id===selCat?"border-color:#e65100;background:#fff3e0;":"");
+      b.style.cssText="padding:4px 6px;border:2px solid #e0e0e0;border-radius:6px;background:#fff;font-size:18px;cursor:pointer;"+(cat.id===selCat?"border-color:#e65100;background:#fff3e0;":"");
       b.onclick=function(){cr.querySelectorAll("button").forEach(function(x){x.style.borderColor="#e0e0e0";x.style.background="#fff";});this.style.borderColor="#e65100";this.style.background="#fff3e0";selCat=cat.id;};
       cr.appendChild(b);
     })(CATS[ci]);}card.appendChild(cr);
@@ -1463,13 +1539,13 @@
 
     var br=document.createElement("div");br.style.cssText="display:flex;gap:6px;";
     var bDel=document.createElement("button");bDel.textContent="🗑️";
-    bDel.style.cssText="padding:6px 8px;border:1px solid #ffcdd2;border-radius:6px;background:#fff;font-size:12px;cursor:pointer;color:#c62828;";
+    bDel.style.cssText="padding:6px 8px;border:1px solid #ffcdd2;border-radius:6px;background:#fff;font-size:16px;cursor:pointer;color:#c62828;";
     bDel.onclick=function(){card.remove();_removeFromCart(idx);};
     var bCancel=document.createElement("button");bCancel.textContent="×";
-    bCancel.style.cssText="padding:6px 8px;border:1px solid #e0e0e0;border-radius:6px;background:#f5f5f5;font-size:12px;cursor:pointer;";
+    bCancel.style.cssText="padding:6px 8px;border:1px solid #e0e0e0;border-radius:6px;background:#f5f5f5;font-size:16px;cursor:pointer;";
     bCancel.onclick=function(){card.remove();};
     var bOk=document.createElement("button");bOk.textContent="✓";
-    bOk.style.cssText="flex:1;padding:6px;border:none;border-radius:6px;background:#e65100;color:#fff;font-size:14px;cursor:pointer;font-weight:700;";
+    bOk.style.cssText="flex:1;padding:6px;border:none;border-radius:6px;background:#e65100;color:#fff;font-size:17px;cursor:pointer;font-weight:700;";
     bOk.onclick=function(){
       var nn=ni.value.trim(),np=parseFloat(pi.value);
       var pv=parseFloat(poidsIn.value),u=unitSel.value;
@@ -1504,7 +1580,7 @@
     ov.style.cssText="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.3);z-index:10000001;display:flex;align-items:center;justify-content:center;";
     var card=document.createElement("div");
     card.style.cssText="background:#fff;border-radius:14px;padding:20px;width:320px;max-width:95vw;box-shadow:0 8px 24px rgba(0,0,0,0.2);font-family:Segoe UI,Arial,sans-serif;";
-    var ti=document.createElement("div");ti.style.cssText="font-size:16px;font-weight:700;margin-bottom:12px;color:#1a1a2e;";
+    var ti=document.createElement("div");ti.style.cssText="font-size:20px;font-weight:700;margin-bottom:12px;color:#1a1a2e;";
     ti.textContent=providedBc?"➕ Nouveau produit (scanné)":"➕ Nouveau produit";card.appendChild(ti);
 
     if(providedBc){
@@ -1630,7 +1706,7 @@
     ov.style.cssText="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:10000002;display:flex;align-items:center;justify-content:center;";
     var card=document.createElement("div");
     card.style.cssText="background:#fff;border-radius:14px;padding:20px;width:380px;max-width:95vw;box-shadow:0 8px 24px rgba(0,0,0,0.3);font-family:Segoe UI,Arial,sans-serif;";
-    var ti=document.createElement("div");ti.style.cssText="font-size:18px;font-weight:700;margin-bottom:12px;color:#1a1a2e;text-align:center;";
+    var ti=document.createElement("div");ti.style.cssText="font-size:22px;font-weight:700;margin-bottom:12px;color:#1a1a2e;text-align:center;";
     ti.textContent="📤 Exporter mes données";card.appendChild(ti);
     var desc=document.createElement("div");desc.style.cssText="font-size:12px;color:#666;margin-bottom:16px;text-align:center;";
     desc.textContent="Télécharge un fichier JSON contenant tous vos produits, ventes et paramètres.";
@@ -1669,7 +1745,7 @@
     ov.style.cssText="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:10000002;display:flex;align-items:center;justify-content:center;";
     var card=document.createElement("div");
     card.style.cssText="background:#fff;border-radius:14px;padding:20px;width:420px;max-width:95vw;max-height:80vh;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,0.3);font-family:Segoe UI,Arial,sans-serif;";
-    var ti=document.createElement("div");ti.style.cssText="font-size:18px;font-weight:700;margin-bottom:12px;color:#1a1a2e;text-align:center;";
+    var ti=document.createElement("div");ti.style.cssText="font-size:22px;font-weight:700;margin-bottom:12px;color:#1a1a2e;text-align:center;";
     ti.textContent="📥 Importer des données";card.appendChild(ti);
     var desc=document.createElement("div");desc.style.cssText="font-size:12px;color:#666;margin-bottom:12px;text-align:center;";
     desc.textContent="Importe un fichier JSON exporté depuis AcimCaisse. Les doublons (même code-barres) sont écrasés.";
