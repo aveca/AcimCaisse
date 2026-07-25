@@ -144230,7 +144230,7 @@ if(typeof dartMainRunner==="function"){dartMainRunner(s,[])}else{s([])}})
 
   // ─── CATEGORIES ──────────────────────────────────────
   var CATS=[
-    {id:"viande",ic:"🥩"}, {id:"laitier",ic:"🧀"}, {id:"epicerie",ic:"🏪"},
+    {id:"viande",ic:"🥩"}, {id:"volaille",ic:"🐔"}, {id:"laitier",ic:"🧀"}, {id:"epicerie",ic:"🏪"},
     {id:"boulangerie",ic:"🍞"}, {id:"boisson",ic:"🥤"}, {id:"surgelé",ic:"🧊"},
     {id:"snack",ic:"🍪"}, {id:"condiment",ic:"🧂"}, {id:"menager",ic:"🧴"},
     {id:"vin",ic:"🍷"}, {id:"autre",ic:"📦"}
@@ -145175,6 +145175,7 @@ if(typeof dartMainRunner==="function"){dartMainRunner(s,[])}else{s([])}})
 
     var btns=[
       {label:"📋 Historique des ventes",fn:function(){ov.remove();_showHistory();}},
+      {label:"🔍 Vérifier / Nettoyer le catalogue",fn:function(){ov.remove();_showProductAudit();}},
       {label:"📄 Importer facture fournisseur",fn:function(){ov.remove();_showInvoiceImport();}},
       {label:"🏷️ Imprimer codes-barres",fn:function(){window.open("barcode.html","_blank");}},
       {label:"📤 Exporter mes données",fn:function(){ov.remove();_showExportDialog();}},
@@ -146006,6 +146007,313 @@ if(typeof dartMainRunner==="function"){dartMainRunner(s,[])}else{s([])}})
     document.body.appendChild(ov);
   }
 
+  // ─── AUTO-CATEGORIZE DICTIONARY ─────────────────────
+  var _CAT_RULES=[
+    // VOLAILLE
+    {kw:["poulet","poule","dinde","dinde","canard","oie","parmelet","paupiette","aiguillette","filet poulet","cuisse poulet","pilon","pilori","blanc poulet","magret","foie gras","chapon","coq"],cat:"volaille",name:null},
+    // VIANDE
+    {kw:["boeuf","bœuf","veau","agneau","porc","steak","côte","cotelette","entrecôte","bavette","hampe","paleron","rumsteck","rôti","roti","haché","hache","saucisse","saucisson","jambon","lard","poitrine","merguez","chipolata","andouillette","boudin","rosette","salami","viande"],cat:"viande",name:null},
+    // LAITIER
+    {kw:["lait","fromage","yaourt","yogurt","crème","beurre","emmental","gruyère","comté","reblochon","camembert","brie","roquefort","chèvre","mozzarella","ricotta","parmesan","mascarpone","morbier","raclette","tome","cheese"],cat:"laitier",name:null},
+    // BOULANGERIE
+    {kw:["pain","baguette","croissant","brioche","challah","pain maison","fougasse","focaccia","pizza","tarte","quiche","galette","crepe","crêpe","muffin","donut","beignet"],cat:"boulangerie",name:null},
+    // EPICERIE
+    {kw:["riz","pâtes","pates","lentilles","pois","haricots","huile","vinaigre","sel","poivre","sucre","farine","oeuf","œuf","conserve","sauce","soupe","bouillon","moutarde","ketchup","mayonnaise","nutella","confiture","miel","café","the","thé","cacao","céréales","biscuit","chips","chocolat","bonbon","bonbons"],cat:"epicerie",name:null},
+    // BOISSON
+    {kw:["eau","jus","soda","bière","biere","limonade","coca","sprite","perrier","san pellegrino","boisson","lait","café","the","thé","vin","champagne","cidre","rhum","whisky","vodka","gin","tonic"],cat:"boisson",name:null},
+    // SURGELE
+    {kw:["surgelé","surgelé","congelé","glace","pizza surgelé","légume surgelé","frites surgelé","poisson surgelé"],cat:"surgelé",name:null},
+    // SNACK
+    {kw:["chips","biscuit","gâteau","gateau","cookie","céréales","barre","snack","nooty","nutella","amande","noisette","cacahuète","fruits secs","muesli"],cat:"snack",name:null},
+    // CONDIMENT
+    {kw:["épice","epice","herbe","basilic","thym","romarin","curry","paprika","cumin","safran","cannelle","vanille"],cat:"condiment",name:null},
+    // MENAGER
+    {kw:["nettoyant","détergent","lessive","savon","shampooing","dentifrice","papier toilette","mouchoir","couche","hygiène","menager","éponge"],cat:"menager",name:null}
+  ];
+
+  function _guessCategory(name){
+    var n=(name||"").toLowerCase();
+    for(var i=0;i<_CAT_RULES.length;i++){
+      var r=_CAT_RULES[i];
+      for(var j=0;j<r.kw.length;j++){
+        if(n.indexOf(r.kw[j])!==-1)return r.cat;
+      }
+    }
+    return null;
+  }
+
+  // ─── PRODUCT AUDIT ──────────────────────────────────
+  function _showProductAudit(){
+    var old=document.getElementById("acim-audit");if(old)old.remove();
+    var ov=document.createElement("div");ov.id="acim-audit";
+    ov.style.cssText="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:10000002;display:flex;align-items:center;justify-content:center;";
+    var card=document.createElement("div");
+    card.style.cssText="background:#fff;border-radius:14px;padding:20px;width:600px;max-width:95vw;max-height:85vh;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,0.3);font-family:Segoe UI,Arial,sans-serif;";
+    var ti=document.createElement("div");ti.style.cssText="font-size:22px;font-weight:700;margin-bottom:4px;color:#1a1a2e;";
+    ti.textContent="🔍 Vérification du catalogue";card.appendChild(ti);
+    var sub=document.createElement("div");sub.style.cssText="font-size:15px;color:#666;margin-bottom:16px;";
+    sub.textContent="Analyse de vos produits — doublons, erreurs, suggestions";card.appendChild(sub);
+
+    var listDiv=document.createElement("div");listDiv.id="acim-audit-list";
+    listDiv.style.cssText="min-height:60px;";listDiv.innerHTML='<div style="text-align:center;padding:20px;color:#999;">Analyse en cours...</div>';
+    card.appendChild(listDiv);
+
+    var btnRow=document.createElement("div");btnRow.style.cssText="display:flex;gap:8px;margin-top:16px;";
+    var bAutoFix=document.createElement("button");bAutoFix.textContent="🤖 Auto-corriger tout";
+    bAutoFix.style.cssText="flex:1;padding:12px;border:none;border-radius:8px;background:#1565c0;color:#fff;font-size:17px;cursor:pointer;font-weight:700;";
+    bAutoFix.onclick=function(){_auditAutoFix(listDiv,bAutoFix);};
+    var bClose=document.createElement("button");bClose.textContent="Fermer";
+    bClose.style.cssText="flex:1;padding:12px;border:2px solid #e0e0e0;border-radius:8px;background:#fff;font-size:17px;cursor:pointer;";
+    bClose.onclick=function(){ov.remove();};
+    btnRow.appendChild(bAutoFix);btnRow.appendChild(bClose);card.appendChild(btnRow);
+    ov.appendChild(card);ov.onclick=function(e){if(e.target===ov)ov.remove();};
+    document.body.appendChild(ov);
+
+    // Run audit async
+    setTimeout(function(){_runAudit(listDiv);},100);
+  }
+
+  function _runAudit(container){
+    _dbGetAll().then(function(products){
+      var issues=[];
+
+      // 1. Check duplicates (same name or same barcode)
+      var byName={};var byBc={};
+      products.forEach(function(p){
+        var n=(p.name||"").toLowerCase().trim();
+        var b=(p.barcode||"").trim();
+        if(n){if(!byName[n])byName[n]=[];byName[n].push(p);}
+        if(b){if(!byBc[b])byBc[b]=[];byBc[b].push(p);}
+      });
+      Object.keys(byName).forEach(function(n){
+        if(byName[n].length>1){
+          issues.push({type:"duplicate-name",label:'Doublon nom: "'+byName[n][0].name+'"',items:byName[n],icon:"👥"});
+        }
+      });
+      Object.keys(byBc).forEach(function(b){
+        if(byBc[b].length>1){
+          issues.push({type:"duplicate-bc",label:'Doublon code-barres: '+b,items:byBc[b],icon:"👥"});
+        }
+      });
+
+      // 2. No price
+      products.forEach(function(p){
+        if(!p.sale_price_cents||p.sale_price_cents<=0){
+          issues.push({type:"no-price",label:'Sans prix: '+(p.name||p.barcode),items:[p],icon:"💰"});
+        }
+      });
+
+      // 3. Wrong category (can be guessed)
+      products.forEach(function(p){
+        var guessed=_guessCategory(p.name);
+        if(guessed&&p.category!==guessed){
+          issues.push({type:"wrong-cat",label:'Mauvaise catégorie: "'+p.name+'" → '+_catIcon(guessed)+' '+guessed,items:[p],icon:"📂",suggestedCat:guessed});
+        }
+      });
+
+      // 4. No category
+      products.forEach(function(p){
+        if(!p.category||p.category==="autre"){
+          var guessed=_guessCategory(p.name);
+          if(guessed){
+            issues.push({type:"no-cat",label:'Catégorie suggérée: "'+p.name+'" → '+_catIcon(guessed)+' '+guessed,items:[p],icon:"📂",suggestedCat:guessed});
+          }
+        }
+      });
+
+      // 5. Weird names (too short, just numbers, etc.)
+      products.forEach(function(p){
+        var n=(p.name||"").trim();
+        if(n.length<2){issues.push({type:"bad-name",label:'Nom invalide: "'+n+'" ('+p.barcode+')',items:[p],icon:"⚠️"});}
+        if(/^\d+$/.test(n)){issues.push({type:"bad-name",label:'Nom numérique: "'+n+'" ('+p.barcode+')',items:[p],icon:"⚠️"});}
+      });
+
+      // 6. Zero stock with sales history? (potential issue)
+      // Skip for now
+
+      // Render
+      container.innerHTML="";
+      if(issues.length===0){
+        container.innerHTML='<div style="text-align:center;padding:30px;color:#2e7d32;font-size:18px;">✅ Aucun problème détecté !<br><span style="font-size:14px;color:#666;">'+products.length+' produits analysés</span></div>';
+        return;
+      }
+
+      var summary=document.createElement("div");
+      summary.style.cssText="padding:10px;background:#fff3e0;border-radius:8px;margin-bottom:12px;font-size:15px;color:#e65100;";
+      summary.textContent="⚠️ "+issues.length+" anomalie(s) trouvée(s) sur "+products.length+" produits";
+      container.appendChild(summary);
+
+      issues.forEach(function(issue,idx){
+        var row=document.createElement("div");
+        row.style.cssText="display:flex;align-items:center;gap:8px;padding:10px;border:1px solid #e0e0e0;border-radius:8px;margin-bottom:6px;";
+        var icon=document.createElement("span");icon.textContent=issue.icon;
+        icon.style.cssText="font-size:20px;flex-shrink:0;";
+        var label=document.createElement("span");label.textContent=issue.label;
+        label.style.cssText="flex:1;font-size:15px;color:#1a1a2e;";
+        row.appendChild(icon);row.appendChild(label);
+
+        if(issue.type==="wrong-cat"||issue.type==="no-cat"){
+          var fixBtn=document.createElement("button");fixBtn.textContent="→ "+_catIcon(issue.suggestedCat)+" "+issue.suggestedCat;
+          fixBtn.style.cssText="padding:6px 12px;border:2px solid #1565c0;border-radius:6px;background:#e3f2fd;font-size:14px;cursor:pointer;font-weight:600;color:#1565c0;white-space:nowrap;";
+          fixBtn.onclick=function(){
+            var p=issue.items[0];
+            p.category=issue.suggestedCat;
+            _dbPut(p).then(function(){
+              row.style.background="#e8f5e9";row.style.borderColor="#2e7d32";
+              fixBtn.textContent="✅ Fait";fixBtn.disabled=true;fixBtn.style.opacity="0.5";
+              _toast("📂 "+p.name+" → "+issue.suggestedCat);
+            });
+          };
+          row.appendChild(fixBtn);
+        }
+
+        if(issue.type==="duplicate-name"||issue.type==="duplicate-bc"){
+          var mergeBtn=document.createElement("button");mergeBtn.textContent="🔄 Fusionner";
+          mergeBtn.style.cssText="padding:6px 12px;border:2px solid #e65100;border-radius:6px;background:#fff3e0;font-size:14px;cursor:pointer;font-weight:600;color:#e65100;white-space:nowrap;";
+          mergeBtn.onclick=function(){
+            _auditMergeDialog(issue.items);row.style.background="#e8f5e9";
+            mergeBtn.textContent="✅";mergeBtn.disabled=true;mergeBtn.style.opacity="0.5";
+          };
+          row.appendChild(mergeBtn);
+
+          var delBtn=document.createElement("button");delBtn.textContent="🗑️";
+          delBtn.style.cssText="padding:6px 8px;border:2px solid #c62828;border-radius:6px;background:#fff;font-size:14px;cursor:pointer;color:#c62828;";
+          delBtn.onclick=function(){
+            if(issue.items.length>1){
+              _auditDeleteDuplicates(issue.items,row,delBtn);
+            }
+          };
+          row.appendChild(delBtn);
+        }
+
+        if(issue.type==="no-price"){
+          var editBtn=document.createElement("button");editBtn.textContent="✏️ Prix";
+          editBtn.style.cssText="padding:6px 12px;border:2px solid #2e7d32;border-radius:6px;background:#e8f5e9;font-size:14px;cursor:pointer;font-weight:600;color:#2e7d32;white-space:nowrap;";
+          editBtn.onclick=function(){
+            _auditSetPrice(issue.items[0],row,editBtn);
+          };
+          row.appendChild(editBtn);
+        }
+
+        if(issue.type==="bad-name"){
+          var delBtn2=document.createElement("button");delBtn2.textContent="🗑️ Supprimer";
+          delBtn2.style.cssText="padding:6px 12px;border:2px solid #c62828;border-radius:6px;background:#fff;font-size:14px;cursor:pointer;color:#c62828;font-weight:600;";
+          delBtn2.onclick=function(){
+            _dbDelete(issue.items[0].barcode).then(function(){
+              row.style.background="#ffebee";row.style.borderColor="#c62828";
+              delBtn2.textContent="✅ Supprimé";delBtn2.disabled=true;delBtn2.style.opacity="0.5";
+              _toast("🗑️ Produit supprimé");
+            });
+          };
+          row.appendChild(delBtn2);
+        }
+
+        container.appendChild(row);
+      });
+    });
+  }
+
+  function _auditMergeDialog(products){
+    var old=document.getElementById("acim-merge");if(old)old.remove();
+    var ov=document.createElement("div");ov.id="acim-merge";
+    ov.style.cssText="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);z-index:10000004;display:flex;align-items:center;justify-content:center;";
+    var card=document.createElement("div");
+    card.style.cssText="background:#fff;border-radius:14px;padding:20px;width:400px;max-width:95vw;box-shadow:0 8px 24px rgba(0,0,0,0.3);font-family:Segoe UI,Arial,sans-serif;";
+    var ti=document.createElement("div");ti.style.cssText="font-size:20px;font-weight:700;margin-bottom:12px;color:#1a1a2e;";
+    ti.textContent="🔄 Fusionner les doublons";card.appendChild(ti);
+    var info=document.createElement("div");info.style.cssText="font-size:15px;color:#666;margin-bottom:12px;";
+    info.textContent=products.length+" produits avec le même nom. Choisissez lequel garder :";
+    card.appendChild(info);
+
+    products.forEach(function(p){
+      var row=document.createElement("div");
+      row.style.cssText="display:flex;align-items:center;gap:8px;padding:10px;border:2px solid #e0e0e0;border-radius:8px;margin-bottom:6px;cursor:pointer;transition:all .15s;";
+      row.onmouseenter=function(){this.style.borderColor="#e65100";this.style.background="#fff3e0";};
+      row.onmouseleave=function(){this.style.borderColor="#e0e0e0";this.style.background="#fff";};
+      var ic=document.createElement("span");ic.textContent=_catIcon(p.category);ic.style.cssText="font-size:20px;";
+      var nm=document.createElement("span");nm.textContent=p.name||"?";nm.style.cssText="flex:1;font-size:15px;font-weight:600;";
+      var pr=document.createElement("span");pr.textContent=(p.sale_price_cents/100).toFixed(2)+"€";
+      pr.style.cssText="font-size:15px;color:#e65100;font-weight:700;";
+      var bc=document.createElement("span");bc.textContent=p.barcode||"no bc";bc.style.cssText="font-size:12px;color:#999;";
+      row.appendChild(ic);row.appendChild(nm);row.appendChild(pr);row.appendChild(bc);
+      row.onclick=function(){
+        // Keep this one, delete the rest
+        var others=products.filter(function(x){return x.barcode!==p.barcode;});
+        var chain=Promise.resolve();
+        others.forEach(function(x){chain=chain.then(function(){return _dbDelete(x.barcode);});});
+        chain.then(function(){
+          ov.remove();
+          _toast("✅ Gardé: "+p.name+" ("+others.length+" supprimé(s))");
+          _showProductAudit();
+        });
+      };
+      card.appendChild(row);
+    });
+
+    var bClose=document.createElement("button");bClose.textContent="Annuler";
+    bClose.style.cssText="width:100%;padding:10px;border:2px solid #e0e0e0;border-radius:8px;background:#fff;font-size:16px;cursor:pointer;margin-top:8px;";
+    bClose.onclick=function(){ov.remove();};
+    card.appendChild(bClose);
+    ov.appendChild(card);ov.onclick=function(e){if(e.target===ov)ov.remove();};
+    document.body.appendChild(ov);
+  }
+
+  function _auditDeleteDuplicates(products,row,btn){
+    // Keep first, delete rest
+    var keep=products[0];
+    var toDelete=products.slice(1);
+    var chain=Promise.resolve();
+    toDelete.forEach(function(p){chain=chain.then(function(){return _dbDelete(p.barcode);});});
+    chain.then(function(){
+      row.style.background="#e8f5e9";row.style.borderColor="#2e7d32";
+      btn.textContent="✅ "+toDelete.length+" supprimé(s)";btn.disabled=true;btn.style.opacity="0.5";
+      _toast("🗑️ "+toDelete.length+" doublon(s) supprimé(s), gardé: "+keep.name);
+    });
+  }
+
+  function _auditSetPrice(product,row,btn){
+    var price=prompt('Prix pour "'+product.name+'" (en €, ex: 5.50):');
+    if(price===null)return;
+    var cents=Math.round(parseFloat(price)*100);
+    if(isNaN(cents)||cents<=0){_toast("❌ Prix invalide");return;}
+    product.sale_price_cents=cents;
+    _dbPut(product).then(function(){
+      row.style.background="#e8f5e9";row.style.borderColor="#2e7d32";
+      btn.textContent="✅ "+(cents/100).toFixed(2)+"€";btn.disabled=true;btn.style.opacity="0.5";
+      _toast("💰 Prix mis à jour: "+product.name+" → "+(cents/100).toFixed(2)+"€");
+    });
+  }
+
+  function _auditAutoFix(container,btn){
+    btn.textContent="⏳ Correction en cours...";btn.disabled=true;btn.style.opacity="0.5";
+    _dbGetAll().then(function(products){
+      var fixed=0;
+      var chain=Promise.resolve();
+      products.forEach(function(p){
+        chain=chain.then(function(){
+          var changed=false;
+          // Auto-fix wrong category
+          if(!p.category||p.category==="autre"){
+            var guessed=_guessCategory(p.name);
+            if(guessed){p.category=guessed;changed=true;}
+          }
+          // Also fix if category doesn't match anymore
+          var guessed2=_guessCategory(p.name);
+          if(guessed2&&p.category!==guessed2){
+            // Only override "autre", don't force if user chose something specific
+            if(p.category==="autre"||!p.category){p.category=guessed2;changed=true;}
+          }
+          if(changed){fixed++;return _dbPut(p);}
+        });
+      });
+      chain.then(function(){
+        _toast("🤖 "+fixed+" produit(s) auto-corrigé(s)");
+        _runAudit(container);
+        btn.textContent="🤖 Auto-corriger tout";btn.disabled=false;btn.style.opacity="1";
+      });
+    });
+  }
+
   // ─── TOAST ────────────────────────────────────────────
   function _toast(msg){
     if(!msg)return;var old=document.getElementById("acim-toast");if(old)old.remove();
@@ -146049,6 +146357,8 @@ if(typeof dartMainRunner==="function"){dartMainRunner(s,[])}else{s([])}})
   window._acimWeighProduct=_weighProduct;
 })();
 // ─── FIN AcimCaisse v34 ───
+
+
 
 
 
