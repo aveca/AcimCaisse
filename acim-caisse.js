@@ -684,7 +684,8 @@
         _addToCart(local.name,0,bc,local.category);
         _toast("✏️ "+local.name+" — cliquez dans le ticket pour le prix");return;
       }
-      _toast("❌ Produit inconnu: "+bc);
+      _quickCreate("",0,bc,"");
+      _toast("🆕 Nouveau produit — code: "+bc);
     });
   }
 
@@ -1431,11 +1432,20 @@
   // ─── QUICK CREATE ────────────────────────────────────
   function _quickCreate(name,priceCents,barcode,category){
     if(_dialogOpen())return;
+    var providedBc=barcode||"";
     var ov=document.createElement("div");ov.id="acim-quick";
     ov.style.cssText="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.3);z-index:10000001;display:flex;align-items:center;justify-content:center;";
     var card=document.createElement("div");
     card.style.cssText="background:#fff;border-radius:14px;padding:20px;width:320px;max-width:95vw;box-shadow:0 8px 24px rgba(0,0,0,0.2);font-family:Segoe UI,Arial,sans-serif;";
-    var ti=document.createElement("div");ti.style.cssText="font-size:16px;font-weight:700;margin-bottom:12px;color:#1a1a2e;";ti.textContent="➕ Nouveau produit";card.appendChild(ti);
+    var ti=document.createElement("div");ti.style.cssText="font-size:16px;font-weight:700;margin-bottom:12px;color:#1a1a2e;";
+    ti.textContent=providedBc?"➕ Nouveau produit (scanné)":"➕ Nouveau produit";card.appendChild(ti);
+
+    if(providedBc){
+      var bcBadge=document.createElement("div");
+      bcBadge.style.cssText="background:#e3f2fd;color:#1565c0;padding:6px 10px;border-radius:8px;font-size:12px;font-weight:600;margin-bottom:8px;font-family:monospace;";
+      bcBadge.textContent="📊 Code-barres: "+providedBc;
+      card.appendChild(bcBadge);
+    }
     var ni=document.createElement("input");ni.type="text";ni.placeholder="Nom du produit";ni.value=name||"";
     ni.style.cssText="width:100%;font-size:15px;padding:10px 14px;border:3px solid #e0e0e0;border-radius:10px;outline:none;box-sizing:border-box;margin-bottom:8px;";
     ni.onfocus=function(){this.style.borderColor="#e65100";};ni.onblur=function(){this.style.borderColor="#e0e0e0";};card.appendChild(ni);
@@ -1494,21 +1504,21 @@
     bOk.onclick=function(){
       var nn=ni.value.trim();
       if(!nn){ni.style.borderColor="#c62828";ni.focus();return;}
-      var autoBc=_nextBarcode();
+      var useBc=providedBc||_nextBarcode();
       var stockQty=parseInt(stockIn.value)||0;
       if(toggle.checked){
         var ppu=parseFloat(ppuIn.value);
         var unitType=ppuUnitSel.value;
         if(isNaN(ppu)||ppu<=0){ppuIn.style.borderColor="#c62828";ppuIn.focus();return;}
         var ppuCents=Math.round(ppu*100);
-        _addToCart(nn,0,autoBc,selCat,null,unitType,ppuCents);
-        _dbPut({barcode:autoBc,name:nn,sale_price_cents:0,category:selCat,stockQty:stockQty,pricePerUnit:ppuCents,unitType:unitType,source:"manual-weight",last_updated:Date.now()});
+        _addToCart(nn,0,useBc,selCat,null,unitType,ppuCents);
+        _dbPut({barcode:useBc,name:nn,sale_price_cents:0,category:selCat,stockQty:stockQty,pricePerUnit:ppuCents,unitType:unitType,source:"manual-weight",last_updated:Date.now()});
         ov.remove();_toast("⚖️ "+nn+" — "+_formatPricePerUnit(ppuCents,unitType));
       }else{
         var np=parseFloat(pi.value);
         var pc=isNaN(np)?0:Math.round(np*100);
-        _addToCart(nn,pc,autoBc,selCat);
-        _dbPut({barcode:autoBc,name:nn,sale_price_cents:pc,category:selCat,stockQty:stockQty,source:"manual",last_updated:Date.now()});
+        _addToCart(nn,pc,useBc,selCat);
+        _dbPut({barcode:useBc,name:nn,sale_price_cents:pc,category:selCat,stockQty:stockQty,source:"manual",last_updated:Date.now()});
         ov.remove();_toast("✅ "+nn+(pc>0?" "+(pc/100).toFixed(2)+"€":""));
       }
     };
