@@ -145336,18 +145336,20 @@ if(typeof dartMainRunner==="function"){dartMainRunner(s,[])}else{s([])}})
       }
     };
 
-    // Parse invoice text into products
+    // Parse invoice text into products (flexible parser)
     function _parseInvoiceText(text){
       var lines=text.split("\n");
       var products=[];
+      var seen={};
       for(var i=0;i<lines.length;i++){
         var line=lines[i].trim();
-        if(!line)continue;
-        // Skip headers/footers
+        if(!line||line.length<5)continue;
         var lower=line.toLowerCase();
-        if(/total|tva|facture|conditions|escompte|acompte|net a payer|port ht|montant ht|base ht|designation|adresse|tel|fax|email/.test(lower))continue;
-        // Try to extract: code name qty price total
-        // Patterns: "123 CODE ARTICLE Description 10 5.50 55.00"
+        // Skip obvious headers/footers
+        if(/^(total|tva|facture|conditions|escompte|acompte|net a payer|port ht|montant ht|base ht|designation|adresse|tel|fax|email|code client|numero|date|ref|bon de|livraison|avoir)/.test(lower))continue;
+        if(/(total\s*:?\s*\d|tva\s*:?\s*\d|merci|bonne|journee|caissier|vendeur)/i.test(line))continue;
+
+        // Strategy 1: strict pattern "NNN CODE NAME QTY PRICE TOTAL"
         var m=line.match(/^(\d{3})\s+(\S+)\s+(.+?)\s+(\d+(?:[.,]\d+)?)\s+(\d+(?:[.,]\d+)?)\s+(\d+(?:[.,]\d+)?)\s*$/);
         if(m){
           var barcode=m[2].replace(/[|\\\/]/g,"");
@@ -145355,20 +145357,81 @@ if(typeof dartMainRunner==="function"){dartMainRunner(s,[])}else{s([])}})
           var qty=parseFloat(m[4].replace(",","."))||1;
           var unitPrice=parseFloat(m[5].replace(",","."))||0;
           var total=parseFloat(m[6].replace(",","."))||0;
-          if(name&&total>0){
+          if(name&&total>0&&!seen[barcode]){
             products.push({barcode:barcode,name:name,qty:qty,unitPrice:unitPrice,totalCents:Math.round(total*100)});
+            seen[barcode]=true;
           }
           continue;
         }
-        // Simpler pattern: numbers + text
-        var nums=line.match(/\d+[.,]\d{2}/g);
-        if(nums&&nums.length>=2){
-          var totalVal=parseFloat(nums[nums.length-1].replace(",","."));
-          var priceVal=parseFloat(nums[nums.length-2].replace(",","."));
-          var namePart=line.replace(/\d+[.,]\d{2}/g,"").replace(/\s+/g," ").trim();
-          if(namePart&&totalVal>0){
-            products.push({barcode:"INV-"+Date.now()+"-"+Math.floor(Math.random()*9999),name:namePart,qty:1,unitPrice:priceVal,totalCents:Math.round(totalVal*100)});
+
+        // Strategy 2: line with barcode pattern (EAN13, EAN8, or alphanumeric code)
+        var bcMatch=line.match(/\b(\d{8,14}|[A-Z]{2,5}[-.]?\d{4,10})\b/);
+        // Strategy 3: find ALL numbers in the line
+        var allNums=[];
+        var numRegex=/(\d+[.,]\d{1,2})\b/g;
+        var nm;
+        while((nm=numRegex.exec(line))!==null){
+          var v=parseFloat(nm[1].replace(",","."));
+          if(!isNaN(v)&&v>0) allNums.push({val:v,idx:nm.index,end:nm.index+nm[0].length});
+        }
+        // Also find integers that could be quantities
+        var intRegex=/\b(\d{1,5})\b/g;
+        while((nm=intRegex.exec(line))!==null){
+          var iv=parseInt(nm[1]);
+          if(iv>0&&iv<100000){
+            var already=false;
+            for(var ai=0;ai<allNums.length;ai++){if(Math.abs(allNums[ai].idx-nm.index)<3)already=true;}
+            if(!already) allNums.push({val:iv,idx:nm.index,end:nm.index+nm[0].length,intOnly:true});
           }
+        }
+        allNums.sort(function(a,b){return a.idx-b.idx;});
+
+        if(allNums.length<2)continue;
+
+        // The last meaningful number is usually the line total
+        var totalVal=allNums[allNums.length-1].val;
+        if(totalVal<=0||totalVal>50000)continue;
+
+        // Extract name: everything that's not a number
+        var namePart=line.replace(/\d+[.,]\d{1,2}\b/g," ").replace(/\b\d{1,5}\b/g," ").replace(/\s+/g," ").trim();
+        // Remove common non-product tokens
+        namePart=namePart.replace(/^[\s\-–—:;/#,.*]+/,"").replace(/[\s\-–—:;/#,.*]+$/,"");
+        if(namePart.length<2)continue;
+
+        // Try to find barcode from the line
+        var barcode="";
+        if(bcMatch) barcode=bcMatch[1];
+        else barcode="INV-"+Date.now()+"-"+i;
+
+        // Deduce unit price: second-to-last number, or total if only 2 numbers
+        var unitPrice=totalVal;
+        var qty=1;
+        if(allNums.length>=3){
+          // Could be: qty price total
+          var candidate=allNums[allNums.length-2];
+          if(!candidate.intOnly&&candidate.val>0&&candidate.val<=5000){
+            unitPrice=candidate.val;
+            qty=Math.round(totalVal/unitPrice);
+            if(qty<=0||qty>10000){qty=1;unitPrice=totalVal;}
+          }else{
+            // Second-to-last is integer => likely qty
+            qty=candidate.val;
+            unitPrice=Math.round((totalVal/qty)*100)/100;
+          }
+        }else if(allNums.length===2){
+          // Two numbers: could be price total or qty total
+          var n1=allNums[0].val;
+          var n2=allNums[1].val;
+          if(n1<n2&&n1<=5000){
+            unitPrice=n1;
+            qty=Math.round(n2/n1);
+            if(qty<=0||qty>10000){qty=1;unitPrice=n2;}
+          }
+        }
+
+        if(!seen[barcode]&&namePart.length>=2){
+          products.push({barcode:barcode,name:namePart,qty:qty,unitPrice:unitPrice,totalCents:Math.round(totalVal*100)});
+          seen[barcode]=true;
         }
       }
       return products;
@@ -145906,6 +145969,7 @@ if(typeof dartMainRunner==="function"){dartMainRunner(s,[])}else{s([])}})
   window._acimWeighProduct=_weighProduct;
 })();
 // ─── FIN AcimCaisse v34 ───
+
 
 
 
