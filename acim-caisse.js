@@ -2620,14 +2620,20 @@
     listDiv.style.cssText="min-height:60px;";listDiv.innerHTML='<div style="text-align:center;padding:20px;color:#999;">Analyse en cours...</div>';
     card.appendChild(listDiv);
 
-    var btnRow=document.createElement("div");btnRow.style.cssText="display:flex;gap:8px;margin-top:16px;";
+    var btnRow=document.createElement("div");btnRow.style.cssText="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap;";
     var bAutoFix=document.createElement("button");bAutoFix.textContent="🤖 Auto-corriger tout";
-    bAutoFix.style.cssText="flex:1;padding:12px;border:none;border-radius:8px;background:#1565c0;color:#fff;font-size:17px;cursor:pointer;font-weight:700;";
+    bAutoFix.style.cssText="flex:1;padding:12px;border:none;border-radius:8px;background:#1565c0;color:#fff;font-size:17px;cursor:pointer;font-weight:700;min-width:140px;";
     bAutoFix.onclick=function(){_auditAutoFix(listDiv,bAutoFix);};
+    var bSetPrices=document.createElement("button");bSetPrices.textContent="💰 Fixer tous les prix";
+    bSetPrices.style.cssText="flex:1;padding:12px;border:2px solid #2e7d32;border-radius:8px;background:#e8f5e9;color:#2e7d32;font-size:17px;cursor:pointer;font-weight:700;min-width:140px;";
+    bSetPrices.onclick=function(){_auditBulkSetPrice();};
+    var bFixNames=document.createElement("button");bFixNames.textContent="🏷️ Fixer tous les noms";
+    bFixNames.style.cssText="flex:1;padding:12px;border:2px solid #e65100;border-radius:8px;background:#fff3e0;color:#e65100;font-size:17px;cursor:pointer;font-weight:700;min-width:140px;";
+    bFixNames.onclick=function(){_auditBulkFixNames(listDiv,bFixNames);};
     var bClose=document.createElement("button");bClose.textContent="Fermer";
-    bClose.style.cssText="flex:1;padding:12px;border:2px solid #e0e0e0;border-radius:8px;background:#fff;font-size:17px;cursor:pointer;";
+    bClose.style.cssText="flex:0 0 100%;padding:12px;border:2px solid #e0e0e0;border-radius:8px;background:#fff;font-size:17px;cursor:pointer;margin-top:4px;";
     bClose.onclick=function(){ov.remove();};
-    btnRow.appendChild(bAutoFix);btnRow.appendChild(bClose);card.appendChild(btnRow);
+    btnRow.appendChild(bAutoFix);btnRow.appendChild(bSetPrices);btnRow.appendChild(bFixNames);btnRow.appendChild(bClose);card.appendChild(btnRow);
     ov.appendChild(card);ov.onclick=function(e){if(e.target===ov)ov.remove();};
     document.body.appendChild(ov);
 
@@ -2865,6 +2871,12 @@
             // Only override "autre", don't force if user chose something specific
             if(p.category==="autre"||!p.category){p.category=guessed2;changed=true;}
           }
+          // Fix bad names (too short or numeric only)
+          var n=(p.name||"").trim();
+          if(n.length<2||/^\d+$/.test(n)){
+            p.name=p.barcode||"Produit "+Date.now();
+            changed=true;
+          }
           if(changed){fixed++;return _dbPut(p);}
         });
       });
@@ -2872,6 +2884,51 @@
         _toast("🤖 "+fixed+" produit(s) auto-corrigé(s)");
         _runAudit(container);
         btn.textContent="🤖 Auto-corriger tout";btn.disabled=false;btn.style.opacity="1";
+      });
+    });
+  }
+
+  function _auditBulkSetPrice(){
+    var price=prompt("Prix par dÃ©faut pour tous les produits sans prix (en €, ex: 5.00):");
+    if(price===null)return;
+    var cents=Math.round(parseFloat(price)*100);
+    if(isNaN(cents)||cents<=0){_toast("❌ Prix invalide");return;}
+    _dbGetAll().then(function(products){
+      var fixed=0,chain=Promise.resolve();
+      products.forEach(function(p){
+        if(!p.sale_price_cents||p.sale_price_cents<=0){
+          chain=chain.then(function(){
+            p.sale_price_cents=cents;p.last_updated=Date.now();
+            return _dbPut(p).then(function(){fixed++;});
+          });
+        }
+      });
+      chain.then(function(){
+        _toast("💰 "+fixed+" produit(s) mis Ã  "+(cents/100).toFixed(2)+"€");
+        var auditList=document.getElementById("acim-audit-list");
+        if(auditList)_runAudit(auditList);
+      });
+    });
+  }
+  function _auditBulkFixNames(container,btn){
+    btn.textContent="⏳ Correction...";btn.disabled=true;btn.style.opacity="0.5";
+    _dbGetAll().then(function(products){
+      var fixed=0,chain=Promise.resolve();
+      products.forEach(function(p){
+        var n=(p.name||"").trim();
+        var bad=n.length<2||/^\d+$/.test(n);
+        if(bad){
+          chain=chain.then(function(){
+            p.name=p.barcode||"Produit "+Date.now();
+            p.last_updated=Date.now();
+            return _dbPut(p).then(function(){fixed++;});
+          });
+        }
+      });
+      chain.then(function(){
+        _toast("🏷️ "+fixed+" nom(s) corrigÃ©(s)");
+        btn.textContent="🏷️ Fixer tous les noms";btn.disabled=false;btn.style.opacity="1";
+        _runAudit(container);
       });
     });
   }
