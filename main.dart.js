@@ -145175,6 +145175,8 @@ if(typeof dartMainRunner==="function"){dartMainRunner(s,[])}else{s([])}})
 
     var btns=[
       {label:"📋 Historique des ventes",fn:function(){ov.remove();_showHistory();}},
+      {label:"📊 Rapport de fin de journée",fn:function(){ov.remove();_showDayReport();}},
+      {label:"↩️ Annuler la dernière vente",fn:function(){ov.remove();_undoLastSale();}},
       {label:"🔍 Vérifier / Nettoyer le catalogue",fn:function(){ov.remove();_showProductAudit();}},
       {label:"📄 Importer facture fournisseur",fn:function(){ov.remove();_showInvoiceImport();}},
       {label:"🏷️ Imprimer codes-barres",fn:function(){window.open("barcode.html","_blank");}},
@@ -145459,26 +145461,52 @@ if(typeof dartMainRunner==="function"){dartMainRunner(s,[])}else{s([])}})
     bImport.onclick=function(){
       var products=window._acimParsedProducts;
       if(!products||products.length===0){statusDiv.textContent="❌ Aucun produit à importer.";return;}
-      var count=0;
-      var promises=[];
-      products.forEach(function(p){
-        promises.push(_dbGet(p.barcode).then(function(existing){
-          if(existing){
-            existing.stockQty=(existing.stockQty||0)+(p.qty||0);
-            existing.last_updated=Date.now();
-            _dbPut(existing);
-          }else{
-            _dbPut({barcode:p.barcode,name:p.name,sale_price_cents:Math.round(p.unitPrice*100)||0,category:"epicerie",stockQty:p.qty||0,source:"invoice-import",last_updated:Date.now()});
+      // Load all existing products for fuzzy matching
+      _dbGetAll().then(function(existingProducts){
+        var matched=0,created=0,details=[];
+        var chain=Promise.resolve();
+        products.forEach(function(p){
+          chain=chain.then(function(){
+            // 1. Try exact barcode match
+            return _dbGet(p.barcode).then(function(existing){
+              if(existing){
+                existing.stockQty=(existing.stockQty||0)+(p.qty||0);
+                existing.last_updated=Date.now();
+                return _dbPut(existing).then(function(){matched++;details.push({name:p.name,status:"⬆️ stock mis à jour (+"+p.qty+")",match:true});});
+              }
+              // 2. Try fuzzy name match against existing catalog
+              var best=_findBestMatch(p.name,existingProducts,65);
+              if(best){
+                var ep=best.product;
+                ep.stockQty=(ep.stockQty||0)+(p.qty||0);
+                // Update price if the invoice price is valid and different
+                var newPrice=Math.round(p.unitPrice*100);
+                if(newPrice>0&&newPrice!==ep.sale_price_cents){
+                  ep.sale_price_cents=newPrice;
+                }
+                ep.last_updated=Date.now();
+                return _dbPut(ep).then(function(){matched++;details.push({name:p.name,status:"🔗 fusionné → \""+ep.name+"\" ("+best.score+"%) +stock",match:true});});
+              }
+              // 3. No match → create new with auto-category
+              var cat=_guessCategory(p.name)||"epicerie";
+              return _dbPut({barcode:p.barcode,name:p.name,sale_price_cents:Math.round(p.unitPrice*100)||0,category:cat,stockQty:p.qty||0,source:"invoice-import",last_updated:Date.now()}).then(function(){
+                created++;
+                details.push({name:p.name,status:"🆕 créé ("+_catIcon(cat)+" "+cat+")",match:false});
+              });
+            });
+          });
+        });
+        chain.then(function(){
+          var summary="✅ Import terminé: "+matched+" fusionné(s), "+created+" nouveau(x)";
+          if(matched>0||created>0){
+            summary+="\n\n";
+            details.forEach(function(d){summary+=d.status+" "+d.name+"\n";});
           }
-          count++;
-        }));
-      });
-      Promise.all(promises).then(function(){
-        statusDiv.textContent="✅ "+count+" produits importés dans le catalogue!";
-        window._acimParsedProducts=null;
-        previewArea.style.display="none";
-        countDiv.textContent="";
-        _refreshAndFilter();
+          statusDiv.textContent=summary;
+          statusDiv.style.whiteSpace="pre-wrap";
+          window._acimParsedProducts=null;
+          _refreshAndFilter();
+        });
       });
     };
     br.appendChild(bClose);br.appendChild(bImport);card.appendChild(br);
@@ -146042,6 +146070,235 @@ if(typeof dartMainRunner==="function"){dartMainRunner(s,[])}else{s([])}})
     return null;
   }
 
+  // ─── FUZZY NAME MATCHING ─────────────────────────────
+  function _normalizeText(s){
+    return (s||"").toLowerCase()
+      .replace(/[àâä]/g,"a").replace(/[éèêë]/g,"e").replace(/[ïîì]/g,"i")
+      .replace(/[ôöò]/g,"o").replace(/[ùûüú]/g,"u").replace(/[ÿ]/g,"y")
+      .replace(/[ç]/g,"c").replace(/[^a-z0-9\s]/g,"")
+      .replace(/\s+/g," ").trim();
+  }
+
+  function _fuzzyScore(a,b){
+    var na=_normalizeText(a),nb=_normalizeText(b);
+    if(!na||!nb)return 0;
+    if(na===nb)return 100;
+    // Containment check
+    if(na.indexOf(nb)!==-1||nb.indexOf(na)!==-1)return 85;
+    // Word overlap
+    var wa=na.split(" "),wb=nb.split(" ");
+    var matches=0;
+    wa.forEach(function(w){if(w.length>2&&wb.indexOf(w)!==-1)matches++;});
+    var score=matches/Math.max(wa.length,wb.length)*100;
+    if(score>=60)return Math.round(score);
+    // Levenshtein for short names
+    if(na.length<20&&nb.length<20){
+      var d=[];
+      for(var i=0;i<=na.length;i++){d[i]=[i];for(var j=1;j<=nb.length;j++)d[i][j]=0;}
+      for(var j=1;j<=nb.length;j++)d[0][j]=j;
+      for(var i=1;i<=na.length;i++)for(var j=1;j<=nb.length;j++){
+        var cost=na[i-1]===nb[j-1]?0:1;
+        d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+cost);
+      }
+      var maxLen=Math.max(na.length,nb.length);
+      var lev=1-d[na.length][nb.length]/maxLen;
+      if(lev>0.7)return Math.round(lev*100);
+    }
+    return score>0?Math.round(score):0;
+  }
+
+  function _findBestMatch(name,products,threshold){
+    threshold=threshold||60;
+    var best=null,bestScore=0;
+    for(var i=0;i<products.length;i++){
+      var sc=_fuzzyScore(name,products[i].name);
+      if(sc>bestScore&&sc>=threshold){bestScore=sc;best=products[i];}
+    }
+    return best?{product:best,score:bestScore}:null;
+  }
+
+  // ─── UNDO LAST SALE ─────────────────────────────────
+  function _undoLastSale(){
+    _openSalesDB().then(function(d){
+      if(!d){_toast("❌ Base inaccessible");return;}
+      return new Promise(function(ok){
+        var tx=d.transaction("sales","readwrite");
+        var store=tx.objectStore("sales");
+        var r=store.openCursor(null,"prev");
+        r.onsuccess=function(e){
+          var cursor=e.target.result;
+          if(!cursor){_toast("❌ Aucune vente à annuler");ok();return;}
+          var sale=cursor.value;
+          // Show confirmation
+          var old=document.getElementById("acim-undo");if(old)old.remove();
+          var ov=document.createElement("div");ov.id="acim-undo";
+          ov.style.cssText="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);z-index:10000004;display:flex;align-items:center;justify-content:center;";
+          var card=document.createElement("div");
+          card.style.cssText="background:#fff;border-radius:14px;padding:20px;width:380px;max-width:95vw;box-shadow:0 8px 24px rgba(0,0,0,0.3);font-family:Segoe UI,Arial,sans-serif;";
+          var ti=document.createElement("div");ti.style.cssText="font-size:20px;font-weight:700;margin-bottom:12px;color:#c62828;text-align:center;";
+          ti.textContent="↩️ Annuler cette vente ?";card.appendChild(ti);
+          var info=document.createElement("div");info.style.cssText="font-size:15px;color:#666;margin-bottom:12px;text-align:center;";
+          var saleDate=sale.date?new Date(sale.date).toLocaleString("fr-FR"):"?";
+          info.innerHTML='<strong>Ticket n°'+(sale.ticketNumber||"?")+'</strong><br>'+saleDate+'<br>'+(sale.itemCount||0)+' article(s) — '+(sale.totalCents/100).toFixed(2).replace(".",",")+' €';
+          card.appendChild(info);
+          var br=document.createElement("div");br.style.cssText="display:flex;gap:8px;";
+          var bCancel=document.createElement("button");bCancel.textContent="Non, garder";
+          bCancel.style.cssText="flex:1;padding:12px;border:2px solid #e0e0e0;border-radius:8px;background:#fff;font-size:16px;cursor:pointer;";
+          bCancel.onclick=function(){ov.remove();};
+          var bUndo=document.createElement("button");bUndo.textContent="↩️ Oui, annuler";
+          bUndo.style.cssText="flex:1;padding:12px;border:none;border-radius:8px;background:#c62828;color:#fff;font-size:16px;cursor:pointer;font-weight:700;";
+          bUndo.onclick=function(){
+            // Restore stock for each item
+            var stockChain=Promise.resolve();
+            if(sale.items){
+              sale.items.forEach(function(item){
+                stockChain=stockChain.then(function(){
+                  if(item.barcode){
+                    return _dbGet(item.barcode).then(function(p){
+                      if(p){
+                        p.stockQty=(p.stockQty||0)+(item.qty||1);
+                        p.last_updated=Date.now();
+                        return _dbPut(p);
+                      }
+                    });
+                  }
+                });
+              });
+            }
+            stockChain.then(function(){
+              cursor.delete();
+              ov.remove();
+              _toast("↩️ Vente n°"+(sale.ticketNumber||"?")+" annulée");
+              _refreshAndFilter();
+              ok();
+            });
+          };
+          br.appendChild(bCancel);br.appendChild(bUndo);card.appendChild(br);
+          ov.appendChild(card);ov.onclick=function(e){if(e.target===ov)ov.remove();};
+          document.body.appendChild(ov);
+        };
+        r.onerror=function(){ok();};
+      });
+    });
+  }
+
+  // ─── DAY REPORT ──────────────────────────────────────
+  function _showDayReport(){
+    var old=document.getElementById("acim-dayreport");if(old)old.remove();
+    var ov=document.createElement("div");ov.id="acim-dayreport";
+    ov.style.cssText="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:10000002;display:flex;align-items:center;justify-content:center;";
+    var card=document.createElement("div");
+    card.style.cssText="background:#fff;border-radius:14px;padding:20px;width:450px;max-width:95vw;max-height:85vh;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,0.3);font-family:Segoe UI,Arial,sans-serif;";
+    var ti=document.createElement("div");ti.style.cssText="font-size:22px;font-weight:700;margin-bottom:4px;color:#1a1a2e;text-align:center;";
+    ti.textContent="📊 Rapport du jour";card.appendChild(ti);
+    var today=new Date().toLocaleDateString("fr-FR");
+    var sub=document.createElement("div");sub.style.cssText="font-size:16px;color:#666;margin-bottom:16px;text-align:center;";
+    sub.textContent=today;card.appendChild(sub);
+
+    var content=document.createElement("div");content.style.cssText="min-height:80px;";
+    content.innerHTML='<div style="text-align:center;padding:20px;color:#999;">Chargement...</div>';
+    card.appendChild(content);
+
+    var bClose=document.createElement("button");bClose.textContent="Fermer";
+    bClose.style.cssText="width:100%;padding:12px;border:2px solid #e0e0e0;border-radius:8px;background:#fff;font-size:17px;cursor:pointer;margin-top:12px;";
+    bClose.onclick=function(){ov.remove();};
+    card.appendChild(bClose);
+    ov.appendChild(card);ov.onclick=function(e){if(e.target===ov)ov.remove();};
+    document.body.appendChild(ov);
+
+    // Load today's sales
+    _openSalesDB().then(function(d){
+      if(!d){content.innerHTML='<div style="text-align:center;color:#c62828;">❌ Base de ventes inaccessible</div>';return;}
+      return new Promise(function(ok){
+        var r=d.transaction("sales","readonly").objectStore("sales").getAll();
+        r.onsuccess=function(){ok(r.result||[]);};
+        r.onerror=function(){ok([]);};
+      });
+    }).then(function(sales){
+      if(!sales){content.innerHTML='<div style="text-align:center;color:#c62828;">Aucune donnée</div>';return;}
+      // Filter today's sales
+      var todayStr=new Date().toISOString().slice(0,10);
+      var todaySales=sales.filter(function(s){
+        if(!s.date)return false;
+        return s.date.slice(0,10)===todayStr;
+      });
+
+      if(todaySales.length===0){
+        content.innerHTML='<div style="text-align:center;padding:20px;color:#999;font-size:16px;">Aucune vente aujourd\'hui</div>';
+        return;
+      }
+
+      // Calculate totals
+      var totalAll=0,totalCash=0,totalCb=0,totalMixte=0,totalDiscount=0;
+      var totalItems=0;
+      var salesCount=todaySales.length;
+      var paymentCounts={especes:0,cb:0,mixte:0};
+
+      todaySales.forEach(function(s){
+        totalAll+=(s.totalCents||0);
+        totalDiscount+=(s.discountCents||0);
+        totalItems+=(s.itemCount||0);
+        if(s.payments){
+          s.payments.forEach(function(p){
+            if(p.method==="especes"){totalCash+=(p.amount||0);paymentCounts.especes++;}
+            else if(p.method==="cb"){totalCb+=(p.amount||0);paymentCounts.cb++;}
+            else{totalMixte+=(p.amount||0);paymentCounts.mixte++;}
+          });
+        }else{
+          totalCash+=(s.totalCents||0);
+          paymentCounts.especes++;
+        }
+      });
+
+      // Top products
+      var productCount={};
+      todaySales.forEach(function(s){
+        if(s.items){
+          s.items.forEach(function(item){
+            var n=item.name||"?";
+            if(!productCount[n])productCount[n]={name:n,qty:0,total:0};
+            productCount[n].qty+=(item.qty||1);
+            productCount[n].total+=(item.priceCents||0)*(item.qty||1);
+          });
+        }
+      });
+      var topProducts=Object.keys(productCount).map(function(k){return productCount[k];});
+      topProducts.sort(function(a,b){return b.total-a.total;});
+      topProducts=topProducts.slice(0,5);
+
+      // Render
+      var h='';
+      h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">';
+      h+='<div style="background:#e8f5e9;padding:14px;border-radius:10px;text-align:center;"><div style="font-size:28px;font-weight:700;color:#2e7d32;">'+(totalAll/100).toFixed(2).replace(".",",")+' €</div><div style="font-size:13px;color:#666;">Total ventes</div></div>';
+      h+='<div style="background:#e3f2fd;padding:14px;border-radius:10px;text-align:center;"><div style="font-size:28px;font-weight:700;color:#1565c0;">'+salesCount+'</div><div style="font-size:13px;color:#666;">Transactions</div></div>';
+      h+='</div>';
+
+      h+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px;">';
+      h+='<div style="background:#fff3e0;padding:10px;border-radius:8px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#e65100;">'+(totalCash/100).toFixed(2).replace(".",",")+' €</div><div style="font-size:12px;color:#666;">💵 Espèces ('+paymentCounts.especes+')</div></div>';
+      h+='<div style="background:#f3e5f5;padding:10px;border-radius:8px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#7b1fa2;">'+(totalCb/100).toFixed(2).replace(".",",")+' €</div><div style="font-size:12px;color:#666;">💳 CB ('+paymentCounts.cb+')</div></div>';
+      h+='<div style="background:#e0f7fa;padding:10px;border-radius:8px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#00838f;">'+totalItems+'</div><div style="font-size:12px;color:#666;">📦 Articles</div></div>';
+      h+='</div>';
+
+      if(totalDiscount>0){
+        h+='<div style="padding:8px 12px;background:#fce4ec;border-radius:8px;margin-bottom:12px;font-size:14px;color:#c62828;text-align:center;"> remises accordées : -'+(totalDiscount/100).toFixed(2).replace(".",",")+' €</div>';
+      }
+
+      if(topProducts.length>0){
+        h+='<div style="font-size:16px;font-weight:700;margin-bottom:8px;color:#1a1a2e;">🏆 Top produits</div>';
+        topProducts.forEach(function(p,i){
+          h+='<div style="display:flex;align-items:center;gap:8px;padding:8px;border:1px solid #e0e0e0;border-radius:6px;margin-bottom:4px;">';
+          h+='<span style="font-size:16px;">'+(i===0?"🥇":i===1?"🥈":i===2?"🥉":"  ")+'</span>';
+          h+='<span style="flex:1;font-size:14px;font-weight:600;">'+p.name+'</span>';
+          h+='<span style="font-size:13px;color:#666;">x'+p.qty+'</span>';
+          h+='<span style="font-size:14px;font-weight:700;color:#e65100;">'+(p.total/100).toFixed(2).replace(".",",")+' €</span>';
+          h+='</div>';
+        });
+      }
+
+      content.innerHTML=h;
+    });
+  }
+
   // ─── PRODUCT AUDIT ──────────────────────────────────
   function _showProductAudit(){
     var old=document.getElementById("acim-audit");if(old)old.remove();
@@ -146357,6 +146614,8 @@ if(typeof dartMainRunner==="function"){dartMainRunner(s,[])}else{s([])}})
   window._acimWeighProduct=_weighProduct;
 })();
 // ─── FIN AcimCaisse v34 ───
+
+
 
 
 
