@@ -493,14 +493,16 @@ function arrayToObj(arr,fields){
 function readTable(data,pageSz,rootPage){
   var pageOff=(rootPage-1)*pageSz;
   if(pageOff>=data.length){log("  readTable: pageOff "+pageOff+" >= data.length "+data.length,"err");return[];}
-  var pageType=data[pageOff];
-  log("  readTable(rootPage="+rootPage+"): pageOff="+pageOff+" pageType="+pageType+" (0x"+pageType.toString(16)+")");
-  if(pageType===13)return readLeafPage(data,pageOff,pageSz);
+  // Page 1 has 100-byte file header before page header; other pages have header at offset 0
+  var headerOffset=(rootPage===1)?100:0;
+  var pageType=data[pageOff+headerOffset];
+  log("  readTable(rootPage="+rootPage+"): pageOff="+pageOff+" headerOffset="+headerOffset+" pageType="+pageType+" (0x"+pageType.toString(16)+")");
+  if(pageType===13)return readLeafPage(data,pageOff,pageSz,headerOffset);
   if(pageType===5){
     var rows=[];
-    var nCells=(data[pageOff+3]<<8)|data[pageOff+4];
+    var nCells=(data[pageOff+headerOffset+3]<<8)|data[pageOff+headerOffset+4];
     log("  Interior page: "+nCells+" cells");
-    var ptrStart=pageOff+8;
+    var ptrStart=pageOff+headerOffset+8;
     for(var i=0;i<nCells;i++){
       var childPage=(data[ptrStart+i*2]<<8)|data[ptrStart+i*2+1];
       log("    child["+i+"]: page "+childPage);
@@ -512,12 +514,13 @@ function readTable(data,pageSz,rootPage){
   return[];
 }
 
-function readLeafPage(data,pageOff,pageSz){
+function readLeafPage(data,pageOff,pageSz,headerOffset){
+  headerOffset=headerOffset||0;
   var rows=[];
-  var nCells=(data[pageOff+3]<<8)|data[pageOff+4];
-  var cellStart=(data[pageOff+5]<<8)|data[pageOff+6];
+  var nCells=(data[pageOff+headerOffset+3]<<8)|data[pageOff+headerOffset+4];
+  var cellStart=(data[pageOff+headerOffset+5]<<8)|data[pageOff+headerOffset+6];
   if(cellStart===0||cellStart>pageSz)cellStart=pageSz;
-  var off=pageOff+cellStart;
+  var off=pageOff+headerOffset+cellStart;
 
   for(var i=0;i<nCells;i++){
     if(off>=data.length)break;
