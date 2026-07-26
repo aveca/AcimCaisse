@@ -202,6 +202,33 @@ function reconstructDrift(files,blocks){
     log("Fichier principal: name='"+mainFile.name+"' length="+mainFile.length);
   }
 
+  // DEBUG: show actual key/value types of first 10 blocks
+  log("","info");
+  log("═══ DEBUG: structure des blocks ═══","info");
+  for(var di=0;di<Math.min(10,blocks.length);di++){
+    var b=blocks[di];
+    var keyType=typeof b.key;
+    var keyStr="";
+    if(b.key===undefined)keyStr="undefined";
+    else if(b.key===null)keyStr="null";
+    else if(Array.isArray(b.key))keyStr="Array["+b.key.length+"]=["+b.key.join(", ")+"]";
+    else if(typeof b.key==="object")keyStr="Object{"+Object.keys(b.key).join(",")+"}";
+    else if(typeof b.key==="string")keyStr="String('"+b.key.substring(0,80)+"')";
+    else if(typeof b.key==="number")keyStr="Number("+b.key+")";
+    else keyStr=keyType;
+    var valType=typeof b.value;
+    var valInfo="";
+    if(b.value instanceof Uint8Array)valInfo="Uint8Array["+b.value.length+"] head="+Array.from(b.value.slice(0,8)).map(function(x){return("0"+x.toString(16)).slice(-2);}).join(" ");
+    else if(b.value instanceof ArrayBuffer)valInfo="ArrayBuffer["+b.value.byteLength+"]";
+    else if(b.value&&b.value.buffer!=null)valInfo="TypedArray["+((b.value.length)||"?")+"]";
+    else if(Array.isArray(b.value))valInfo="Array["+b.value.length+"] first="+JSON.stringify(b.value.slice(0,4));
+    else if(typeof b.value==="string")valInfo="String("+b.value.length+") '"+b.value.substring(0,60)+"'";
+    else if(b.value&&typeof b.value==="object")valInfo="Object{"+Object.keys(b.value).join(",")+"}";
+    else valInfo=String(b.value).substring(0,60);
+    log("  block["+di+"]: key="+keyStr);
+    log("    val: "+valInfo);
+  }
+
   // Strategy 1: Parse block keys as [fileId, offset] arrays
   var fileIdMap={};
   blocks.forEach(function(b,idx){
