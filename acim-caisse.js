@@ -1,4 +1,4 @@
-// ─── AcimCaisse v34 — POS complet: paiement + remise + historique + stocks + factures + barcodes ──
+// ─── AcimCaisse v36 — POS complet + reset JSON maître + photos produits Open Food Facts ──
 ;(function(){
   "use strict";
   var _log=function(m){console.log("[Acim] "+m);};
@@ -264,6 +264,26 @@
         };
       });
       var catMap={"Congele":"surgelé","Frais":"viande","Sec":"snack","Divers":"epicerie"};
+      var volailleKw=["poulet","poule","dinde","canard","oeuf","œuf","blanc","cuisse","aiguillette","filet poulet","magret","foie gras","coq"];
+      var viandeKw=["boeuf","bœuf","veau","agneau","porc","steak","côte","cotelette","entrecôte","bavette","haché","hache","rôti","roti","saucisse","jambon","lard","merguez","chipolata","boudin","salami","viande"];
+      var laitierKw=["lait","fromage","yaourt","yogurt","crème","beurre","emmental","gruyère","mozzarella","ricotta","parmesan"];
+      var boissonKw=["eau","jus","soda","bière","biere","limonade","coca","sprite","perrier","boisson","vin","champagne","cidre","rhum","whisky","vodka"];
+      var snackKw=["chips","biscuit","gâteau","gateau","cookie","céréales","barre","snack","nooty","nutella","amande","noisette","cacahuète","fruits secs","muesli","chocolat","bonbon","bonbons"];
+      function _betterYardenCat(yardenCat,name){
+        var n=(name||"").toLowerCase();
+        if(yardenCat==="Frais"){
+          for(var i=0;i<volailleKw.length;i++){if(n.indexOf(volailleKw[i])!==-1)return"volaille";}
+          for(var i=0;i<viandeKw.length;i++){if(n.indexOf(viandeKw[i])!==-1)return"viande";}
+          for(var i=0;i<laitierKw.length;i++){if(n.indexOf(laitierKw[i])!==-1)return"laitier";}
+          return"viande";
+        }
+        if(yardenCat==="Sec"){
+          for(var i=0;i<boissonKw.length;i++){if(n.indexOf(boissonKw[i])!==-1)return"boisson";}
+          for(var i=0;i<snackKw.length;i++){if(n.indexOf(snackKw[i])!==-1)return"snack";}
+          return"epicerie";
+        }
+        return catMap[yardenCat]||"epicerie";
+      }
       var chain=Promise.resolve();
       var count=0;
       for(var i=0;i<_supplierCatalog.length;i++){
@@ -271,7 +291,7 @@
           chain=chain.then(function(){
             var bc=p.ean||"";
             var name=p.name||"";
-            var cat=catMap[p.category]||catMap[p.cat]||"epicerie";
+            var cat=_betterYardenCat(p.category||p.cat||"",name);
             if(!bc||!name)return;
             return _dbPut({barcode:bc,name:name,sale_price_cents:0,category:cat,stockQty:0,low_stock_threshold:5,source:"yarden-catalog",last_updated:Date.now()}).then(function(){count++;});
           });
@@ -673,9 +693,21 @@
       delBtn.onclick=function(e){e.stopPropagation();_confirmDeleteProduct(_cardP);};
       card.appendChild(delBtn);
 
-      var ic=document.createElement("span");
+      var ic=document.createElement("div");
+      ic.style.cssText="width:64px;height:64px;display:flex;align-items:center;justify-content:center;margin-bottom:4px;font-size:36px;overflow:hidden;border-radius:8px;background:#f9f9f9;flex-shrink:0;";
       ic.textContent=_catIcon(p.category||"autre");
-      ic.style.cssText="font-size:40px;margin-bottom:4px;";
+      ic.style.fontSize="36px";
+      (function(bc,el){
+        _getCachedImage(bc).then(function(url){
+          if(url){
+            el.innerHTML='<img src="'+esc(url)+'" alt="" style="width:64px;height:64px;object-fit:contain;border-radius:6px;">';
+          }else{
+            _enqueueImage(bc,function(url){
+              if(url)el.innerHTML='<img src="'+esc(url)+'" alt="" style="width:64px;height:64px;object-fit:contain;border-radius:6px;">';
+            });
+          }
+        });
+      })(p.barcode,ic);
       card.appendChild(ic);
 
       var nm=document.createElement("div");
@@ -1263,6 +1295,7 @@
       {label:"📒 Catalogue fournisseur",fn:function(){ov.remove();_showSupplierCatalog();}},
       {label:"🏷️ Imprimer codes-barres",fn:function(){window.open("barcode.html","_blank");}},
       {label:"📤 Exporter mes données",fn:function(){ov.remove();_showExportDialog();}},
+      {label:"📦 Réinitialiser depuis un JSON maître",fn:function(){ov.remove();_showResetFromJson();}},
       {label:"📥 Importer des données (JSON)",fn:function(){ov.remove();_showImportDialog();}},
       {label:"🖥️ Écran client (2e écran)",fn:function(){window.open("customer-display.html","_blank");}},
       {label:"🔄 Migrer depuis l'ancienne version",fn:function(){window.open("migration.html","_blank");}},
@@ -2203,6 +2236,158 @@
     };
     ov.appendChild(card);ov.onclick=function(e){if(e.target===ov)ov.remove();};
     document.body.appendChild(ov);
+  }
+
+  // ─── RESET FROM MASTER JSON ───────────────────────────
+  function _showResetFromJson(){
+    var old=document.getElementById("acim-reset-json");if(old)old.remove();
+    var ov=document.createElement("div");ov.id="acim-reset-json";
+    ov.style.cssText="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:10000002;display:flex;align-items:center;justify-content:center;";
+    var card=document.createElement("div");
+    card.style.cssText="background:#fff;border-radius:14px;padding:20px;width:420px;max-width:95vw;box-shadow:0 8px 24px rgba(0,0,0,0.3);font-family:Segoe UI,Arial,sans-serif;";
+    var ti=document.createElement("div");ti.style.cssText="font-size:22px;font-weight:700;margin-bottom:12px;color:#c62828;text-align:center;";
+    ti.textContent="⚠️ Réinitialisation totale";card.appendChild(ti);
+    var warning=document.createElement("div");
+    warning.style.cssText="background:#fff3e0;border-left:4px solid #e65100;padding:12px;font-size:13px;color:#333;margin-bottom:16px;border-radius:4px;line-height:1.5;";
+    warning.innerHTML='<strong>Cette opération va TOUT effacer :</strong><br>🗑️ Tous les produits<br>🗑️ Tout l\'historique des ventes<br>🗑️ Tous les paramètres (nom magasin, séquences)<br><br>Ensuite, vous importez un fichier JSON <strong>maître</strong> contenant uniquement vos vrais produits (bons EAN, prix, stocks, catégories).<br><br><span style="color:#e65100;">💡 Astuce : exportez d\'abord vos données actuelles via le menu si vous voulez les conserver.</span>';
+    card.appendChild(warning);
+    var step1=document.createElement("div");step1.style.cssText="margin-bottom:12px;";
+    var bTemplate=document.createElement("button");bTemplate.textContent="📄 Télécharger un template JSON vierge";
+    bTemplate.style.cssText="width:100%;padding:12px;border:2px solid #1565c0;border-radius:8px;background:#e3f2fd;color:#1565c0;font-size:14px;cursor:pointer;font-weight:700;margin-bottom:8px;";
+    bTemplate.onclick=function(){
+      var template={
+        version:1,exportDate:new Date().toISOString(),source:"acim-caisse-template",
+        products:[
+          {barcode:"3017620422003",name:"Nutella 750g",sale_price_cents:499,category:"epicerie",stockQty:10,low_stock_threshold:3,source:"master",last_updated:Date.now()},
+          {barcode:"3274080005003",name:"Cristaline 50cl",sale_price_cents:50,category:"boisson",stockQty:48,low_stock_threshold:12,source:"master",last_updated:Date.now()},
+          {barcode:"ACIM-001",name:"Poulet fermier 1kg",sale_price_cents:1290,category:"volaille",stockQty:6,low_stock_threshold:2,source:"master",last_updated:Date.now()},
+          {barcode:"ACIM-002",name:"Steak haché 250g",sale_price_cents:450,category:"viande",stockQty:20,low_stock_threshold:5,source:"master",last_updated:Date.now()}
+        ],
+        sales:[],meta:{}
+      };
+      _downloadJSON(template,"acimcaisse-template.json");
+      _toast("✅ Template JSON téléchargé — éditez-le dans un tableur");
+    };
+    step1.appendChild(bTemplate);
+    var descTemplate=document.createElement("div");descTemplate.style.cssText="font-size:11px;color:#888;margin-bottom:12px;text-align:center;";
+    descTemplate.textContent="Ouvrez le fichier dans Excel/LibreOffice, modifiez les lignes, puis importez-le ci-dessous.";
+    step1.appendChild(descTemplate);
+    card.appendChild(step1);
+    var fileLabel=document.createElement("div");fileLabel.style.cssText="font-size:14px;font-weight:700;margin-bottom:6px;color:#1a1a2e;";
+    fileLabel.textContent="2. Sélectionnez votre fichier JSON maître :";
+    card.appendChild(fileLabel);
+    var fileInput=document.createElement("input");fileInput.type="file";fileInput.accept=".json";
+    fileInput.style.cssText="width:100%;padding:10px;border:2px dashed #e0e0e0;border-radius:8px;font-size:14px;cursor:pointer;margin-bottom:12px;box-sizing:border-box;";
+    card.appendChild(fileInput);
+    var statusDiv=document.createElement("div");statusDiv.style.cssText="font-size:12px;color:#666;min-height:20px;margin-bottom:8px;";
+    card.appendChild(statusDiv);
+    var br=document.createElement("div");br.style.cssText="display:flex;gap:8px;margin-top:8px;";
+    var bCancel=document.createElement("button");bCancel.textContent="Annuler";
+    bCancel.style.cssText="flex:1;padding:10px;border:2px solid #e0e0e0;border-radius:8px;background:#fff;font-size:14px;cursor:pointer;";
+    bCancel.onclick=function(){ov.remove();};
+    var bReset=document.createElement("button");bReset.textContent="⚠️ TOUT EFFACER & IMPORTER";
+    bReset.style.cssText="flex:2;padding:10px;border:none;border-radius:8px;background:#c62828;color:#fff;font-size:14px;cursor:pointer;font-weight:700;display:none;";
+    bReset.onclick=function(){
+      bReset.disabled=true;bReset.style.opacity="0.5";
+      statusDiv.textContent="⏳ Effacement de toutes les données...";
+      _clearAllStores().then(function(){
+        statusDiv.textContent="⏳ Importation des produits...";
+        return _importMasterJson(parsedData);
+      }).then(function(result){
+        statusDiv.textContent="✅ Terminé! "+result.prods+" produits importés.";
+        statusDiv.style.color="#2e7d32";
+        _toast("✅ Réinitialisation terminée — "+result.prods+" produits chargés");
+        setTimeout(function(){ov.remove();},1500);
+      }).catch(function(err){
+        statusDiv.textContent="❌ Erreur: "+err.message;
+        statusDiv.style.color="#c62828";
+        bReset.disabled=false;bReset.style.opacity="1";
+      });
+    };
+    var parsedData=null;
+    fileInput.onchange=function(e){
+      var file=e.target.files[0];if(!file)return;
+      statusDiv.textContent="⏳ Lecture de "+file.name+"...";
+      bReset.style.display="none";parsedData=null;
+      var reader=new FileReader();
+      reader.onload=function(ev){
+        try{
+          parsedData=JSON.parse(ev.target.result);
+          var prods=(parsedData.products||[]);
+          if(!Array.isArray(prods)||prods.length===0){statusDiv.textContent="❌ Le fichier ne contient aucun produit valide.";statusDiv.style.color="#c62828";return;}
+          var valid=prods.filter(function(p){return p.barcode&&p.name;}).length;
+          if(valid===0){statusDiv.textContent="❌ Aucun produit avec code-barres ET nom trouvé.";statusDiv.style.color="#c62828";return;}
+          statusDiv.innerHTML="✅ Fichier valide: <strong>"+prods.length+"</strong> produit(s) trouvés (dont "+valid+" valides)<br>💰 "+(parsedData.sales||[]).length+" vente(s) dans le fichier (ignorées)";
+          statusDiv.style.color="#2e7d32";
+          bReset.style.display="block";
+        }catch(ex){
+          statusDiv.textContent="❌ Fichier invalide: "+ex.message;
+          statusDiv.style.color="#c62828";
+        }
+      };
+      reader.readAsText(file);
+    };
+    br.appendChild(bCancel);br.appendChild(bReset);card.appendChild(br);
+    ov.appendChild(card);ov.onclick=function(e){if(e.target===ov)ov.remove();};
+    document.body.appendChild(ov);
+  }
+  function _clearAllStores(){
+    return Promise.all([
+      _dbDeleteAll(),
+      _openSalesDB().then(function(d){if(!d)return;return new Promise(function(ok){var tx=d.transaction("sales","readwrite");tx.objectStore("sales").clear();tx.oncomplete=ok;tx.onerror=ok;});}),
+      _openMeta().then(function(d){if(!d)return;return new Promise(function(ok){var tx=d.transaction("meta","readwrite");tx.objectStore("meta").clear();tx.oncomplete=ok;tx.onerror=ok;});})
+    ]);
+  }
+  function _importMasterJson(data){
+    var prods=data.products||[];
+    var count=0;
+    var chain=Promise.resolve();
+    prods.forEach(function(p){
+      if(!p.barcode||!p.name)return;
+      chain=chain.then(function(){
+        return _dbPut({
+          barcode:p.barcode,
+          name:p.name,
+          sale_price_cents:p.sale_price_cents||0,
+          category:p.category||"epicerie",
+          stockQty:typeof p.stockQty==="number"?p.stockQty:0,
+          low_stock_threshold:typeof p.low_stock_threshold==="number"?p.low_stock_threshold:5,
+          source:"master",
+          last_updated:Date.now()
+        }).then(function(){count++;});
+      });
+    });
+    return chain.then(function(){
+      // Reset critical meta so startup chain re-runs properly
+      return _openMeta().then(function(d){
+        if(!d)return;
+        return new Promise(function(ok){
+          var tx=d.transaction("meta","readwrite");
+          var s=tx.objectStore("meta");
+          s.put({key:_BACKUP_IMPORTED_KEY,value:true});
+          s.put({key:_YARDEN_IMPORTED_KEY,value:true});
+          s.put({key:_INVOICE_MATCHED_KEY,value:true});
+          s.put({key:_bcSeqKey,value:1000});
+          s.put({key:_ticketSeqKey,value:1});
+          s.put({key:_settingsKey,value:{storeName:"AcimCaisse",footer:"Merci de votre visite !"}});
+          tx.oncomplete=function(){_log("Meta reset for master JSON");ok();};
+          tx.onerror=function(){ok();};
+        });
+      }).then(function(){
+        // Reload sequences and settings
+        return Promise.all([_loadBcSeq(),_loadTicketSeq(),_loadSettings()]);
+      }).then(function(){
+        // Reload products in memory and re-render
+        return _dbGetAll().then(function(all){
+          _allProducts=all||[];
+          _filterProducts();
+          _renderCart();
+          _broadcastCart();
+        });
+      }).then(function(){
+        return{prods:count};
+      });
+    });
   }
 
   // ─── AUTO-CATEGORIZE DICTIONARY ─────────────────────
@@ -3193,11 +3378,76 @@
     }).catch(function(){return 0;});
   }
 
+  // ─── PRODUCT IMAGES (Open Food Facts) ────────────────
+  var _imgCache={};
+  var _imgQueue=[];
+  var _imgProcessing=false;
+  var _imgTotalFetched=0;
+
+  function _getCachedImage(bc){
+    if(_imgCache[bc]!==undefined)return Promise.resolve(_imgCache[bc]);
+    return _openMeta().then(function(d){
+      if(!d)return null;
+      return new Promise(function(ok){
+        var r=d.transaction("meta","readonly").objectStore("meta").get("img-"+bc);
+        r.onsuccess=function(){var v=r.result?r.result.value:null;_imgCache[bc]=v;ok(v);};
+        r.onerror=function(){ok(null);};
+      });
+    });
+  }
+  function _cacheImage(bc,url){
+    _imgCache[bc]=url;
+    _openMeta().then(function(d){
+      if(!d)return;
+      var tx=d.transaction("meta","readwrite");
+      tx.objectStore("meta").put({key:"img-"+bc,value:url});
+    });
+  }
+  function _fetchImageFromApi(bc){
+    if(!/^\d{8,13}$/.test(bc))return Promise.resolve(null);
+    return fetch("https://world.openfoodfacts.org/api/v0/product/"+bc+".json",{headers:{"User-Agent":"AcimCaisse/1.0"}}).then(function(r){
+      if(!r.ok)return null;
+      return r.json();
+    }).then(function(d){
+      if(!d||!d.product)return null;
+      var u=d.product.image_front_small_url||d.product.image_front_url||d.product.image_url;
+      if(!u)return null;
+      return fetch(u).then(function(ir){
+        if(!ir.ok)return null;
+        return ir.blob();
+      }).then(function(b){
+        if(!b)return null;
+        return new Promise(function(ok){
+          var rd=new FileReader();
+          rd.onload=function(){ok(rd.result);};
+          rd.onerror=function(){ok(null);};
+          rd.readAsDataURL(b);
+        });
+      });
+    }).catch(function(){return null;});
+  }
+  function _enqueueImage(bc,cb){
+    if(!bc||_imgCache[bc]!==undefined)return;
+    _imgQueue.push({bc:bc,cb:cb});
+    _processImageQueue();
+  }
+  function _processImageQueue(){
+    if(_imgProcessing||_imgQueue.length===0)return;
+    _imgProcessing=true;
+    var item=_imgQueue.shift();
+    _fetchImageFromApi(item.bc).then(function(dataUrl){
+      if(dataUrl){_cacheImage(item.bc,dataUrl);_imgTotalFetched++;}else{_imgCache[item.bc]=null;}
+      if(item.cb)item.cb(dataUrl);
+      _imgProcessing=false;
+      setTimeout(_processImageQueue,600);
+    }).catch(function(){_imgProcessing=false;setTimeout(_processImageQueue,600);});
+  }
+
   // ─── INIT ────────────────────────────────────────────
   function init(){
     if(!_acquireTabLock()){_toast("⚠ Caisse déjà ouverte dans un autre onglet");return;}
     Promise.all([_loadBcSeq(),_loadTicketSeq(),_loadSettings()]).then(function(){
-      _log("v34 — POS complet: paiement + remise + historique + stocks");
+      _log("v36 — POS + photos produits");
       _importBackupFromEmbedded().then(function(imported){
         if(imported)_toast("✅ Catalogue importé (38 produits)");
         return _importSupplierCatalogFromMeta();
