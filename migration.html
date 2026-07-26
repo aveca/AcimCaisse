@@ -132,15 +132,33 @@ function openAndExtract(dbInfo){
       try{
         var tx=db.transaction(sname,"readonly");
         var store=tx.objectStore(sname);
-        store.getAll().onsuccess=function(de){
-          allData[sname]=de.target.result||[];
-          log("📦 '"+sname+"': "+allData[sname].length+" entrées");
-          pending--;
-          if(pending===0) processData(allData);
+        // Use cursor to get BOTH key and value (needed for Drift blocks compound keys)
+        var entries=[];
+        var cursorReq=store.openCursor();
+        cursorReq.onsuccess=function(ce){
+          var cursor=ce.target.result;
+          if(cursor){
+            entries.push({key:cursor.key,value:cursor.value});
+            cursor.continue();
+          } else {
+            allData[sname]=entries;
+            log("📦 '"+sname+"': "+entries.length+" entrées");
+            pending--;
+            if(pending===0) processData(allData);
+          }
         };
-        store.getAll().onerror=function(){
-          pending--;
-          if(pending===0) processData(allData);
+        cursorReq.onerror=function(){
+          // Fallback to getAll
+          store.getAll().onsuccess=function(de){
+            allData[sname]=(de.target.result||[]).map(function(v,i){return{key:i,value:v};});
+            log("📦 '"+sname+"': "+allData[sname].length+" entrées (fallback)");
+            pending--;
+            if(pending===0) processData(allData);
+          };
+          cursorReq.onerror=function(){
+            pending--;
+            if(pending===0) processData(allData);
+          };
         };
       }catch(err){
         log("❌ Store '"+sname+"': "+err.message,"err");
