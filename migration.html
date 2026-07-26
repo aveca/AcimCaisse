@@ -421,9 +421,21 @@ function parseSQLite(data){
     var masterRows=readTable(data,pageSz,1);
     log("sqlite_master: "+masterRows.length+" lignes","ok");
 
+    // Show first 5 raw master rows for debug
+    for(var mi=0;mi<Math.min(5,masterRows.length);mi++){
+      var raw=masterRows[mi];
+      log("  raw["+mi+"]: len="+raw.length+" vals="+JSON.stringify(raw).substring(0,300));
+    }
+
     // Convert master rows to objects
     var masterFields=["type","name","tbl_name","rootpage","sql"];
     var masterObjs=masterRows.map(function(r){return arrayToObj(r,masterFields);});
+
+    // Show first 3 converted objects
+    for(var mj=0;mj<Math.min(3,masterObjs.length);mj++){
+      var o=masterObjs[mj];
+      log("  obj["+mj+"]: type="+JSON.stringify(o.type)+" name="+JSON.stringify(o.name)+" rootpage="+JSON.stringify(o.rootpage)+" sql="+JSON.stringify(o.sql).substring(0,80));
+    }
 
     var tables={};
     for(var i=0;i<masterObjs.length;i++){
