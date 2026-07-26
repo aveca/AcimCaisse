@@ -553,7 +553,7 @@ function readLeafPage(data,pageOff,pageSz,headerOffset){
   var rows=[];
   var nCells=(data[pageOff+headerOffset+3]<<8)|data[pageOff+headerOffset+4];
   var cellContentStart=(data[pageOff+headerOffset+5]<<8)|data[pageOff+headerOffset+6];
-  addLog('  page cells='+nCells+' cellContentOffset='+cellContentStart+' headerOff='+headerOffset);
+  log('  page cells='+nCells+' cellContentOffset='+cellContentStart+' headerOff='+headerOffset);
 
   // Cell pointers start right after the page header (8 bytes for leaf table b-tree)
   // Each pointer is 2 bytes, value is offset from start of PAGE to cell content
@@ -563,7 +563,7 @@ function readLeafPage(data,pageOff,pageSz,headerOffset){
     var off=pageOff+cellOffset;
     if(i<3){
       var preview=[];for(var b=0;b<8;b++)preview.push(data[off+b]);
-      addLog('  cell['+i+'] bytes='+JSON.stringify(preview));
+      log('  cell['+i+'] bytes='+JSON.stringify(preview));
     }
 
     try{
