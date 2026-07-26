@@ -146761,13 +146761,16 @@ if(typeof dartMainRunner==="function"){dartMainRunner(s,[])}else{s([])}})
     var bSetPrices=document.createElement("button");bSetPrices.textContent="💰 Fixer tous les prix";
     bSetPrices.style.cssText="flex:1;padding:12px;border:2px solid #2e7d32;border-radius:8px;background:#e8f5e9;color:#2e7d32;font-size:17px;cursor:pointer;font-weight:700;min-width:140px;";
     bSetPrices.onclick=function(){_auditBulkSetPrice();};
+    var bMatchInvoice=document.createElement("button");bMatchInvoice.textContent="🔗 Lier produits facture → catalogue";
+    bMatchInvoice.style.cssText="flex:1;padding:12px;border:none;border-radius:8px;background:#00695c;color:#fff;font-size:15px;cursor:pointer;font-weight:700;min-width:160px;";
+    bMatchInvoice.onclick=function(){_auditMatchInvoiceProducts(listDiv,bMatchInvoice);};
     var bFixNames=document.createElement("button");bFixNames.textContent="🏷️ Fixer tous les noms";
     bFixNames.style.cssText="flex:1;padding:12px;border:2px solid #e65100;border-radius:8px;background:#fff3e0;color:#e65100;font-size:17px;cursor:pointer;font-weight:700;min-width:140px;";
     bFixNames.onclick=function(){_auditBulkFixNames(listDiv,bFixNames);};
     var bClose=document.createElement("button");bClose.textContent="Fermer";
     bClose.style.cssText="flex:0 0 100%;padding:12px;border:2px solid #e0e0e0;border-radius:8px;background:#fff;font-size:17px;cursor:pointer;margin-top:4px;";
     bClose.onclick=function(){ov.remove();};
-    btnRow.appendChild(bAutoFix);btnRow.appendChild(bAutoMerge);btnRow.appendChild(bSetPrices);btnRow.appendChild(bFixNames);btnRow.appendChild(bClose);card.appendChild(btnRow);
+    btnRow.appendChild(bAutoFix);btnRow.appendChild(bAutoMerge);btnRow.appendChild(bMatchInvoice);btnRow.appendChild(bSetPrices);btnRow.appendChild(bFixNames);btnRow.appendChild(bClose);card.appendChild(btnRow);
     ov.appendChild(card);ov.onclick=function(e){if(e.target===ov)ov.remove();};
     document.body.appendChild(ov);
 
@@ -147128,6 +147131,138 @@ if(typeof dartMainRunner==="function"){dartMainRunner(s,[])}else{s([])}})
     });
   }
 
+  // ─── MATCH INVOICE PRODUCTS TO YARDEN ────────────────
+  function _cleanInvoiceName(name){
+    var n=(name||"").trim();
+    // Remove encoding artifacts
+    n=n.replace(/[�ǸǮǼǽǾǵ]/g,"");
+    // Remove garbage suffixes from BKR/OFF/VIA format: ", , % € V00", ", , € V01"
+    n=n.replace(/, ,\s*%\s*[€']\s*V\d{2}/g,"");
+    n=n.replace(/, ,\s*[€']\s*V\d{2}/g,"");
+    // Remove unit prefixes like "Kilogram "
+    n=n.replace(/\b(Kilogram|Litres?|Portions?|Pièces?)\s+/gi,"");
+    // Remove trailing units and prices: "G '€", "grs '€", "g '€", "ml '€", "kg '€"
+    n=n.replace(/(?:\s+(?:g(?:rs?)?|ml|kg|L)\s*['€]+\s*['€]*)\s*$/,"");
+    n=n.replace(/\s*['][€]\s*$/,"");
+    n=n.replace(/\s*['][€]['][€]\s*$/,"");
+    // Remove status flags
+    n=n.replace(/\s*(?:PRIX\s+NET|PROMO|RUPTURE|BAISSE|PRIX\s+EN)\s*/gi,"");
+    // Remove date suffixes (months)
+    n=n.replace(/\s+(?:Janvier|Février|Mars|Avril|Mai|Juin|Juil(?:let)?|Août|Sept(?:embre)?|Oct(?:obre)?|Nov(?:embre)?|Déc(?:embre)?)\s*/gi,"");
+    // Remove "R" prefix (product code prefix used by supplier)
+    n=n.replace(/^R(?=[A-Z])/,"");
+    // Remove leading codes like "BKR/S018 ", "OFF001 ", "VIA200 ", "TOMA/A/S "
+    n=n.replace(/^[A-Z0-9]{2,}\/[A-Z0-9]+\s+/,"");
+    n=n.replace(/^[A-Z]{2,}\d+\s+/,"");
+    // Collapse multiple spaces
+    n=n.replace(/\s+/g," ").trim();
+    return n;
+  }
+
+  function _isGarbageName(name){
+    var n=(name||"").trim().toLowerCase();
+    // All numeric
+    if(/^\d+$/.test(n))return true;
+    // IBAN / bank
+    if(/^fr\d{2}/i.test(n))return true;
+    if(/iban|bic|siret|tva/i.test(n))return true;
+    // Legal clauses
+    if(n.indexOf("marchandises faisant l'objet")>=0)return true;
+    if(n.indexOf("société au capital")>=0)return true;
+    // Invoice references
+    if(/^fas\d{6}/i.test(n))return true;
+    if(/^n[°]?\s*bc\s*\/\s*date/i.test(n))return true;
+    if(/^bc\d{4,}/i.test(n))return true;
+    // Shipping/port fees
+    if(/^z?port\s+.*frais/i.test(n))return true;
+    // Pure garbage codes
+    if(/^v\d{2}\s*['€%]\s*['€%]\s*$/.test(n))return true;
+    // Tariff change headers
+    if(/changement de tarif|nouveau tarif|applicable au/i.test(n))return true;
+    // Company info lines
+    if(/royal wine europe/i.test(n))return true;
+    // Invoices numbers only
+    if(/^\d{6,10}$/.test(n)&&parseInt(n)>100000)return true;
+    // Partial dates
+    if(/^au\s+(janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre)\s*$/i.test(n))return true;
+    return false;
+  }
+
+  function _auditMatchInvoiceProducts(container,btn){
+    btn.textContent="⏳ Analyse...";btn.disabled=true;btn.style.opacity="0.5";
+    _dbGetAll().then(function(products){
+      var invProducts=products.filter(function(p){return p.source==="invoice-import";});
+      var yardenProducts=products.filter(function(p){return p.source==="yarden-catalog"||!p.source;});
+      var matched=0,garbage=0,unmatched=0,transferred=0;
+      var report=[];
+      var chain=Promise.resolve();
+
+      invProducts.forEach(function(p){
+        chain=chain.then(function(){
+          // Delete garbage entries
+          if(_isGarbageName(p.name)){
+            garbage++;
+            report.push({action:"🗑️ Supprimé (garbage): "+p.name+" ("+p.barcode+")"});
+            return _dbDelete(p.barcode);
+          }
+          // Clean name and try fuzzy match
+          var cleanName=_cleanInvoiceName(p.name);
+          if(!cleanName||cleanName.length<2){
+            garbage++;
+            report.push({action:"🗑️ Supprimé (nom vide): "+p.name+" ("+p.barcode+")"});
+            return _dbDelete(p.barcode);
+          }
+          var best=null,bestScore=0;
+          for(var yi=0;yi<yardenProducts.length;yi++){
+            var sc=_fuzzyScore(cleanName,yardenProducts[yi].name);
+            if(sc>bestScore&&sc>=60){bestScore=sc;best=yardenProducts[yi];}
+          }
+          if(best){
+            var changed=false;
+            // Transfer stock
+            if(p.stockQty>0&&(!best.stockQty||best.stockQty===0)){best.stockQty=p.stockQty;changed=true;}
+            // Transfer price (keep max)
+            if(p.sale_price_cents>0&&(!best.sale_price_cents||best.sale_price_cents===0)){best.sale_price_cents=p.sale_price_cents;changed=true;}
+            else if(p.sale_price_cents>0&&best.sale_price_cents>0&&p.sale_price_cents!==best.sale_price_cents){
+              best.sale_price_cents=Math.max(p.sale_price_cents,best.sale_price_cents);changed=true;
+            }
+            if(changed){
+              best.last_updated=Date.now();
+              return _dbPut(best).then(function(){
+                return _dbDelete(p.barcode).then(function(){
+                  matched++;transferred++;
+                  report.push({action:"✅ "+best.name+" ← stock="+p.stockQty+" prix="+(p.sale_price_cents/100).toFixed(2)+"€ (score:"+bestScore+"%)"});
+                });
+              });
+            }else{
+              return _dbDelete(p.barcode).then(function(){
+                matched++;
+                report.push({action:"✅ "+best.name+" (déjà à jour, doublon supprimé)"});
+              });
+            }
+          }else{
+            unmatched++;
+            report.push({action:"❌ Non matché: "+p.name+" → net: "+cleanName+" ("+p.barcode+")"});
+          }
+        });
+      });
+
+      chain.then(function(){
+        var msg="✅ "+matched+" matché(s) dont "+transferred+" transfert(s), "+garbage+" garbage supprimé(s), "+unmatched+" non matché(s)";
+        _toast(msg);
+        container.innerHTML="<div style='padding:10px;background:#e8f5e9;border-radius:8px;margin-bottom:12px;font-size:15px;color:#2e7d32;font-weight:700;'>"+msg+"</div>";
+        var list=document.createElement("div");
+        list.style.cssText="max-height:250px;overflow-y:auto;font-size:13px;";
+        report.forEach(function(r){
+          var row=document.createElement("div");row.style.cssText="padding:3px 6px;border-bottom:1px solid #f0f0f0;";
+          row.textContent=r.action;list.appendChild(row);
+        });
+        container.appendChild(list);
+        btn.textContent="🔗 Lier produits facture → catalogue";btn.disabled=false;btn.style.opacity="1";
+      });
+    });
+  }
+
   // ─── TOAST ────────────────────────────────────────────
   function _toast(msg){
     if(!msg)return;var old=document.getElementById("acim-toast");if(old)old.remove();
@@ -147177,6 +147312,7 @@ if(typeof dartMainRunner==="function"){dartMainRunner(s,[])}else{s([])}})
   window._acimWeighProduct=_weighProduct;
 })();
 // ─── FIN AcimCaisse v34 ───
+
 
 
 
