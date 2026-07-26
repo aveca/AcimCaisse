@@ -230,6 +230,7 @@
   }
 
   var _SUPCAT_META_KEY="supplier-catalog";
+  var _PDFCAT_META_KEY="catalog-from-pdf";
   function _importSupplierCatalogFromMeta(){
     return _openMeta().then(function(d){
       if(!d)return 0;
@@ -237,34 +238,82 @@
         var r=d.transaction("meta","readonly").objectStore("meta").get(_SUPCAT_META_KEY);
         r.onsuccess=function(){
           var cat=r.result&&r.result.value;
-          if(!Array.isArray(cat)||cat.length===0){ok(0);return;}
-          _supplierCatalog=cat;
-          _openDB().then(function(d){
-            if(!d){ok(0);return;}
-            var tx=d.transaction("products","readonly");
-            var store=tx.objectStore("products");
-            var countReq=store.count();
-            countReq.onsuccess=function(){
-              if(countReq.result>0){ok(0);return;}
-              var promises=[];
-              for(var i=0;i<cat.length;i++){
-                var p=cat[i];
-                if(!p.barcode)continue;
-                var salePrice=p.sale_price>100?p.sale_price:Math.round((p.sale_price||0)*100);
-                var purchasePrice=p.purchase_price>100?p.purchase_price:Math.round((p.purchase_price||0)*100);
-                var catName=_guessCategory(p.name)||"epicerie";
-                promises.push(_dbPut({
-                  barcode:p.barcode,name:p.name,
-                  sale_price_cents:salePrice,
-                  purchase_price_cents:purchasePrice,
-                  category:catName,stockQty:0,low_stock_threshold:5,
-                  source:"supplier-catalog",last_updated:Date.now()
-                }));
+          // Also check for catalog-from-pdf
+          var r2=d.transaction("meta","readonly").objectStore("meta").get(_PDFCAT_META_KEY);
+          r2.onsuccess=function(){
+            var pdfCat=r2.result&&r2.result.value;
+            // Merge both catalogs, preferring supplier catalog
+            var merged=cat||[];
+            if(pdfCat&&Array.isArray(pdfCat)){
+              var existingBcs={};
+              for(var mi=0;mi<merged.length;mi++){if(merged[mi].barcode)existingBcs[merged[mi].barcode]=true;}
+              for(var pj=0;pj<pdfCat.length;pj++){
+                if(pdfCat[pj].barcode&&!existingBcs[pdfCat[pj].barcode]){merged.push(pdfCat[pj]);existingBcs[pdfCat[pj].barcode]=true;}
               }
-              Promise.all(promises).then(function(){ok(promises.length);});
-            };
-            countReq.onerror=function(){ok(0);};
-          });
+            }
+            if(!Array.isArray(merged)||merged.length===0){ok(0);return;}
+            _supplierCatalog=merged;
+            _openDB().then(function(d){
+              if(!d){ok(0);return;}
+              var tx=d.transaction("products","readonly");
+              var store=tx.objectStore("products");
+              var countReq=store.count();
+              countReq.onsuccess=function(){
+                if(countReq.result>0){ok(0);return;}
+                var promises=[];
+                for(var i=0;i<merged.length;i++){
+                  var p=merged[i];
+                  if(!p.barcode)continue;
+                  // sale_price (supplier cat, in cents if >100) OR unitPrice (PDF import, in euros)
+                  var salePrice=0;
+                  if(p.sale_price>0)salePrice=p.sale_price>100?p.sale_price:Math.round(p.sale_price*100);
+                  else if(p.unitPrice>0)salePrice=Math.round(p.unitPrice*100);
+                  else if(p.sale_price_cents>0)salePrice=p.sale_price_cents;
+                  var purchasePrice=p.purchase_price>100?p.purchase_price:Math.round((p.purchase_price||0)*100);
+                  var catName=_guessCategory(p.name)||"epicerie";
+                  promises.push(_dbPut({
+                    barcode:p.barcode,name:p.name,
+                    sale_price_cents:salePrice,
+                    purchase_price_cents:purchasePrice,
+                    category:catName,stockQty:p.qty||p.stockQty||0,low_stock_threshold:5,
+                    source:"supplier-catalog",last_updated:Date.now()
+                  }));
+                }
+                Promise.all(promises).then(function(){ok(promises.length);});
+              };
+              countReq.onerror=function(){ok(0);};
+            });
+          };
+          r2.onerror=function(){
+            if(!Array.isArray(cat)||cat.length===0){ok(0);return;}
+            _supplierCatalog=cat;
+            _openDB().then(function(d){
+              if(!d){ok(0);return;}
+              var tx=d.transaction("products","readonly");
+              var store=tx.objectStore("products");
+              var countReq=store.count();
+              countReq.onsuccess=function(){
+                if(countReq.result>0){ok(0);return;}
+                var promises=[];
+                for(var i=0;i<cat.length;i++){
+                  var p=cat[i];
+                  if(!p.barcode)continue;
+                  var salePrice=p.sale_price>100?p.sale_price:Math.round((p.sale_price||0)*100);
+                  var purchasePrice=p.purchase_price>100?p.purchase_price:Math.round((p.purchase_price||0)*100);
+                  var catName=_guessCategory(p.name)||"epicerie";
+                  promises.push(_dbPut({
+                    barcode:p.barcode,name:p.name,
+                    sale_price_cents:salePrice>0?salePrice:0,
+                    purchase_price_cents:purchasePrice,
+                    category:catName,stockQty:0,low_stock_threshold:5,
+                    source:"supplier-catalog",last_updated:Date.now()
+                  }));
+                }
+                Promise.all(promises).then(function(){ok(promises.length);});
+              };
+              countReq.onerror=function(){ok(0);};
+            });
+          };
         };
         r.onerror=function(){ok(0);};
       });
@@ -1419,6 +1468,12 @@
           if(matched>0||created>0){
             summary+="\n\n";
             details.forEach(function(d){summary+=d.status+" "+d.name+"\n";});
+            // Save imported products to meta for auto-restore on startup
+            _openMeta().then(function(d){
+              if(!d)return;
+              var tx=d.transaction("meta","readwrite");
+              tx.objectStore("meta").put({key:"catalog-from-pdf",value:products});
+            });
           }
           statusDiv.textContent=summary;
           statusDiv.style.whiteSpace="pre-wrap";
