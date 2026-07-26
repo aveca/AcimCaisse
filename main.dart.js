@@ -144128,7 +144128,7 @@ if(typeof dartMainRunner==="function"){dartMainRunner(s,[])}else{s([])}})
 
 
 
-// ─── AcimCaisse v36 — POS complet + reset JSON maître + photos produits Open Food Facts ──
+// // ─── AcimCaisse v37 — Bug fixes + catégorisation Yarden améliorée + photos ──
 ;(function(){
   "use strict";
   var _log=function(m){console.log("[Acim] "+m);};
@@ -144394,22 +144394,59 @@ if(typeof dartMainRunner==="function"){dartMainRunner(s,[])}else{s([])}})
         };
       });
       var catMap={"Congele":"surgelé","Frais":"viande","Sec":"snack","Divers":"epicerie"};
-      var volailleKw=["poulet","poule","dinde","canard","oeuf","œuf","blanc","cuisse","aiguillette","filet poulet","magret","foie gras","coq"];
-      var viandeKw=["boeuf","bœuf","veau","agneau","porc","steak","côte","cotelette","entrecôte","bavette","haché","hache","rôti","roti","saucisse","jambon","lard","merguez","chipolata","boudin","salami","viande"];
-      var laitierKw=["lait","fromage","yaourt","yogurt","crème","beurre","emmental","gruyère","mozzarella","ricotta","parmesan"];
-      var boissonKw=["eau","jus","soda","bière","biere","limonade","coca","sprite","perrier","boisson","vin","champagne","cidre","rhum","whisky","vodka"];
-      var snackKw=["chips","biscuit","gâteau","gateau","cookie","céréales","barre","snack","nooty","nutella","amande","noisette","cacahuète","fruits secs","muesli","chocolat","bonbon","bonbons"];
+      // ── FRAIS keywords ──
+      var volailleKw=["poulet","poule","dinde","canard","oeuf","œuf","blanc poulet","cuisse","aiguillette","filet poulet","magret","foie gras","coq","parmelet","paupiette","pilon","pilori"];
+      var viandeKw=["boeuf","bœuf","veau","agneau","porc","steak","côte","cotelette","entrecôte","bavette","haché","hache","rôti","roti","saucisse","jambon","lard","merguez","chipolata","boudin","salami","viande","poitrine","andouillette","rosette","saucisson"];
+      var laitierKw=["lait","fromage","yaourt","yogurt","crème","beurre","emmental","gruyère","mozzarella","ricotta","parmesan","mascarpone","reblochon","camembert","brie","roquefort","chèvre","morbier","raclette","tome","comté"];
+      // ── SEC keywords (alimentaire) ──
+      var boissonAlcoolKw=["vin ","vin de","champagne","cidre","rhum","whisky","whiskey","vodka","gin ","grappa","armagnac","cognac","酒","saké","porto","marsala","madeira"];
+      var boissonKw=["eau ","eau minérale","eau de source","jus ","jus de","soda","bière","biere","limonade","coca","sprite","perrier","boisson","thé ","thé de","café ","café de","tisane","infusion","ice tea","oranga"];
+      var condimentKw=["vinaigre","moutarde","ketchup","mayonnaise","sauce ","sauces","huile d","huile de","sel ","poivre","épice","epice","herbe","basilic","thym","romarin","curry","paprika","cumin","safran","cannelle","vanille","exhausteur","exhausteurs","assafoetida","haldi","cumin","methi"];
+      var snackKw=["chips","biscuit","biscuits","gâteau","gateau","cookie","céréales","cereales","barre ","snack","nooty","nutella","amande","noisette","cacahuète","fruits secs","muesli","chocolat","bonbon","bonbons","cracker","grignotage"];
+      var epicerieSecKw=["riz ","pâtes","pates","lentilles","pois ","haricots","farine","sucre ","confiture","miel","café","the ","cacao","céréales","conserve","soupe","bouillon","nutella","pâte ","pâtes "];
+      // ── DIVERS keywords ──
+      var menagerKw=["lessive","détergent","detergent","nettoyant","savon","shampooing","dentifrice","papier toilette","mouchoir","couche","hygiène","menager","éponge","assouplissant","adoucissant","lingette","détachant","detachant","séche-linge","bougie","candle"];
+      var menagerKw2=["éponges","eponges","papier sulfurisé","sacs cuisson","barquette","assiette","gobelet","nappe","ciseaux","couteau","spatule","cuillère","louche","roulette","tablier","éplucheur","planche"];
+      var cuisineKw=["ciseaux","couteau","spatule","cuillère","louche","roulette","tablier","éplucheur","planche","manchon","gant","torchon","râpe","mixeur","balance","thermomètre"];
+      // ── ALCOOL: vin category ──
+      var vinKw=["vin ","vin de","champagne","cava","prosecc","crémant","sparkling","brut ","demi-sec","doux","rosé","rouge ","blanc ","mousseux","grappa","armagnac","cognac","porto","saké"];
+
       function _betterYardenCat(yardenCat,name){
         var n=(name||"").toLowerCase();
+        // ── FRAIS ──
         if(yardenCat==="Frais"){
           for(var i=0;i<volailleKw.length;i++){if(n.indexOf(volailleKw[i])!==-1)return"volaille";}
           for(var i=0;i<viandeKw.length;i++){if(n.indexOf(viandeKw[i])!==-1)return"viande";}
           for(var i=0;i<laitierKw.length;i++){if(n.indexOf(laitierKw[i])!==-1)return"laitier";}
+          if(n.indexOf("choucroute")!==-1||n.indexOf("cuisiné")!==-1||n.indexOf("plat ")!==-1)return"epicerie";
           return"viande";
         }
+        // ── CONGELE ──
+        if(yardenCat==="Congele")return"surgelé";
+        // ── SEC (dry goods — needs thorough sub-categorization) ──
         if(yardenCat==="Sec"){
+          // Vin/alcool d'abord (avant boisson non-alcool)
+          for(var i=0;i<vinKw.length;i++){if(n.indexOf(vinKw[i])!==-1)return"vin";}
+          for(var i=0;i<boissonAlcoolKw.length;i++){if(n.indexOf(boissonAlcoolKw[i])!==-1)return"vin";}
+          // Boisson non-alcool
           for(var i=0;i<boissonKw.length;i++){if(n.indexOf(boissonKw[i])!==-1)return"boisson";}
+          // Condiment
+          for(var i=0;i<condimentKw.length;i++){if(n.indexOf(condimentKw[i])!==-1)return"condiment";}
+          // Snack
           for(var i=0;i<snackKw.length;i++){if(n.indexOf(snackKw[i])!==-1)return"snack";}
+          // Epicerie
+          for(var i=0;i<epicerieSecKw.length;i++){if(n.indexOf(epicerieSecKw[i])!==-1)return"epicerie";}
+          // Cornichon, olives, conserves
+          if(n.indexOf("cornichon")!==-1||n.indexOf("olive")!==-1||n.indexOf("conserve")!==-1||n.indexOf("sauce")!==-1)return"epicerie";
+          return"epicerie";
+        }
+        // ── DIVERS (cleaning, utensils, candles) ──
+        if(yardenCat==="Divers"){
+          for(var i=0;i<menagerKw.length;i++){if(n.indexOf(menagerKw[i])!==-1)return"menager";}
+          for(var i=0;i<menagerKw2.length;i++){if(n.indexOf(menagerKw2[i])!==-1)return"menager";}
+          for(var i=0;i<cuisineKw.length;i++){if(n.indexOf(cuisineKw[i])!==-1)return"menager"};
+          if(n.indexOf("bougie")!==-1||n.indexOf("chabbat")!==-1||n.indexOf("hanouka")!==-1||n.indexOf("pessah")!==-1||n.indexOf("hametz")!==-1||n.indexOf("sticker")!==-1)return"menager";
+          if(n.indexOf("assiette")!==-1||n.indexOf("gobelet")!==-1||n.indexOf("nappe")!==-1||n.indexOf("sac ")!==-1||n.indexOf("aluminium")!==-1)return"menager";
           return"epicerie";
         }
         return catMap[yardenCat]||"epicerie";
@@ -145199,7 +145236,7 @@ if(typeof dartMainRunner==="function"){dartMainRunner(s,[])}else{s([])}})
     items.forEach(function(it){
       var line=it.name||"?";
       if(it.qty&&it.qty>1)line=it.qty+"× "+line;
-      html.push('<div class="r-line"><span>'+line+'</span><span class="r-price">'+(it.priceCents/100).toFixed(2).replace(".",",")+'</span></div>');
+      html.push('<div class="r-line"><span>'+line+'</span><span class="r-price">'+((it.priceCents||it.price||0)/100).toFixed(2).replace(".",",")+'</span></div>');
     });
     html.push('<div class="r-div"></div>');
     if(discountCents>0){
@@ -145251,7 +145288,7 @@ if(typeof dartMainRunner==="function"){dartMainRunner(s,[])}else{s([])}})
     items.forEach(function(it){
       var line=it.name||"?";
       if(it.qty&&it.qty>1)line=it.qty+"× "+line;
-      lines.push('<div class="r-line"><span>'+line+'</span><span class="r-price">'+(it.priceCents/100).toFixed(2).replace(".",",")+'</span></div>');
+      lines.push('<div class="r-line"><span>'+line+'</span><span class="r-price">'+((it.priceCents||it.price||0)/100).toFixed(2).replace(".",",")+'</span></div>');
     });
     lines.push('<div class="r-div"></div>');
     if(discountCents>0){
@@ -145889,7 +145926,7 @@ if(typeof dartMainRunner==="function"){dartMainRunner(s,[])}else{s([])}})
     document.body.appendChild(ov);
   }
 
-  function esc(s){return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+  function esc(s){return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
 
   // ─── SETTINGS ────────────────────────────────────────
   function _showSettings(){
@@ -146623,7 +146660,7 @@ if(typeof dartMainRunner==="function"){dartMainRunner(s,[])}else{s([])}})
           var ti=document.createElement("div");ti.style.cssText="font-size:20px;font-weight:700;margin-bottom:12px;color:#c62828;text-align:center;";
           ti.textContent="↩️ Annuler cette vente ?";card.appendChild(ti);
           var info=document.createElement("div");info.style.cssText="font-size:15px;color:#666;margin-bottom:12px;text-align:center;";
-          var saleDate=sale.date?new Date(sale.date).toLocaleString("fr-FR"):"?";
+          var saleDate=sale.isoTime?new Date(sale.isoTime).toLocaleString("fr-FR"):(sale.timestamp?new Date(sale.timestamp).toLocaleString("fr-FR"):"?");
           info.innerHTML='<strong>Ticket n°'+(sale.ticketNumber||"?")+'</strong><br>'+saleDate+'<br>'+(sale.itemCount||0)+' article(s) — '+(sale.totalCents/100).toFixed(2).replace(".",",")+' €';
           card.appendChild(info);
           var br=document.createElement("div");br.style.cssText="display:flex;gap:8px;";
@@ -146839,8 +146876,9 @@ if(typeof dartMainRunner==="function"){dartMainRunner(s,[])}else{s([])}})
       // Filter today's sales
       var todayStr=new Date().toISOString().slice(0,10);
       var todaySales=sales.filter(function(s){
-        if(!s.date)return false;
-        return s.date.slice(0,10)===todayStr;
+        var iso=s.isoTime||"";if(!iso&&s.timestamp)iso=new Date(s.timestamp).toISOString();
+        if(!iso)return false;
+        return iso.slice(0,10)===todayStr;
       });
 
       if(todaySales.length===0){
@@ -146860,9 +146898,9 @@ if(typeof dartMainRunner==="function"){dartMainRunner(s,[])}else{s([])}})
         totalItems+=(s.itemCount||0);
         if(s.payments){
           s.payments.forEach(function(p){
-            if(p.method==="especes"){totalCash+=(p.amount||0);paymentCounts.especes++;}
-            else if(p.method==="cb"){totalCb+=(p.amount||0);paymentCounts.cb++;}
-            else{totalMixte+=(p.amount||0);paymentCounts.mixte++;}
+            if(p.method==="especes"){totalCash+=(p.amountCents||p.amount||0);paymentCounts.especes++;}
+            else if(p.method==="cb"){totalCb+=(p.amountCents||p.amount||0);paymentCounts.cb++;}
+            else{totalMixte+=(p.amountCents||p.amount||0);paymentCounts.mixte++;}
           });
         }else{
           totalCash+=(s.totalCents||0);
@@ -146878,7 +146916,7 @@ if(typeof dartMainRunner==="function"){dartMainRunner(s,[])}else{s([])}})
             var n=item.name||"?";
             if(!productCount[n])productCount[n]={name:n,qty:0,total:0};
             productCount[n].qty+=(item.qty||1);
-            productCount[n].total+=(item.priceCents||0)*(item.qty||1);
+            productCount[n].total+=((item.priceCents||item.price||0))*(item.qty||1);
           });
         }
       });
@@ -147271,7 +147309,7 @@ if(typeof dartMainRunner==="function"){dartMainRunner(s,[])}else{s([])}})
   }
 
   function _auditBulkSetPrice(){
-    var price=prompt("Prix par dÃ©faut pour tous les produits sans prix (en €, ex: 5.00):");
+    var price=prompt("Prix par défaut pour tous les produits sans prix (en €, ex: 5.00):");
     if(price===null)return;
     var cents=Math.round(parseFloat(price)*100);
     if(isNaN(cents)||cents<=0){_toast("❌ Prix invalide");return;}
@@ -147286,7 +147324,7 @@ if(typeof dartMainRunner==="function"){dartMainRunner(s,[])}else{s([])}})
         }
       });
       chain.then(function(){
-        _toast("💰 "+fixed+" produit(s) mis Ã  "+(cents/100).toFixed(2)+"€");
+        _toast("💰 "+fixed+" produit(s) mis à "+(cents/100).toFixed(2)+"€");
         var auditList=document.getElementById("acim-audit-list");
         if(auditList)_runAudit(auditList);
       });
@@ -147308,7 +147346,7 @@ if(typeof dartMainRunner==="function"){dartMainRunner(s,[])}else{s([])}})
         }
       });
       chain.then(function(){
-        _toast("🏷️ "+fixed+" nom(s) corrigÃ©(s)");
+        _toast("🏷️ "+fixed+" nom(s) corrigé(s)");
         btn.textContent="🏷️ Fixer tous les noms";btn.disabled=false;btn.style.opacity="1";
         _runAudit(container);
       });
@@ -147577,7 +147615,7 @@ if(typeof dartMainRunner==="function"){dartMainRunner(s,[])}else{s([])}})
   function init(){
     if(!_acquireTabLock()){_toast("⚠ Caisse déjà ouverte dans un autre onglet");return;}
     Promise.all([_loadBcSeq(),_loadTicketSeq(),_loadSettings()]).then(function(){
-      _log("v36 — POS + photos produits");
+      _log("v37 — bug fixes + catégorisation + photos");
       _importBackupFromEmbedded().then(function(imported){
         if(imported)_toast("✅ Catalogue importé (38 produits)");
         return _importSupplierCatalogFromMeta();
@@ -147617,6 +147655,8 @@ if(typeof dartMainRunner==="function"){dartMainRunner(s,[])}else{s([])}})
   window._acimWeighProduct=_weighProduct;
 })();
 // ─── FIN AcimCaisse v34 ───
+
+ ───
 
 
 
