@@ -733,20 +733,42 @@
       card.appendChild(delBtn);
 
       var cat=(p.category||"autre").toLowerCase();
+      var bg=_catBg[cat]||"#f5f5f5";
       var ic=document.createElement("div");
-      ic.style.cssText="width:64px;height:64px;display:flex;align-items:center;justify-content:center;margin-bottom:4px;font-size:28px;overflow:hidden;border-radius:8px;background:"+(_catBg[cat]||"#f5f5f5")+";flex-shrink:0;";
-      ic.innerHTML='<span style="opacity:0.5">'+_catIcon(cat)+'</span>';
-      (function(bc,el,origIcon){
+      ic.style.cssText="position:relative;width:64px;height:64px;display:flex;align-items:center;justify-content:center;margin-bottom:4px;overflow:hidden;border-radius:8px;background:"+bg+";flex-shrink:0;";
+      var icBg=document.createElement("div");
+      icBg.style.cssText="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;border-radius:8px;background:"+bg+";";
+      icBg.innerHTML='<span style="opacity:0.5;font-size:28px">'+_catIcon(cat)+'</span>';
+      ic.appendChild(icBg);
+      var icImg=document.createElement("img");
+      icImg.style.cssText="position:absolute;inset:0;width:64px;height:64px;object-fit:contain;border-radius:6px;display:none;background:"+bg+";";
+      ic.appendChild(icImg);
+      (function(bc,im,bgEl){
         _getCachedImage(bc).then(function(url){
-          if(url){
-            el.innerHTML='<img src="'+esc(url)+'" alt="" style="width:64px;height:64px;object-fit:contain;border-radius:6px;">';
-          }else{
-            _enqueueImage(bc,function(url){
-              if(url)el.innerHTML='<img src="'+esc(url)+'" alt="" style="width:64px;height:64px;object-fit:contain;border-radius:6px;">';
-            });
-          }
+          if(url){im.src=url;im.style.display="block";bgEl.style.display="none";}
+          else _enqueueImage(bc,function(url){if(url){im.src=url;im.style.display="block";bgEl.style.display="none";}});
         });
-      })(p.barcode,ic,cat);
+      })(p.barcode,icImg,icBg);
+      var ub=document.createElement("button");
+      ub.innerHTML='<span style="opacity:0.7">📷</span>';ub.title="Ajouter / changer la photo";
+      ub.style.cssText="position:absolute;bottom:0;right:0;width:20px;height:20px;border:none;border-radius:4px 0 6px 0;background:rgba(0,0,0,0.35);color:#fff;font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;line-height:1;z-index:1;";
+      ub.onclick=function(e){
+        e.stopPropagation();
+        var inp=document.createElement("input");inp.type="file";inp.accept="image/*";
+        inp.onchange=function(ev){
+          var f=ev.target.files[0];if(!f)return;
+          var rd=new FileReader();
+          rd.onload=function(ev2){
+            var du=ev2.target.result;
+            _cacheImage(p.barcode,du);
+            icImg.src=du;icImg.style.display="block";icBg.style.display="none";
+          };
+          rd.readAsDataURL(f);
+        };
+        inp.click();
+      };
+      ic.appendChild(ub);
+      card.appendChild(ic);
       card.appendChild(ic);
 
       var nm=document.createElement("div");
