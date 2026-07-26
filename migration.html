@@ -552,49 +552,52 @@ function readLeafPage(data,pageOff,pageSz,headerOffset){
   headerOffset=headerOffset||0;
   var rows=[];
   var nCells=(data[pageOff+headerOffset+3]<<8)|data[pageOff+headerOffset+4];
-  var cellContentOffset=(data[pageOff+headerOffset+5]<<8)|data[pageOff+headerOffset+6];
-  // cellContentOffset is relative to start of PAGE (not header), so from pageOff
-  // For page 1: pageOff=0, headerOffset=100, cellContentOffset is from byte 0 of page
-  var cellStart=pageOff+cellContentOffset;
-  if(cellContentOffset===0||cellContentOffset>pageSz)cellStart=pageOff+pageSz;
-  var off=cellStart;
 
+  // Cell pointers start right after the page header (8 bytes for leaf table b-tree)
+  // Each pointer is 2 bytes, value is offset from start of PAGE to cell content
   for(var i=0;i<nCells;i++){
-    if(off>=data.length)break;
-    var pv=readVarint(data,off);var payloadLen=pv.v;off=pv.o;
-    pv=readVarint(data,off);var rowid=pv.v;off=pv.o;
-    var payload=data.slice(off,off+payloadLen);
-    off+=payloadLen;
+    var ptrOffset=pageOff+headerOffset+8+i*2;
+    var cellOffset=(data[ptrOffset]<<8)|data[ptrOffset+1];
+    var off=pageOff+cellOffset;
 
-    var hs=readVarint(payload,0);
-    var hdrBytes=hs.v;
-    var hdrOff=hs.o;
-    var serials=[];
-    while(hdrOff<hdrBytes){
-      var sv=readVarint(payload,hdrOff);
-      serials.push(sv.v);
-      hdrOff=sv.o;
-    }
+    try{
+      var pv=readVarint(data,off);var payloadLen=pv.v;off=pv.o;
+      pv=readVarint(data,off);var rowid=pv.v;off=pv.o;
+      var payload=data.slice(off,off+payloadLen);
+      off+=payloadLen;
 
-    var vals=[];
-    var vOff=hdrBytes;
-    for(var j=0;j<serials.length;j++){
-      var s=serials[j];
-      if(s===0){vals.push(null);}
-      else if(s===1){vals.push(readI8(payload,vOff));vOff+=1;}
-      else if(s===2){vals.push(readI16(payload,vOff));vOff+=2;}
-      else if(s===3){vals.push(readI24(payload,vOff));vOff+=3;}
-      else if(s===4){vals.push(readI32(payload,vOff));vOff+=4;}
-      else if(s===5){vals.push(readI48(payload,vOff));vOff+=6;}
-      else if(s===6){vals.push(readI64(payload,vOff));vOff+=8;}
-      else if(s===7){vals.push(readF64(payload,vOff));vOff+=8;}
-      else if(s===8){vals.push(0);}
-      else if(s===9){vals.push(1);}
-      else if(s>=12&&s%2===0){var bl=(s-12)/2;vals.push(readStr(payload,vOff,bl));vOff+=bl;}
-      else if(s>=13&&s%2===1){var tl=(s-13)/2;vals.push(readStr(payload,vOff,tl));vOff+=tl;}
-      else{vals.push(null);}
+      var hs=readVarint(payload,0);
+      var hdrBytes=hs.v;
+      var hdrOff=hs.o;
+      var serials=[];
+      while(hdrOff<hdrBytes){
+        var sv=readVarint(payload,hdrOff);
+        serials.push(sv.v);
+        hdrOff=sv.o;
+      }
+
+      var vals=[];
+      var vOff=hdrBytes;
+      for(var j=0;j<serials.length;j++){
+        var s=serials[j];
+        if(s===0){vals.push(null);}
+        else if(s===1){vals.push(readI8(payload,vOff));vOff+=1;}
+        else if(s===2){vals.push(readI16(payload,vOff));vOff+=2;}
+        else if(s===3){vals.push(readI24(payload,vOff));vOff+=3;}
+        else if(s===4){vals.push(readI32(payload,vOff));vOff+=4;}
+        else if(s===5){vals.push(readI48(payload,vOff));vOff+=6;}
+        else if(s===6){vals.push(readI64(payload,vOff));vOff+=8;}
+        else if(s===7){vals.push(readF64(payload,vOff));vOff+=8;}
+        else if(s===8){vals.push(0);}
+        else if(s===9){vals.push(1);}
+        else if(s>=12&&s%2===0){var bl=(s-12)/2;vals.push(readStr(payload,vOff,bl));vOff+=bl;}
+        else if(s>=13&&s%2===1){var tl=(s-13)/2;vals.push(readStr(payload,vOff,tl));vOff+=tl;}
+        else{vals.push(null);}
+      }
+      rows.push(vals);
+    }catch(e){
+      // skip bad cell
     }
-    rows.push(vals);
   }
   return rows;
 }
