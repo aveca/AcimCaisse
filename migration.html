@@ -552,9 +552,12 @@ function readLeafPage(data,pageOff,pageSz,headerOffset){
   headerOffset=headerOffset||0;
   var rows=[];
   var nCells=(data[pageOff+headerOffset+3]<<8)|data[pageOff+headerOffset+4];
-  var cellStart=(data[pageOff+headerOffset+5]<<8)|data[pageOff+headerOffset+6];
-  if(cellStart===0||cellStart>pageSz)cellStart=pageSz;
-  var off=pageOff+headerOffset+cellStart;
+  var cellContentOffset=(data[pageOff+headerOffset+5]<<8)|data[pageOff+headerOffset+6];
+  // cellContentOffset is relative to start of PAGE (not header), so from pageOff
+  // For page 1: pageOff=0, headerOffset=100, cellContentOffset is from byte 0 of page
+  var cellStart=pageOff+cellContentOffset;
+  if(cellContentOffset===0||cellContentOffset>pageSz)cellStart=pageOff+pageSz;
+  var off=cellStart;
 
   for(var i=0;i<nCells;i++){
     if(off>=data.length)break;
