@@ -229,6 +229,51 @@
     }).catch(function(e){_err("Backup import error:",e);return false;});
   }
 
+  var _YARDEN_IMPORTED_KEY="yarden-catalog-imported-v1";
+  function _importYardenCatalog(){
+    return _openMeta().then(function(d){
+      if(!d)return false;
+      return new Promise(function(ok){
+        var r=d.transaction("meta","readonly").objectStore("meta").get(_YARDEN_IMPORTED_KEY);
+        r.onsuccess=function(){
+          if(r.result&&r.result.value){ok(false);return;}
+          _doImportYarden().then(function(count){
+            if(count>0){
+              var tx=d.transaction("meta","readwrite");
+              tx.objectStore("meta").put({key:_YARDEN_IMPORTED_KEY,value:true});
+            }
+            ok(count);
+          }).catch(function(){ok(0);});
+        };
+        r.onerror=function(){_doImportYarden().then(function(c){ok(c);}).catch(function(){ok(0);});};
+      });
+    }).catch(function(e){_err("Yarden import error:",e);return 0;});
+  }
+  function _doImportYarden(){
+    return fetch("./assets/assets/catalog/supplier_catalog.json").then(function(resp){
+      if(!resp.ok)throw new Error("Fetch failed: "+resp.status);
+      return resp.json();
+    }).then(function(data){
+      var products=data.products||[];
+      if(!Array.isArray(products)||products.length===0)return 0;
+      var catMap={"Congele":"surgelé","Frais":"viande","Sec":"snack","Divers":"epicerie"};
+      var chain=Promise.resolve();
+      var count=0;
+      for(var i=0;i<products.length;i++){
+        (function(p){
+          chain=chain.then(function(){
+            var bc=p.ean||"";
+            var name=p.name||"";
+            var cat=catMap[p.category]||catMap[p.cat]||"epicerie";
+            if(!bc||!name)return;
+            return _dbPut({barcode:bc,name:name,sale_price_cents:0,category:cat,stockQty:0,low_stock_threshold:5,source:"yarden-catalog",last_updated:Date.now()}).then(function(){count++;});
+          });
+        })(products[i]);
+      }
+      return chain.then(function(){return count;});
+    });
+  }
+
   var _SUPCAT_META_KEY="supplier-catalog";
   var _PDFCAT_META_KEY="catalog-from-pdf";
   function _importSupplierCatalogFromMeta(){
@@ -2712,6 +2757,9 @@
         return _importSupplierCatalogFromMeta();
       }).then(function(imported){
         if(imported>0)_toast("✅ "+imported+" produits catalogue fournisseur importés");
+        return _importYardenCatalog();
+      }).then(function(yardenCount){
+        if(yardenCount>0)_toast("✅ "+yardenCount+" produits Yarden importés");
         return _dbGetAll();
       }).then(function(all){
         _allProducts=all||[];
