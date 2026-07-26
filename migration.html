@@ -399,10 +399,23 @@ function parseSQLite(data){
   log("","info");
   log("═══ Parsing SQLite ═══","info");
 
+  // Show raw header bytes
+  var hdrHex="";
+  for(var hx=0;hx<Math.min(32,data.length);hx++){
+    hdrHex+=("0"+data[hx].toString(16)).slice(-2)+" ";
+    if(hx%16===15)hdrHex+="\n    ";
+  }
+  log("Header hex: "+hdrHex);
+
   var pageSz=(data[16]<<8)|data[17];
+  log("Raw page size bytes: ["+data[16]+", "+data[17]+"] = "+pageSz);
   if(pageSz===1)pageSz=65536;
   if(pageSz===0)pageSz=4096;
   log("Page size: "+pageSz+" bytes");
+
+  // Show page 1 type byte
+  log("Page 1 type byte (offset 0): "+data[0]+" (0x"+data[0].toString(16)+")");
+  log("Page 1 type description: "+(data[0]===13?"leaf table b-tree (13)":data[0]===5?"interior b-tree (5)":data[0]===10?"leaf index (10)":data[0]===2?"interior index (2)":"UNKNOWN ("+data[0]+")"));
 
   try{
     var masterRows=readTable(data,pageSz,1);
@@ -479,19 +492,23 @@ function arrayToObj(arr,fields){
 
 function readTable(data,pageSz,rootPage){
   var pageOff=(rootPage-1)*pageSz;
-  if(pageOff>=data.length)return[];
+  if(pageOff>=data.length){log("  readTable: pageOff "+pageOff+" >= data.length "+data.length,"err");return[];}
   var pageType=data[pageOff];
+  log("  readTable(rootPage="+rootPage+"): pageOff="+pageOff+" pageType="+pageType+" (0x"+pageType.toString(16)+")");
   if(pageType===13)return readLeafPage(data,pageOff,pageSz);
   if(pageType===5){
     var rows=[];
     var nCells=(data[pageOff+3]<<8)|data[pageOff+4];
+    log("  Interior page: "+nCells+" cells");
     var ptrStart=pageOff+8;
     for(var i=0;i<nCells;i++){
       var childPage=(data[ptrStart+i*2]<<8)|data[ptrStart+i*2+1];
+      log("    child["+i+"]: page "+childPage);
       if(childPage>0)rows=rows.concat(readTable(data,pageSz,childPage));
     }
     return rows;
   }
+  log("  Page type "+pageType+" non géré","err");
   return[];
 }
 
