@@ -229,6 +229,48 @@
     }).catch(function(e){_err("Backup import error:",e);return false;});
   }
 
+  var _SUPCAT_META_KEY="supplier-catalog";
+  function _importSupplierCatalogFromMeta(){
+    return _openMeta().then(function(d){
+      if(!d)return 0;
+      return new Promise(function(ok){
+        var r=d.transaction("meta","readonly").objectStore("meta").get(_SUPCAT_META_KEY);
+        r.onsuccess=function(){
+          var cat=r.result&&r.result.value;
+          if(!Array.isArray(cat)||cat.length===0){ok(0);return;}
+          _supplierCatalog=cat;
+          _openDB().then(function(d){
+            if(!d){ok(0);return;}
+            var tx=d.transaction("products","readonly");
+            var store=tx.objectStore("products");
+            var countReq=store.count();
+            countReq.onsuccess=function(){
+              if(countReq.result>0){ok(0);return;}
+              var promises=[];
+              for(var i=0;i<cat.length;i++){
+                var p=cat[i];
+                if(!p.barcode)continue;
+                var salePrice=p.sale_price>100?p.sale_price:Math.round((p.sale_price||0)*100);
+                var purchasePrice=p.purchase_price>100?p.purchase_price:Math.round((p.purchase_price||0)*100);
+                var catName=_guessCategory(p.name)||"epicerie";
+                promises.push(_dbPut({
+                  barcode:p.barcode,name:p.name,
+                  sale_price_cents:salePrice,
+                  purchase_price_cents:purchasePrice,
+                  category:catName,stockQty:0,low_stock_threshold:5,
+                  source:"supplier-catalog",last_updated:Date.now()
+                }));
+              }
+              Promise.all(promises).then(function(){ok(promises.length);});
+            };
+            countReq.onerror=function(){ok(0);};
+          });
+        };
+        r.onerror=function(){ok(0);};
+      });
+    }).catch(function(e){_err("Supplier catalog import error:",e);return 0;});
+  }
+
   // ─── CART ────────────────────────────────────────────
   var _myCart=[];
   var _realBcMap={};
@@ -2137,6 +2179,7 @@
           statusDiv.textContent="✅ "+_supplierCatalog.length+" produits chargés";
           searchRow.style.display="block";
           searchIn.focus();
+          _openMeta().then(function(d){if(!d)return;var tx=d.transaction("meta","readwrite");tx.objectStore("meta").put({key:"supplier-catalog",value:_supplierCatalog});});
         }catch(ex){statusDiv.textContent="❌ Erreur JSON: "+ex.message;}
       };
       reader.readAsText(file);
@@ -2611,6 +2654,9 @@
       _log("v34 — POS complet: paiement + remise + historique + stocks");
       _importBackupFromEmbedded().then(function(imported){
         if(imported)_toast("✅ Catalogue importé (38 produits)");
+        return _importSupplierCatalogFromMeta();
+      }).then(function(imported){
+        if(imported>0)_toast("✅ "+imported+" produits catalogue fournisseur importés");
         return _dbGetAll();
       }).then(function(all){
         _allProducts=all||[];
