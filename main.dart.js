@@ -144128,7 +144128,8 @@ if(typeof dartMainRunner==="function"){dartMainRunner(s,[])}else{s([])}})
 
 
 
-// ─── AcimCaisse v37 — Bug fixes + catégorisation Yarden améliorée + photos ──
+
+// ─── AcimCaisse v37 — Bug fixes + catégorisation Yarden améliorée + photos ──
 ;(function(){
   "use strict";
   var _log=function(m){console.log("[Acim] "+m);};
@@ -144238,6 +144239,8 @@ if(typeof dartMainRunner==="function"){dartMainRunner(s,[])}else{s([])}})
     for(var i=0;i<CATS.length;i++)if(CATS[i].id===id)return CATS[i].ic;
     return "📦";
   }
+  var _catBg={viande:"#fce4e4",volaille:"#fef0db",laitier:"#dbeafe",epicerie:"#dcfce7",boulangerie:"#fef9c3",boisson:"#ccfbf1",snack:"#fef3c7",condiment:"#f3f4f6",menager:"#ede9fe",surgelé:"#cffafe",vin:"#fce7f3",autre:"#f5f5f5"};
+
 
   // ─── CATALOGUE IndexedDB ─────────────────────────────
   var _db=null;
@@ -144860,11 +144863,11 @@ if(typeof dartMainRunner==="function"){dartMainRunner(s,[])}else{s([])}})
       delBtn.onclick=function(e){e.stopPropagation();_confirmDeleteProduct(_cardP);};
       card.appendChild(delBtn);
 
+      var cat=(p.category||"autre").toLowerCase();
       var ic=document.createElement("div");
-      ic.style.cssText="width:64px;height:64px;display:flex;align-items:center;justify-content:center;margin-bottom:4px;font-size:36px;overflow:hidden;border-radius:8px;background:#f9f9f9;flex-shrink:0;";
-      ic.textContent=_catIcon(p.category||"autre");
-      ic.style.fontSize="36px";
-      (function(bc,el){
+      ic.style.cssText="width:64px;height:64px;display:flex;align-items:center;justify-content:center;margin-bottom:4px;font-size:28px;overflow:hidden;border-radius:8px;background:"+(_catBg[cat]||"#f5f5f5")+";flex-shrink:0;";
+      ic.innerHTML='<span style="opacity:0.5">'+_catIcon(cat)+'</span>';
+      (function(bc,el,origIcon){
         _getCachedImage(bc).then(function(url){
           if(url){
             el.innerHTML='<img src="'+esc(url)+'" alt="" style="width:64px;height:64px;object-fit:contain;border-radius:6px;">';
@@ -144874,7 +144877,7 @@ if(typeof dartMainRunner==="function"){dartMainRunner(s,[])}else{s([])}})
             });
           }
         });
-      })(p.barcode,ic);
+      })(p.barcode,ic,cat);
       card.appendChild(ic);
 
       var nm=document.createElement("div");
@@ -147608,8 +147611,8 @@ if(typeof dartMainRunner==="function"){dartMainRunner(s,[])}else{s([])}})
       if(dataUrl){_cacheImage(item.bc,dataUrl);_imgTotalFetched++;}else{_imgCache[item.bc]=null;}
       if(item.cb)item.cb(dataUrl);
       _imgProcessing=false;
-      setTimeout(_processImageQueue,600);
-    }).catch(function(){_imgProcessing=false;setTimeout(_processImageQueue,600);});
+      _processImageQueue();
+    }).catch(function(){_imgProcessing=false;_processImageQueue();});
   }
 
   // ─── INIT ────────────────────────────────────────────
