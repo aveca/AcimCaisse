@@ -1335,6 +1335,7 @@
       {label:"📦 Réinitialiser depuis un JSON maître",fn:function(){ov.remove();_showResetFromJson();}},
       {label:"📥 Importer des données (JSON)",fn:function(){ov.remove();_showImportDialog();}},
       {label:"🖥️ Écran client (2e écran)",fn:function(){window.open("customer-display.html","_blank");}},
+      {label:"⬇️ Télécharger la version bureau (.exe)",fn:function(){window.open("https://github.com/aveca/AcimCaisse/releases/latest","_blank");}},
       {label:"🔄 Migrer depuis l'ancienne version",fn:function(){window.open("migration.html","_blank");}},
       {label:"⚙️ Paramètres",fn:function(){ov.remove();_showSettings();}},
     ];

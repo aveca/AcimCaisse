@@ -144128,7 +144128,7 @@ if(typeof dartMainRunner==="function"){dartMainRunner(s,[])}else{s([])}})
 
 
 
-// // ─── AcimCaisse v37 — Bug fixes + catégorisation Yarden améliorée + photos ──
+// // // ─── AcimCaisse v37 — Bug fixes + catégorisation Yarden améliorée + photos ──
 ;(function(){
   "use strict";
   var _log=function(m){console.log("[Acim] "+m);};
@@ -145465,6 +145465,7 @@ if(typeof dartMainRunner==="function"){dartMainRunner(s,[])}else{s([])}})
       {label:"📦 Réinitialiser depuis un JSON maître",fn:function(){ov.remove();_showResetFromJson();}},
       {label:"📥 Importer des données (JSON)",fn:function(){ov.remove();_showImportDialog();}},
       {label:"🖥️ Écran client (2e écran)",fn:function(){window.open("customer-display.html","_blank");}},
+      {label:"⬇️ Télécharger la version bureau (.exe)",fn:function(){window.open("https://github.com/aveca/AcimCaisse/releases/latest","_blank");}},
       {label:"🔄 Migrer depuis l'ancienne version",fn:function(){window.open("migration.html","_blank");}},
       {label:"⚙️ Paramètres",fn:function(){ov.remove();_showSettings();}},
     ];
@@ -147655,6 +147656,8 @@ if(typeof dartMainRunner==="function"){dartMainRunner(s,[])}else{s([])}})
   window._acimWeighProduct=_weighProduct;
 })();
 // ─── FIN AcimCaisse v34 ───
+
+ ───
 
  ───
 
