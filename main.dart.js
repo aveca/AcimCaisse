@@ -145146,46 +145146,101 @@ if(typeof dartMainRunner==="function"){dartMainRunner(s,[])}else{s([])}})
     ov.style.cssText="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:10000002;display:flex;align-items:center;justify-content:center;";
     var receipt=document.createElement("div");
     receipt.style.cssText="background:#fff;border-radius:14px;padding:20px;width:340px;max-width:95vw;max-height:80vh;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,0.3);font-family:'Courier New',monospace;font-size:13px;";
-    var lines=[];
-    lines.push('<div style="text-align:center;margin-bottom:8px;font-size:16px;font-weight:700;">'+_settings.storeName+'</div>');
-    lines.push('<div style="text-align:center;color:#666;font-size:11px;">Ticket n°'+ticketNum+'</div>');
-    lines.push('<div style="text-align:center;color:#666;font-size:11px;">'+new Date().toLocaleString("fr-FR")+'</div>');
-    lines.push('<hr style="border:none;border-top:1px dashed #ccc;margin:8px 0;">');
+    var html=[];
+    html.push('<div class="r-header">'+(_settings.storeName||'Magasin')+'</div>');
+    html.push('<div class="r-sub">Ticket n°'+ticketNum+' &nbsp;|&nbsp; '+new Date().toLocaleDateString("fr-FR")+' '+new Date().toLocaleTimeString("fr-FR",{hour:'2-digit',minute:'2-digit'})+'</div>');
+    html.push('<div class="r-div"></div>');
     items.forEach(function(it){
-      var line=(it.name||"?");
+      var line=it.name||"?";
       if(it.qty&&it.qty>1)line=it.qty+"× "+line;
-      lines.push('<div style="display:flex;justify-content:space-between;"><span>'+line+'</span><span>'+(it.priceCents/100).toFixed(2).replace(".",",")+' €</span></div>');
+      html.push('<div class="r-line"><span>'+line+'</span><span class="r-price">'+(it.priceCents/100).toFixed(2).replace(".",",")+'</span></div>');
     });
-    lines.push('<hr style="border:none;border-top:1px dashed #ccc;margin:8px 0;">');
+    html.push('<div class="r-div"></div>');
     if(discountCents>0){
-      lines.push('<div style="display:flex;justify-content:space-between;color:#2e7d32;"><span>Remise</span><span>-'+(discountCents/100).toFixed(2).replace(".",",")+' €</span></div>');
+      html.push('<div class="r-line" style="color:#2e7d32;"><span>Remise</span><span class="r-price">-'+(discountCents/100).toFixed(2).replace(".",",")+'</span></div>');
     }
-    lines.push('<div style="display:flex;justify-content:space-between;font-weight:700;font-size:16px;margin-top:8px;"><span>TOTAL</span><span>'+(total/100).toFixed(2).replace(".",",")+' €</span></div>');
+    html.push('<div class="r-total"><span>TOTAL</span><span class="r-price">'+(total/100).toFixed(2).replace(".",",")+'</span></div>');
     if(payments&&payments.length>0){
-      lines.push('<hr style="border:none;border-top:1px dashed #ccc;margin:8px 0;">');
+      html.push('<div class="r-div"></div>');
       payments.forEach(function(pay){
-        var label=pay.method==="especes"?"💵 Espèces":pay.method==="cb"?"💳 CB":"🔀 Mixte";
-        lines.push('<div style="display:flex;justify-content:space-between;"><span>'+label+'</span><span>'+(pay.amountCents/100).toFixed(2).replace(".",",")+' €</span></div>');
+        var label=pay.method==="especes"?"Espèces":pay.method==="cb"?"Carte":"Mixte";
+        html.push('<div class="r-line"><span>'+label+'</span><span class="r-price">'+(pay.amountCents/100).toFixed(2).replace(".",",")+'</span></div>');
         if(pay.changeCents>0){
-          lines.push('<div style="display:flex;justify-content:space-between;color:#2e7d32;"><span>Rendu</span><span>'+(pay.changeCents/100).toFixed(2).replace(".",",")+' €</span></div>');
+          html.push('<div class="r-line" style="color:#2e7d32;"><span>Rendu</span><span class="r-price">'+(pay.changeCents/100).toFixed(2).replace(".",",")+'</span></div>');
         }
       });
     }
-    lines.push('<hr style="border:none;border-top:1px dashed #ccc;margin:8px 0;">');
-    lines.push('<div style="text-align:center;color:#666;font-size:11px;margin-top:8px;">'+_settings.footer+'</div>');
-    receipt.innerHTML=lines.join("");
+    html.push('<div class="r-div"></div>');
+    html.push('<div class="r-footer">'+(_settings.footer||'')+'</div>');
+    receipt.innerHTML=html.join("");
     var btnRow=document.createElement("div");btnRow.style.cssText="display:flex;gap:8px;margin-top:12px;";
     var bClose=document.createElement("button");bClose.textContent="Fermer";
     bClose.style.cssText="flex:1;padding:10px;border:2px solid #e0e0e0;border-radius:8px;background:#fff;font-size:14px;cursor:pointer;";
     bClose.onclick=function(){ov.remove();};
     var bPrint=document.createElement("button");bPrint.textContent="🖨️ Imprimer";
     bPrint.style.cssText="flex:1;padding:10px;border:none;border-radius:8px;background:#1a1a2e;color:#fff;font-size:14px;cursor:pointer;font-weight:700;";
-    bPrint.onclick=function(){window.print();};
+    bPrint.onclick=function(){
+      // Store receipt HTML for print
+      var pr=document.getElementById("acim-print-receipt");
+      if(!pr){
+        pr=document.createElement("div");pr.id="acim-print-receipt";
+        document.body.appendChild(pr);
+      }
+      pr.innerHTML=_buildPrintReceipt(ticketNum,items,total,discountCents,payments);
+      window.print();
+    };
     btnRow.appendChild(bClose);btnRow.appendChild(bPrint);
     receipt.appendChild(btnRow);
     ov.appendChild(receipt);
     ov.onclick=function(e){if(e.target===ov)ov.remove();};
     document.body.appendChild(ov);
+  }
+  function _buildPrintReceipt(ticketNum,items,total,discountCents,payments){
+    var store=_settings.storeName||"Magasin";
+    var footer=_settings.footer||"";
+    var lines=[];
+    lines.push('<div class="r-header">'+store+'</div>');
+    lines.push('<div class="r-sub">Ticket n°'+ticketNum+' &nbsp;|&nbsp; '+new Date().toLocaleDateString("fr-FR")+' '+new Date().toLocaleTimeString("fr-FR",{hour:'2-digit',minute:'2-digit'})+'</div>');
+    lines.push('<div class="r-div"></div>');
+    items.forEach(function(it){
+      var line=it.name||"?";
+      if(it.qty&&it.qty>1)line=it.qty+"× "+line;
+      lines.push('<div class="r-line"><span>'+line+'</span><span class="r-price">'+(it.priceCents/100).toFixed(2).replace(".",",")+'</span></div>');
+    });
+    lines.push('<div class="r-div"></div>');
+    if(discountCents>0){
+      lines.push('<div class="r-line" style="color:#2e7d32;"><span>Remise</span><span class="r-price">-'+(discountCents/100).toFixed(2).replace(".",",")+'</span></div>');
+    }
+    lines.push('<div class="r-total"><span>TOTAL</span><span class="r-price">'+(total/100).toFixed(2).replace(".",",")+'</span></div>');
+    if(payments&&payments.length>0){
+      lines.push('<div class="r-div"></div>');
+      payments.forEach(function(pay){
+        var label=pay.method==="especes"?"Espèces":pay.method==="cb"?"Carte":"Mixte";
+        lines.push('<div class="r-line"><span>'+label+'</span><span class="r-price">'+(pay.amountCents/100).toFixed(2).replace(".",",")+'</span></div>');
+        if(pay.changeCents>0){
+          lines.push('<div class="r-line" style="color:#2e7d32;"><span>Rendu</span><span class="r-price">'+(pay.changeCents/100).toFixed(2).replace(".",",")+'</span></div>');
+        }
+      });
+    }
+    lines.push('<div class="r-div"></div>');
+    lines.push('<div class="r-footer">'+footer+'</div>');
+    return lines.join("")+_getPrintStyles();
+  }
+  function _getPrintStyles(){
+    return '<style>'
+      +'@page{size:80mm auto;margin:0;}'
+      +'@media print{'
+      +'body *{visibility:hidden;}'
+      +'#acim-print-receipt,#acim-print-receipt *{visibility:visible;}'
+      +'#acim-print-receipt{position:fixed;top:0;left:0;width:80mm;padding:2mm 3mm;font-family:"Courier New",monospace;font-size:3.2mm;color:#000;background:#fff;line-height:1.3;-webkit-print-color-adjust:exact;print-color-adjust:exact;}'
+      +'.r-header{font-size:4mm;font-weight:700;text-align:center;margin-bottom:2mm;}'
+      +'.r-sub{font-size:2.8mm;text-align:center;color:#333;margin-bottom:2mm;}'
+      +'.r-div{border-top:0.3mm dashed #000;margin:1.5mm 0;}'
+      +'.r-line{display:flex;justify-content:space-between;font-size:3mm;margin:0.5mm 0;}'
+      +'.r-price{font-weight:700;white-space:nowrap;}'
+      +'.r-total{display:flex;justify-content:space-between;font-weight:700;font-size:4mm;margin-top:1.5mm;}'
+      +'.r-footer{text-align:center;font-size:2.5mm;color:#555;margin-top:2mm;}'
+      +'}</style>';
   }
 
   // ─── WEIGH PRODUCT MODAL ─────────────────────────────
@@ -146919,6 +146974,8 @@ if(typeof dartMainRunner==="function"){dartMainRunner(s,[])}else{s([])}})
   window._acimWeighProduct=_weighProduct;
 })();
 // ─── FIN AcimCaisse v34 ───
+
+
 
 
 
