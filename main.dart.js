@@ -147271,6 +147271,59 @@ if(typeof dartMainRunner==="function"){dartMainRunner(s,[])}else{s([])}})
     document.body.appendChild(t);setTimeout(function(){t.style.transition="opacity 0.3s";t.style.opacity="0";setTimeout(function(){t.remove();},300);},2500);
   }
 
+  // ─── AUTO-MATCH INVOICE PRODUCTS ON STARTUP ────────
+  var _INVOICE_MATCHED_KEY="acim-invoice-matched-v1";
+  function _autoMatchInvoiceProducts(){
+    _log("Checking invoice products...");
+    return _openMeta().then(function(d){
+      if(!d)return 0;
+      return new Promise(function(ok){
+        var r=d.transaction("meta","readonly").objectStore("meta").get(_INVOICE_MATCHED_KEY);
+        r.onsuccess=function(){
+          if(r.result&&r.result.value){ok(0);return;}
+          // Run the matching silently
+          _dbGetAll().then(function(products){
+            var invProducts=products.filter(function(p){return p.source==="invoice-import";});
+            var yardenProducts=products.filter(function(p){return p.source==="yarden-catalog"||!p.source;});
+            if(invProducts.length===0){ok(0);return;}
+            var matched=0,garbage=0,unmatched=0;
+            var chain=Promise.resolve();
+            invProducts.forEach(function(p){
+              chain=chain.then(function(){
+                if(_isGarbageName(p.name)){garbage++;return _dbDelete(p.barcode);}
+                var cleanName=_cleanInvoiceName(p.name);
+                if(!cleanName||cleanName.length<2){garbage++;return _dbDelete(p.barcode);}
+                var best=null,bestScore=0;
+                for(var yi=0;yi<yardenProducts.length;yi++){
+                  var sc=_fuzzyScore(cleanName,yardenProducts[yi].name);
+                  if(sc>bestScore&&sc>=60){bestScore=sc;best=yardenProducts[yi];}
+                }
+                if(best){
+                  var changed=false;
+                  if(p.stockQty>0&&(!best.stockQty||best.stockQty===0)){best.stockQty=p.stockQty;changed=true;}
+                  if(p.sale_price_cents>0&&(!best.sale_price_cents||best.sale_price_cents===0)){best.sale_price_cents=p.sale_price_cents;changed=true;}
+                  else if(p.sale_price_cents>0&&best.sale_price_cents>0&&p.sale_price_cents!==best.sale_price_cents){
+                    best.sale_price_cents=Math.max(p.sale_price_cents,best.sale_price_cents);changed=true;
+                  }
+                  if(changed){best.last_updated=Date.now();return _dbPut(best).then(function(){return _dbDelete(p.barcode).then(function(){matched++;});});}
+                  else {return _dbDelete(p.barcode).then(function(){matched++;});}
+                }else{unmatched++;}
+              });
+            });
+            chain.then(function(){
+              _log("Auto-match: "+matched+" matché(s), "+garbage+" garbage, "+unmatched+" non matché(s)");
+              // Mark as done
+              var tx=d.transaction("meta","readwrite");
+              tx.objectStore("meta").put({key:_INVOICE_MATCHED_KEY,value:true});
+              ok(matched+garbage);
+            });
+          });
+        };
+        r.onerror=function(){ok(0);};
+      });
+    }).catch(function(){return 0;});
+  }
+
   // ─── INIT ────────────────────────────────────────────
   function init(){
     if(!_acquireTabLock()){_toast("⚠ Caisse déjà ouverte dans un autre onglet");return;}
@@ -147284,6 +147337,9 @@ if(typeof dartMainRunner==="function"){dartMainRunner(s,[])}else{s([])}})
         return _importYardenCatalog();
       }).then(function(yardenCount){
         if(yardenCount>0)_toast("✅ "+yardenCount+" produits Yarden importés");
+        return _autoMatchInvoiceProducts();
+      }).then(function(cleaned){
+        if(cleaned>0)_toast("🔗 "+cleaned+" produit(s) facture synchronisé(s)");
         return _dbGetAll();
       }).then(function(all){
         _allProducts=all||[];
@@ -147312,6 +147368,7 @@ if(typeof dartMainRunner==="function"){dartMainRunner(s,[])}else{s([])}})
   window._acimWeighProduct=_weighProduct;
 })();
 // ─── FIN AcimCaisse v34 ───
+
 
 
 
