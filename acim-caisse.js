@@ -2624,6 +2624,9 @@
     var bAutoFix=document.createElement("button");bAutoFix.textContent="🤖 Auto-corriger tout";
     bAutoFix.style.cssText="flex:1;padding:12px;border:none;border-radius:8px;background:#1565c0;color:#fff;font-size:17px;cursor:pointer;font-weight:700;min-width:140px;";
     bAutoFix.onclick=function(){_auditAutoFix(listDiv,bAutoFix);};
+    var bAutoMerge=document.createElement("button");bAutoMerge.textContent="🔗 Auto-fusionner doublons";
+    bAutoMerge.style.cssText="flex:1;padding:12px;border:none;border-radius:8px;background:#6a1b9a;color:#fff;font-size:17px;cursor:pointer;font-weight:700;min-width:140px;";
+    bAutoMerge.onclick=function(){_auditAutoMerge(listDiv,bAutoMerge);};
     var bSetPrices=document.createElement("button");bSetPrices.textContent="💰 Fixer tous les prix";
     bSetPrices.style.cssText="flex:1;padding:12px;border:2px solid #2e7d32;border-radius:8px;background:#e8f5e9;color:#2e7d32;font-size:17px;cursor:pointer;font-weight:700;min-width:140px;";
     bSetPrices.onclick=function(){_auditBulkSetPrice();};
@@ -2633,7 +2636,7 @@
     var bClose=document.createElement("button");bClose.textContent="Fermer";
     bClose.style.cssText="flex:0 0 100%;padding:12px;border:2px solid #e0e0e0;border-radius:8px;background:#fff;font-size:17px;cursor:pointer;margin-top:4px;";
     bClose.onclick=function(){ov.remove();};
-    btnRow.appendChild(bAutoFix);btnRow.appendChild(bSetPrices);btnRow.appendChild(bFixNames);btnRow.appendChild(bClose);card.appendChild(btnRow);
+    btnRow.appendChild(bAutoFix);btnRow.appendChild(bAutoMerge);btnRow.appendChild(bSetPrices);btnRow.appendChild(bFixNames);btnRow.appendChild(bClose);card.appendChild(btnRow);
     ov.appendChild(card);ov.onclick=function(e){if(e.target===ov)ov.remove();};
     document.body.appendChild(ov);
 
@@ -2781,8 +2784,69 @@
     });
   }
 
+  function _auditAutoMerge(container,btn){
+    btn.textContent="⏳ Fusion...";btn.disabled=true;btn.style.opacity="0.5";
+    _dbGetAll().then(function(products){
+      var byName={},byBc={};
+      products.forEach(function(p){
+        var n=(p.name||"").toLowerCase().trim();
+        var b=(p.barcode||"").trim();
+        if(n){if(!byName[n])byName[n]=[];byName[n].push(p);}
+        if(b){if(!byBc[b])byBc[b]=[];byBc[b].push(p);}
+      });
+      var toDelete=[];
+      // Merge duplicate names: keep the best one
+      Object.keys(byName).forEach(function(n){
+        var group=byName[n];
+        if(group.length<2)return;
+        var best=_pickBest(group);
+        group.forEach(function(p){
+          if(p.barcode!==best.barcode)toDelete.push(p);
+        });
+      });
+      // Merge duplicate barcodes: keep the best one
+      Object.keys(byBc).forEach(function(b){
+        var group=byBc[b];
+        if(group.length<2)return;
+        var best=_pickBest(group);
+        group.forEach(function(p){
+          if(p.barcode!==best.barcode)toDelete.push(p);
+        });
+      });
+      // Deduplicate delete list
+      var seen={};
+      toDelete=toDelete.filter(function(p){
+        var k=p.barcode||"";
+        if(seen[k])return false;
+        seen[k]=true;return true;
+      });
+      // Delete all at once
+      var chain=Promise.resolve();
+      toDelete.forEach(function(p){
+        chain=chain.then(function(){
+          return _dbDelete(p.barcode);
+        });
+      });
+      chain.then(function(){
+        _toast("🔗 "+toDelete.length+" doublon(s) supprimé(s)");
+        btn.textContent="🔗 Auto-fusionner doublons";btn.disabled=false;btn.style.opacity="1";
+        _runAudit(container);
+      });
+    });
+  }
+  function _pickBest(group){
+    var best=group[0];
+    for(var i=1;i<group.length;i++){
+      var p=group[i];
+      var bestScore=(best.sale_price_cents||0)+(best.stockQty||0)*0.1;
+      var pScore=(p.sale_price_cents||0)+(p.stockQty||0)*0.1;
+      if(p.barcode&&!best.barcode){best=p;continue;}
+      if(pScore>bestScore)best=p;
+    }
+    return best;
+  }
+
   function _auditMergeDialog(products){
-    var old=document.getElementById("acim-merge");if(old)old.remove();
     var ov=document.createElement("div");ov.id="acim-merge";
     ov.style.cssText="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);z-index:10000004;display:flex;align-items:center;justify-content:center;";
     var card=document.createElement("div");
