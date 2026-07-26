@@ -1,0 +1,25 @@
+{
+  "name": "acimcaisse-repo",
+  "version": "1.0.0",
+  "description": "",
+  "main": "electron-main.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aveca/AcimCaisse.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/aveca/AcimCaisse/issues"
+  },
+  "homepage": "https://github.com/aveca/AcimCaisse#readme",
+  "devDependencies": {
+    "electron": "^43.2.0",
+    "electron-packager": "^17.1.2"
+  }
+}
