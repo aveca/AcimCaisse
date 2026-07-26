@@ -550,9 +550,15 @@
 
       // Stock badge
       if(p.stockQty!=null&&p.stockQty!==0){
+        var threshold=p.low_stock_threshold||5;
+        var isLow=p.stockQty<=threshold;
+        var isExpired=p.expiry_date&&new Date(p.expiry_date)<new Date();
         var stBadge=document.createElement("div");
-        stBadge.style.cssText="font-size:13px;color:"+(p.stockQty<5?"#c62828":"#666")+";margin-top:2px;";
-        stBadge.textContent="Stock: "+p.stockQty;card.appendChild(stBadge);
+        var stColor=isExpired?"#c62828":isLow?"#e65100":"#666";
+        stBadge.style.cssText="font-size:13px;color:"+stColor+";margin-top:2px;font-weight:"+(isLow||isExpired?"700":"normal")+";";
+        stBadge.textContent=(isExpired?"⚠️ Périmé!":isLow?"⚠️ Stock bas!":"Stock: ")+p.stockQty;
+        if(isExpired&&p.expiry_date)stBadge.textContent+=" (DLC: "+p.expiry_date+")";
+        card.appendChild(stBadge);
       }
 
       card.onclick=function(){
@@ -1048,6 +1054,7 @@
       {label:"↩️ Annuler la dernière vente",fn:function(){ov.remove();_undoLastSale();}},
       {label:"🔍 Vérifier / Nettoyer le catalogue",fn:function(){ov.remove();_showProductAudit();}},
       {label:"📄 Importer facture fournisseur",fn:function(){ov.remove();_showInvoiceImport();}},
+      {label:"📒 Catalogue fournisseur",fn:function(){ov.remove();_showSupplierCatalog();}},
       {label:"🏷️ Imprimer codes-barres",fn:function(){window.open("barcode.html","_blank");}},
       {label:"📤 Exporter mes données",fn:function(){ov.remove();_showExportDialog();}},
       {label:"📥 Importer des données (JSON)",fn:function(){ov.remove();_showImportDialog();}},
@@ -1659,6 +1666,21 @@
     stockIn.style.cssText="flex:1;font-size:14px;padding:8px;border:2px solid #e0e0e0;border-radius:6px;outline:none;";
     stockRow.appendChild(stockLabel);stockRow.appendChild(stockIn);card.appendChild(stockRow);
 
+    // Purchase price + threshold row
+    var ppRow=document.createElement("div");ppRow.style.cssText="display:flex;gap:4px;margin-bottom:8px;";
+    var ppIn=document.createElement("input");ppIn.type="number";ppIn.step="0.01";ppIn.min="0";
+    ppIn.placeholder="Prix d'achat";ppIn.style.cssText="flex:1;font-size:13px;padding:6px;border:2px solid #e0e0e0;border-radius:6px;outline:none;";
+    var thIn=document.createElement("input");thIn.type="number";thIn.step="1";thIn.min="0";thIn.value="5";
+    thIn.placeholder="Seuil stock";thIn.style.cssText="width:70px;font-size:13px;padding:6px;border:2px solid #e0e0e0;border-radius:6px;outline:none;";
+    ppRow.appendChild(ppIn);ppRow.appendChild(thIn);card.appendChild(ppRow);
+
+    // Expiry date
+    var expRow=document.createElement("div");expRow.style.cssText="display:flex;align-items:center;gap:4px;margin-bottom:8px;";
+    var expLabel=document.createElement("span");expLabel.style.cssText="font-size:12px;color:#666;";expLabel.textContent="DLC:";
+    var expIn=document.createElement("input");expIn.type="date";
+    expIn.style.cssText="flex:1;font-size:13px;padding:6px;border:2px solid #e0e0e0;border-radius:6px;outline:none;";
+    expRow.appendChild(expLabel);expRow.appendChild(expIn);card.appendChild(expRow);
+
     var cr=document.createElement("div");cr.style.cssText="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:12px;";
     var selCat=category||"autre";
     for(var ci=0;ci<CATS.length;ci++){(function(cat){
@@ -1684,13 +1706,13 @@
         if(isNaN(ppu)||ppu<=0){ppuIn.style.borderColor="#c62828";ppuIn.focus();return;}
         var ppuCents=Math.round(ppu*100);
         _addToCart(nn,0,useBc,selCat,null,unitType,ppuCents);
-        _dbPut({barcode:useBc,name:nn,sale_price_cents:0,category:selCat,stockQty:stockQty,pricePerUnit:ppuCents,unitType:unitType,source:"manual-weight",last_updated:Date.now()});
+        _dbPut({barcode:useBc,name:nn,sale_price_cents:0,category:selCat,stockQty:stockQty,pricePerUnit:ppuCents,unitType:unitType,purchase_price_cents:Math.round((parseFloat(ppIn.value)||0)*100),low_stock_threshold:parseInt(thIn.value)||5,expiry_date:expIn.value||null,source:"manual-weight",last_updated:Date.now()});
         ov.remove();_toast("⚖️ "+nn+" — "+_formatPricePerUnit(ppuCents,unitType));
       }else{
         var np=parseFloat(pi.value);
         var pc=isNaN(np)?0:Math.round(np*100);
         _addToCart(nn,pc,useBc,selCat);
-        _dbPut({barcode:useBc,name:nn,sale_price_cents:pc,category:selCat,stockQty:stockQty,source:"manual",last_updated:Date.now()});
+        _dbPut({barcode:useBc,name:nn,sale_price_cents:pc,category:selCat,stockQty:stockQty,purchase_price_cents:Math.round((parseFloat(ppIn.value)||0)*100),low_stock_threshold:parseInt(thIn.value)||5,expiry_date:expIn.value||null,source:"manual",last_updated:Date.now()});
         ov.remove();_toast("✅ "+nn+(pc>0?" "+(pc/100).toFixed(2)+"€":""));
       }
     };
@@ -2047,6 +2069,140 @@
           document.body.appendChild(ov);
         };
         r.onerror=function(){ok();};
+      });
+    });
+  }
+
+  // ─── SUPPLIER CATALOG ────────────────────────────────
+  var _supplierCatalog=null;
+  function _showSupplierCatalog(){
+    var old=document.getElementById("acim-supcat");if(old)old.remove();
+    var ov=document.createElement("div");ov.id="acim-supcat";
+    ov.style.cssText="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:10000002;display:flex;align-items:center;justify-content:center;";
+    var card=document.createElement("div");
+    card.style.cssText="background:#fff;border-radius:14px;padding:20px;width:550px;max-width:95vw;max-height:85vh;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,0.3);font-family:Segoe UI,Arial,sans-serif;";
+    var ti=document.createElement("div");ti.style.cssText="font-size:22px;font-weight:700;margin-bottom:4px;color:#1a1a2e;";
+    ti.textContent="📒 Catalogue fournisseur";card.appendChild(ti);
+    var desc=document.createElement("div");desc.style.cssText="font-size:15px;color:#666;margin-bottom:12px;";
+    desc.textContent="Chargez un fichier JSON du catalogue fournisseur pour rechercher par code-barres.";card.appendChild(desc);
+
+    // File input
+    var fileInput=document.createElement("input");fileInput.type="file";fileInput.accept=".json";
+    fileInput.style.cssText="width:100%;padding:10px;border:2px dashed #e0e0e0;border-radius:8px;font-size:14px;cursor:pointer;margin-bottom:12px;";
+    card.appendChild(fileInput);
+
+    var statusDiv=document.createElement("div");statusDiv.style.cssText="font-size:14px;color:#666;min-height:20px;margin-bottom:12px;";
+    card.appendChild(statusDiv);
+
+    // Search bar
+    var searchRow=document.createElement("div");searchRow.style.cssText="display:none;margin-bottom:12px;";
+    var searchIn=document.createElement("input");searchIn.type="text";searchIn.placeholder="🔍 Scanner ou taper un code-barres...";
+    searchIn.style.cssText="width:100%;font-size:18px;font-weight:700;padding:12px;border:3px solid #e65100;border-radius:10px;outline:none;box-sizing:border-box;";
+    searchRow.appendChild(searchIn);card.appendChild(searchRow);
+
+    // Results
+    var resultsDiv=document.createElement("div");resultsDiv.style.cssText="min-height:60px;";
+    card.appendChild(resultsDiv);
+
+    // Close
+    var bClose=document.createElement("button");bClose.textContent="Fermer";
+    bClose.style.cssText="width:100%;padding:12px;border:2px solid #e0e0e0;border-radius:8px;background:#fff;font-size:17px;cursor:pointer;margin-top:12px;";
+    bClose.onclick=function(){ov.remove();};
+    card.appendChild(bClose);
+
+    ov.appendChild(card);ov.onclick=function(e){if(e.target===ov)ov.remove();};
+    document.body.appendChild(ov);
+
+    // File load handler
+    fileInput.onchange=function(e){
+      var file=e.target.files[0];if(!file)return;
+      statusDiv.textContent="⏳ Chargement de "+file.name+"...";
+      var reader=new FileReader();
+      reader.onload=function(ev){
+        try{
+          var data=JSON.parse(ev.target.result);
+          var products=data.products||data.items||data;
+          if(!Array.isArray(products)){statusDiv.textContent="❌ Format JSON invalide (tableau attendu)";return;}
+          // Normalize
+          _supplierCatalog=products.map(function(p){
+            return{
+              barcode:p.barcode||p.code_barres||p.bc||"",
+              name:p.name||p.nom||p.designation||"",
+              purchase_price:p.purchase_price_cents||p.prix_achat||p.prixHT||0,
+              sale_price:p.sale_price_cents||p.prix_vente||0,
+              unit:p.unit||p.unite||"pc",
+              category:p.category||p.categorie||""
+            };
+          }).filter(function(p){return p.barcode||p.name;});
+          statusDiv.textContent="✅ "+_supplierCatalog.length+" produits chargés";
+          searchRow.style.display="block";
+          searchIn.focus();
+        }catch(ex){statusDiv.textContent="❌ Erreur JSON: "+ex.message;}
+      };
+      reader.readAsText(file);
+    };
+
+    // Search handler
+    searchIn.addEventListener("input",function(){
+      var q=(searchIn.value||"").trim().toLowerCase();
+      if(q.length<2){resultsDiv.innerHTML="";return;}
+      if(!_supplierCatalog){resultsDiv.innerHTML='<div style="color:#999;text-align:center;padding:10px;">Chargez d\'abord un catalogue</div>';return;}
+      var matches=_supplierCatalog.filter(function(p){
+        return(p.barcode&&p.barcode.toLowerCase().indexOf(q)!==-1)||(p.name&&p.name.toLowerCase().indexOf(q)!==-1);
+      }).slice(0,10);
+
+      resultsDiv.innerHTML="";
+      if(matches.length===0){
+        resultsDiv.innerHTML='<div style="text-align:center;padding:10px;color:#999;">Aucun résultat pour "'+q+'"</div>';
+        return;
+      }
+      matches.forEach(function(p){
+        var row=document.createElement("div");
+        row.style.cssText="display:flex;align-items:center;gap:8px;padding:10px;border:1px solid #e0e0e0;border-radius:8px;margin-bottom:6px;cursor:pointer;transition:all .15s;";
+        row.onmouseenter=function(){this.style.borderColor="#e65100";this.style.background="#fff3e0";};
+        row.onmouseleave=function(){this.style.borderColor="#e0e0e0";this.style.background="#fff";};
+        var nm=document.createElement("span");nm.textContent=p.name||"?";nm.style.cssText="flex:1;font-size:15px;font-weight:600;";
+        var bc=document.createElement("span");bc.textContent=p.barcode||"no bc";bc.style.cssText="font-size:12px;color:#999;font-family:monospace;";
+        var pr=document.createElement("span");
+        var pp=p.purchase_price;
+        if(pp>0){
+          if(pp>100)pp=pp;
+          else pp=Math.round(pp*100);
+          pr.textContent="Achat: "+(pp/100).toFixed(2)+"€";
+        }else{pr.textContent="";}
+        pr.style.cssText="font-size:14px;color:#2e7d32;font-weight:700;white-space:nowrap;";
+        row.appendChild(nm);row.appendChild(bc);row.appendChild(pr);
+        // If barcode matches an existing product, show stock
+        if(p.barcode){
+          _dbGet(p.barcode).then(function(existing){
+            if(existing){
+              var st=document.createElement("span");
+              st.textContent="Stock: "+(existing.stockQty||0);
+              st.style.cssText="font-size:13px;color:"+(existing.stockQty<=5?"#c62828":"#666")+";font-weight:700;";
+              row.appendChild(st);
+            }else{
+              var newBtn=document.createElement("button");newBtn.textContent="➕ Ajouter";
+              newBtn.style.cssText="padding:4px 8px;border:2px solid #e65100;border-radius:6px;background:#fff3e0;font-size:13px;cursor:pointer;font-weight:600;color:#e65100;white-space:nowrap;";
+              newBtn.onclick=function(e){
+                e.stopPropagation();
+                var cat=_guessCategory(p.name)||"epicerie";
+                _dbPut({
+                  barcode:p.barcode,name:p.name,
+                  sale_price_cents:p.sale_price>100?p.sale_price:Math.round((p.sale_price||0)*100),
+                  purchase_price_cents:p.purchase_price>100?p.purchase_price:Math.round((p.purchase_price||0)*100),
+                  category:cat,stockQty:0,low_stock_threshold:5,
+                  source:"supplier-catalog",last_updated:Date.now()
+                }).then(function(){
+                  newBtn.textContent="✅ Ajouté";newBtn.disabled=true;newBtn.style.opacity="0.5";
+                  _toast("➕ "+p.name+" ajouté au catalogue");
+                  _refreshAndFilter();
+                });
+              };
+              row.appendChild(newBtn);
+            }
+          });
+        }
+        resultsDiv.appendChild(row);
       });
     });
   }
