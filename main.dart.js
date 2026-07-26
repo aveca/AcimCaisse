@@ -144128,7 +144128,7 @@ if(typeof dartMainRunner==="function"){dartMainRunner(s,[])}else{s([])}})
 
 
 
-// // // ─── AcimCaisse v37 — Bug fixes + catégorisation Yarden améliorée + photos ──
+// ─── AcimCaisse v37 — Bug fixes + catégorisation Yarden améliorée + photos ──
 ;(function(){
   "use strict";
   var _log=function(m){console.log("[Acim] "+m);};
@@ -147656,47 +147656,4 @@ if(typeof dartMainRunner==="function"){dartMainRunner(s,[])}else{s([])}})
   window._acimWeighProduct=_weighProduct;
 })();
 // ─── FIN AcimCaisse v34 ───
-
- ───
-
- ───
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 })()
