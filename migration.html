@@ -421,20 +421,42 @@ function parseSQLite(data){
     var masterRows=readTable(data,pageSz,1);
     log("sqlite_master: "+masterRows.length+" lignes","ok");
 
-    // Show first 5 raw master rows for debug
+    // Show first 5 raw master rows for debug (safe stringification)
     for(var mi=0;mi<Math.min(5,masterRows.length);mi++){
       var raw=masterRows[mi];
-      log("  raw["+mi+"]: len="+raw.length+" vals="+JSON.stringify(raw).substring(0,300));
+      var safeStr="[";
+      for(var si=0;si<raw.length;si++){
+        var v=raw[si];
+        var vs="";
+        if(v===null||v===undefined)vs=String(v);
+        else if(typeof v==="string")vs='"'+v.substring(0,60)+'"';
+        else if(typeof v==="number")vs=String(v);
+        else if(v instanceof Uint8Array)vs="BLOB["+v.length+"]";
+        else if(v instanceof ArrayBuffer)vs="AB["+v.byteLength+"]";
+        else if(typeof v==="object")vs="Obj";
+        else vs=typeof v;
+        if(si>0)safeStr+=", ";
+        safeStr+=vs;
+      }
+      safeStr+="]";
+      log("  raw["+mi+"]: "+safeStr);
     }
 
     // Convert master rows to objects
     var masterFields=["type","name","tbl_name","rootpage","sql"];
-    var masterObjs=masterRows.map(function(r){return arrayToObj(r,masterFields);});
+    var masterObjs=[];
+    for(var mj=0;mj<masterRows.length;mj++){
+      try{
+        masterObjs.push(arrayToObj(masterRows[mj],masterFields));
+      }catch(e){
+        log("  arrayToObj error["+mj+"]: "+e.message,"err");
+      }
+    }
 
     // Show first 3 converted objects
-    for(var mj=0;mj<Math.min(3,masterObjs.length);mj++){
-      var o=masterObjs[mj];
-      log("  obj["+mj+"]: type="+JSON.stringify(o.type)+" name="+JSON.stringify(o.name)+" rootpage="+JSON.stringify(o.rootpage)+" sql="+JSON.stringify(o.sql).substring(0,80));
+    for(var mk=0;mk<Math.min(3,masterObjs.length);mk++){
+      var o=masterObjs[mk];
+      log("  obj["+mk+"]: type="+(typeof o.type==="string"?o.type:String(o.type))+" name="+(typeof o.name==="string"?o.name:String(o.name))+" rootpage="+String(o.rootpage));
     }
 
     var tables={};
