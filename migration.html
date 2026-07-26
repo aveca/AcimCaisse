@@ -26,11 +26,8 @@
   table{width:100%;border-collapse:collapse;font-size:12px;margin:8px 0;}
   th,td{padding:6px 8px;border-bottom:1px solid #f0f0f0;text-align:left;}
   th{background:#f5f5f5;font-weight:700;}
-  .badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;}
-  .badge-ok{background:#e8f5e9;color:#2e7d32;}
-  .badge-warn{background:#fff3e0;color:#e65100;}
+  pre{background:#1a1a2e;color:#a5d6a7;padding:10px;border-radius:8px;font-size:11px;overflow-x:auto;max-height:400px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;font-family:'Courier New',monospace;}
   .hidden{display:none;}
-  pre{background:#1a1a2e;color:#a5d6a7;padding:10px;border-radius:8px;font-size:11px;overflow-x:auto;max-height:300px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;font-family:'Courier New',monospace;}
 </style>
 </head>
 <body>
@@ -39,27 +36,20 @@
   <p class="subtitle">Récupérez vos produits, ventes et paramètres de l'ancienne version Flutter.</p>
 
   <div class="card" id="step1">
-    <h2>1. Diagnostic de la base</h2>
-    <p>Liste de toutes les bases IndexedDB dans ce navigateur.</p>
+    <h2>1. Scanner et migrer</h2>
+    <p>Cliquez pour scanner toutes les bases IndexedDB, reconstruire SQLite, et migrer vos produits.</p>
     <div id="s1-status" class="status status-info">En attente...</div>
-    <button class="btn btn-primary" id="btn1" onclick="scanAllDBs()">🔍 Scanner les bases</button>
+    <button class="btn btn-primary" id="btn1" onclick="startMigration()">🔍 Scanner et migrer automatiquement</button>
   </div>
 
   <div class="card hidden" id="step2">
-    <h2>2. Contenu de acim_caisse</h2>
+    <h2>2. Log détaillé</h2>
     <div id="s2-log"></div>
   </div>
 
   <div class="card hidden" id="step3">
-    <h2>3. Données extraites</h2>
+    <h2>3. Résultat</h2>
     <div id="s3-content"></div>
-    <button class="btn btn-success hidden" id="btn3" onclick="runMigration()">🚀 Migrer</button>
-  </div>
-
-  <div class="card hidden" id="step4">
-    <h2>✅ Migration terminée !</h2>
-    <div id="s4-status" class="status status-ok"></div>
-    <a href="index.html" class="btn btn-info" style="display:inline-block;text-decoration:none;margin-top:8px;">🏪 Ouvrir AcimCaisse</a>
   </div>
 </div>
 
@@ -67,461 +57,322 @@
 "use strict";
 var _old={products:[],categories:[],sales:[],saleItems:[],payments:[],settings:null};
 var _log=[];
+var _logEl;
 
 function log(msg,cls){
   _log.push({msg:msg,cls:cls||""});
-  var el=document.getElementById("s2-log");
-  if(!el)return;
-  el.innerHTML="<pre>"+_log.map(function(l){return'<span style="color:'+(l.cls==="err"?"#ef5350":l.cls==="ok"?"#66bb6a":"#90caf9")+'">'+esc(l.msg)+"</span>";}).join("\n")+"</pre>";
-  el.scrollTop=el.scrollHeight;
+  if(!_logEl)_logEl=document.getElementById("s2-log");
+  if(!_logEl)return;
+  _logEl.innerHTML="<pre>"+_log.map(function(l){return'<span style="color:'+(l.cls==="err"?"#ef5350":l.cls==="ok"?"#66bb6a":"#90caf9")+'">'+esc(l.msg)+"</span>";}).join("\n")+"</pre>";
+  _logEl.scrollTop=_logEl.scrollHeight;
 }
 function esc(s){return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
 
+function setInfo(msg){document.getElementById("s1-status").textContent=msg;}
+function setWarn(msg){var e=document.getElementById("s1-status");e.textContent=msg;e.className="status status-warn";}
+function setOk(msg){var e=document.getElementById("s1-status");e.textContent=msg;e.className="status status-ok";}
+function setErr(msg){var e=document.getElementById("s1-status");e.textContent=msg;e.className="status status-err";}
+
 // ═══════════════════════════════════════════════════════════
-//  STEP 1: SCAN ALL INDEXEDDB DATABASES
+//  MAIN ENTRY
 // ═══════════════════════════════════════════════════════════
-function scanAllDBs(){
-  var st=document.getElementById("s1-status");
-  st.textContent="🔍 Scan en cours...";
-  st.className="status status-info";
+function startMigration(){
   document.getElementById("btn1").disabled=true;
+  document.getElementById("step2").classList.remove("hidden");
+  setInfo("🔍 Scan de toutes les bases IndexedDB...");
 
   if(!indexedDB.databases){
-    st.textContent="❌ indexedDB.databases() non supporté par ce navigateur.";
-    st.className="status status-err";
+    setErr("❌ indexedDB.databases() non supporté.");
     document.getElementById("btn1").disabled=false;
     return;
   }
 
   indexedDB.databases().then(function(dbs){
-    if(dbs.length===0){
-      st.textContent="❌ Aucune base IndexedDB trouvée.";
-      st.className="status status-err";
+    if(!dbs||dbs.length===0){
+      setErr("❌ Aucune base IndexedDB trouvée.");
       return;
     }
-    var names=dbs.map(function(d){return d.name+" (v"+d.version+")";});
-    st.innerHTML="✅ <strong>"+dbs.length+" bases</strong> trouvées:<br>"+names.join("<br>");
-    st.className="status status-ok";
-
-    document.getElementById("step2").classList.remove("hidden");
-
+    log("✅ "+dbs.length+" base(s) trouvée(s): "+dbs.map(function(d){return d.name;}).join(", "),"ok");
     // Find acim_caisse
     var target=null;
     for(var i=0;i<dbs.length;i++){
       if(dbs[i].name==="acim_caisse"){target=dbs[i];break;}
     }
     if(!target){
-      log("❌ Base 'acim_caisse' non trouvée parmi: "+names.join(", "),"err");
-      log("","info");
-      log("Essayez une extraction directe de TOUTES les bases...","info");
-      // Try all databases
-      exploreAllDBs(dbs);
+      setErr("❌ Base 'acim_caisse' non trouvée.");
+      log("Bases disponibles: "+dbs.map(function(d){return d.name+" v"+d.version;}).join(", "),"err");
       return;
     }
-    log("✅ Base acim_caisse trouvée (v"+target.version+")","ok");
-    openAcimCaisse(target);
+    log("✅ acim_caisse trouvée (v"+target.version+")","ok");
+    openAndExtract(target);
   }).catch(function(err){
-    st.textContent="❌ Erreur scan: "+err.message;
-    st.className="status status-err";
-    document.getElementById("btn1").disabled=false;
+    setErr("❌ Erreur scan: "+err.message);
   });
 }
 
-function openAcimCaisse(dbInfo){
-  log("Ouverture de acim_caisse...");
+// ═══════════════════════════════════════════════════════════
+//  OPEN acim_caisse AND READ ALL STORES
+// ═══════════════════════════════════════════════════════════
+function openAndExtract(dbInfo){
   var req=indexedDB.open(dbInfo.name,dbInfo.version);
-  req.onerror=function(e){
-    log("❌ Erreur ouverture: "+(e.target.error?.message||"unknown"),"err");
-  };
+  req.onerror=function(e){setErr("❌ Erreur ouverture: "+(e.target.error?.message||"unknown"));};
   req.onsuccess=function(e){
     var db=e.target.result;
     var stores=Array.from(db.objectStoreNames);
-    log("Stores trouvés: "+stores.join(", "),"ok");
+    log("Stores: "+stores.join(", "),"ok");
 
     if(stores.length===0){
-      log("❌ Aucun store dans la base!","err");
+      setErr("❌ Aucun store.");
       return;
     }
 
-    // Explore each store
-    var pending=stores.length;
     var allData={};
+    var pending=stores.length;
     stores.forEach(function(sname){
       try{
         var tx=db.transaction(sname,"readonly");
         var store=tx.objectStore(sname);
-        var getAllReq=store.getAll();
-        var getAllKeysReq=store.getAllKeys();
-        var countReq=store.count();
-
-        countReq.onsuccess=function(){
-          log("  📦 Store '"+sname+"': "+countReq.result+" enregistrements");
-        };
-
-        getAllKeysReq.onsuccess=function(){
-          var keys=getAllKeysReq.result;
-          log("  🔑 Clés de '"+sname+"': "+JSON.stringify(keys.slice(0,10))+(keys.length>10?"... ("+keys.length+" total)":""));
-        };
-
-        getAllReq.onsuccess=function(){
-          var data=getAllReq.result;
-          allData[sname]=data;
-          log("  📄 Données de '"+sname+"': "+data.length+" entrées");
-
-          // Show first 3 entries (truncated)
-          for(var i=0;i<Math.min(3,data.length);i++){
-            var entry=data[i];
-            var preview=JSON.stringify(entry);
-            if(preview.length>300) preview=preview.substring(0,300)+"...";
-            log("    ["+i+"]: "+preview);
-          }
-
+        store.getAll().onsuccess=function(de){
+          allData[sname]=de.target.result||[];
+          log("📦 '"+sname+"': "+allData[sname].length+" entrées");
           pending--;
-          if(pending===0){
-            analyzeData(allData,stores);
-          }
+          if(pending===0) processData(allData);
+        };
+        store.getAll().onerror=function(){
+          pending--;
+          if(pending===0) processData(allData);
         };
       }catch(err){
-        log("❌ Erreur store '"+sname+"': "+err.message,"err");
+        log("❌ Store '"+sname+"': "+err.message,"err");
         pending--;
-        if(pending===0) analyzeData(allData,stores);
+        if(pending===0) processData(allData);
       }
     });
   };
 }
 
-function exploreAllDBs(dbs){
-  document.getElementById("step2").classList.remove("hidden");
-  var pending=dbs.length;
-  var allDBData={};
-
-  dbs.forEach(function(dbInfo){
-    var req=indexedDB.open(dbInfo.name,dbInfo.version);
-    req.onerror=function(){pending--;if(pending===0) findFlutterData(allDBData);};
-    req.onsuccess=function(e){
-      var db=e.target.result;
-      var stores=Array.from(db.objectStoreNames);
-      log("","info");
-      log("═══ Base: "+dbInfo.name+" (v"+dbInfo.version+") ═══","info");
-      log("Stores: "+stores.join(", "));
-
-      if(stores.length===0){pending--;if(pending===0) findFlutterData(allDBData);return;}
-
-      var storePending=stores.length;
-      var baseData={};
-      stores.forEach(function(sname){
-        try{
-          var tx=db.transaction(sname,"readonly");
-          var store=tx.objectStore(sname);
-          store.count().onsuccess=function(ce){
-            var count=ce.target.result;
-            log("  '"+sname+"': "+count+" entrées");
-            if(count>0){
-              store.getAll().onsuccess=function(de){
-                var data=de.target.result;
-                baseData[sname]=data;
-                // Show first 2
-                for(var i=0;i<Math.min(2,data.length);i++){
-                  var p=JSON.stringify(data[i]);
-                  if(p.length>200) p=p.substring(0,200)+"...";
-                  log("    ["+i+"]: "+p);
-                }
-                storePending--;
-                if(storePending===0){allDBData[dbInfo.name]=baseData;pending--;if(pending===0) findFlutterData(allDBData);}
-              };
-            } else {
-              storePending--;
-              if(storePending===0){allDBData[dbInfo.name]=baseData;pending--;if(pending===0) findFlutterData(allDBData);}
-            }
-          };
-        }catch(err){
-          log("  ❌ "+sname+": "+err.message,"err");
-          storePending--;
-          if(storePending===0){allDBData[dbInfo.name]=baseData;pending--;if(pending===0) findFlutterData(allDBData);}
-        }
-      });
-    };
-  });
-}
-
-function findFlutterData(allDBData){
-  log("","info");
-  log("═══ ANALYSE ═══","info");
-
-  // Look for products-like data in any database
-  var dbNames=Object.keys(allDBData);
-  var foundProducts=null;
-  var foundDB="";
-
-  for(var i=0;i<dbNames.length;i++){
-    var dbname=dbNames[i];
-    var stores=allDBData[dbname];
-    var storeNames=Object.keys(stores);
-
-    for(var j=0;j<storeNames.length;j++){
-      var sname=storeNames[j];
-      var data=stores[sname];
-      if(!data||data.length===0) continue;
-
-      // Check if this looks like products
-      var first=data[0];
-      if(typeof first==="object"){
-        var keys=Object.keys(first);
-        var keyStr=keys.join(",").toLowerCase();
-        if(keyStr.indexOf("name")>=0&&(keyStr.indexOf("price")>=0||keyStr.indexOf("barcode")>=0||keyStr.indexOf("stock")>=0)){
-          log("✅ Produits trouvés dans: "+dbname+">"+sname+" ("+data.length+" entrées)","ok");
-          foundProducts=data;
-          foundDB=dbname;
-        }
-        if(keyStr.indexOf("sale")>=0&&keyStr.indexOf("total")>=0){
-          log("✅ Ventes trouvées dans: "+dbname+">"+sname+" ("+data.length+" entrées)","ok");
-        }
-        if(keyStr.indexOf("ticket")>=0&&keyStr.indexOf("total")>=0){
-          log("✅ Ventes trouvées dans: "+dbname+">"+sname+" ("+data.length+" entrées)","ok");
-        }
-      }
-    }
-  }
-
-  if(foundProducts){
-    log("","info");
-    log("Migration possible depuis: "+foundDB,"ok");
-    // TODO: direct migration from found data
-  } else {
-    log("","info");
-    log("Aucune donnée produit standard trouvée.","err");
-    log("Voir le log ci-dessus pour le contenu brut de chaque base.","info");
-  }
-}
-
 // ═══════════════════════════════════════════════════════════
-//  STEP 2: ANALYZE acim_caisse DATA
+//  PROCESS: DETECT DRIFT OR DIRECT
 // ═══════════════════════════════════════════════════════════
-function analyzeData(allData,storeNames){
-  log("","info");
-  log("═══ ANALYSE DU CONTENU ═══","info");
-
-  // Check if we have files+blocks (Drift SQLite) or direct data
-  if(allData.files && allData.blocks){
-    log("Structure Drift détectée: files + blocks","ok");
-    log("Fichiers:","info");
+function processData(allData){
+  if(allData.files&&allData.blocks){
+    log("","info");
+    log("═══ Structure Drift (files + blocks) détectée ═══","info");
+    log("files: "+allData.files.length+" | blocks: "+allData.blocks.length,"info");
+    // Show file info
     allData.files.forEach(function(f,i){
-      log("  ["+i+"] name='"+f.name+"' length="+f.length);
+      log("  file["+i+"]: name='"+f.name+"' length="+f.length+" version="+f.version);
     });
-    log("Blocks: "+allData.blocks.length+" blocs","info");
-
-    // Try to reconstruct
-    if(allData.files.length>0 && allData.blocks.length>0){
-      reconstructDrift(allData.files,allData.blocks);
-    }
+    // Try to reconstruct SQLite
+    reconstructDrift(allData.files,allData.blocks);
   } else {
-    // Direct data stores
-    log("Données directes (pas Drift blocks)","info");
-    storeNames.forEach(function(sname){
-      var data=allData[sname]||[];
-      if(data.length===0) return;
-      var first=data[0];
-      var keys=Object.keys(first);
-      log("  "+sname+": "+data.length+" entrées, champs: "+keys.join(", "));
-    });
-
-    // Try to directly use as old format
-    directExtract(allData,storeNames);
+    // Check for blocks-only
+    var hasBlocks=false;
+    var storeNames=Object.keys(allData);
+    for(var i=0;i<storeNames.length;i++){
+      if(storeNames[i].toLowerCase().indexOf("block")>=0){hasBlocks=true;break;}
+    }
+    if(hasBlocks){
+      log("Store 'blocks' trouvé mais pas de 'files' — tentative de reconstruction...","info");
+      var blocks=[];
+      storeNames.forEach(function(sn){
+        if(sn.toLowerCase().indexOf("block")>=0) blocks=allData[sn];
+      });
+      reconstructDrift([],blocks);
+    } else {
+      log("Données directes (pas Drift)","info");
+      directExtract(allData);
+    }
   }
 }
 
+// ═══════════════════════════════════════════════════════════
+//  RECONSTRUCT SQLITE FROM DRIFT BLOCKS
+// ═══════════════════════════════════════════════════════════
 function reconstructDrift(files,blocks){
   log("","info");
-  log("═══ RECONSTRUCTION SQLITE ═══","info");
+  log("═══ Reconstruction SQLite ═══","info");
 
-  // Find the main file
+  // Find the main file (largest)
   var mainFile=null;
-  var mainFileKey=null;
-  for(var i=0;i<files.length;i++){
-    if(!mainFile||files[i].length>mainFile.length){
-      mainFile=files[i];
-      mainFileKey=files[i];
+  if(files.length>0){
+    for(var i=0;i<files.length;i++){
+      if(!mainFile||files[i].length>mainFile.length) mainFile=files[i];
     }
+    log("Fichier principal: name='"+mainFile.name+"' length="+mainFile.length);
   }
-  log("Fichier principal: name='"+mainFile.name+"' length="+mainFile.length);
 
-  // Find file ID by looking at block keys
-  // Block key format in Drift: [fileId, offset]
-  // We need to find which fileId corresponds to our main file
-  var fileIds=new Set();
-  blocks.forEach(function(b){
-    // The key might be stored differently depending on browser
-    // Try to extract fileId from the key
-    if(b.key&&Array.isArray(b.key)){
-      fileIds.add(b.key[0]);
+  // Strategy 1: Parse block keys as [fileId, offset] arrays
+  var fileIdMap={};
+  blocks.forEach(function(b,idx){
+    if(!b.key&&b.key!==0)return;
+    if(Array.isArray(b.key)){
+      var fid=b.key[0], off=b.key[1]||0;
+      if(!fileIdMap[fid])fileIdMap[fid]=[];
+      fileIdMap[fid].push({offset:off,value:toBytes(b.value),idx:idx});
     }
   });
 
-  log("FileIDs trouvés dans les blocks: "+Array.from(fileIds).join(", "));
+  var fids=Object.keys(fileIdMap);
+  if(fids.length>0){
+    log("FileIDs (array keys): "+fids.join(", "));
+    // Try each fileId, look for SQLite header
+    for(var fi=0;fi<fids.length;fi++){
+      var fid=fids[fi];
+      var rel=fileIdMap[fid];
+      rel.sort(function(a,b){return a.offset-b.offset;});
+      log("  fid "+fid+": "+rel.length+" blocks");
 
-  // Try each fileId
-  var fileIdArr=Array.from(fileIds);
-  if(fileIdArr.length===0){
-    log("❌ Aucun fileId trouvé dans les clés des blocks","err");
-    log("Structure des blocks:","info");
-    for(var j=0;j<Math.min(3,blocks.length);j++){
-      var b=blocks[j];
-      var keyInfo="key type: "+typeof b.key;
-      if(Array.isArray(b.key)) keyInfo="key=["+b.key.join(", ")+"]";
-      else if(typeof b.key==="string") keyInfo="key='"+b.key+"'";
-      else if(typeof b.key==="number") keyInfo="key="+b.key;
-      var valType=typeof b.value;
-      var valLen=0;
-      if(b.value instanceof ArrayBuffer) valLen=b.value.byteLength;
-      else if(b.value&&b.value.byteLength!=null) valLen=b.value.byteLength;
-      else if(Array.isArray(b.value)) valLen=b.value.length;
-      log("  block["+j+"]: "+keyInfo+", value type="+valType+" len="+valLen);
+      // Check if first block has SQLite header
+      if(rel.length>0&&rel[0].value&&rel[0].value.length>=16){
+        var hdr=rel[0].value;
+        if(hdr[0]===0x53&&hdr[1]===0x51&&hdr[2]===0x4C&&hdr[3]===0x69){
+          log("  ✅ SQLite header trouvé!","ok");
+          var maxEnd=0;
+          rel.forEach(function(r){if(r.offset+r.value.length>maxEnd)maxEnd=r.offset+r.value.length;});
+          buildAndParse({length:maxEnd},rel);
+          return;
+        }
+      }
     }
-    return;
+    log("Aucun fileId n'a de header SQLite dans le 1er bloc","info");
   }
 
-  // Try to reconstruct for each fileId
-  for(var fi=0;fi<fileIdArr.length;fi++){
-    var fid=fileIdArr[fi];
-    var relevantBlocks=blocks.filter(function(b){
-      return Array.isArray(b.key)&&b.key[0]===fid;
-    }).sort(function(a,b){
-      return a.key[1]-b.key[1];
-    });
-
-    log("FileId "+fid+": "+relevantBlocks.length+" blocks");
-
-    if(relevantBlocks.length===0) continue;
-
-    // Check first block header
-    var firstBlk=relevantBlocks[0].value;
-    var header="";
-    if(firstBlk instanceof Uint8Array){
-      for(var h=0;h<Math.min(16,firstBlk.length);h++){
-        header+=String.fromCharCode(firstBlk[h]);
+  // Strategy 2: Scan ALL blocks for SQLite header (53 51 4C 69 = "SQLi")
+  log("Scan de tous les blocs pour header SQLite...","info");
+  for(var bi=0;bi<blocks.length;bi++){
+    var val=toBytes(blocks[bi].value);
+    if(!val||val.length<16)continue;
+    if(val[0]===0x53&&val[1]===0x51&&val[2]===0x4C&&val[3]===0x69){
+      log("✅ SQLite header trouvé dans block["+bi+"]! ("+val.length+" octets)","ok");
+      // Reconstruct: treat ALL blocks as one flat file using their keys as offsets
+      var allBlocks=[];
+      var maxOff=0;
+      for(var bj=0;bj<blocks.length;bj++){
+        var bv=toBytes(blocks[bj].value);
+        if(!bv||bv.length===0)continue;
+        var off=0;
+        if(Array.isArray(blocks[bj].key))off=blocks[bj].key[1]||0;
+        else if(typeof blocks[bj].key==="number")off=blocks[bj].key;
+        else if(typeof blocks[bj].key==="object"&&blocks[bj].key!==null)off=blocks[bj].key.offset||blocks[bj].key.pos||0;
+        allBlocks.push({offset:off,value:bv});
+        if(off+bv.length>maxOff)maxOff=off+bv.length;
       }
-    } else if(firstBlk instanceof ArrayBuffer){
-      var arr=new Uint8Array(firstBlk);
-      for(var h2=0;h2<Math.min(16,arr.length);h2++){
-        header+=String.fromCharCode(arr[h2]);
-      }
-    }
-    log("  Header du 1er bloc: '"+header+"'");
-
-    if(header.indexOf("SQLite")===0){
-      log("  ✅ SQLite trouvé! Reconstruction...","ok");
-      buildAndParse(mainFile,relevantBlocks);
+      allBlocks.sort(function(a,b){return a.offset-b.offset;});
+      buildAndParse({length:maxOff},allBlocks);
       return;
     }
   }
 
-  log("❌ Aucun bloc ne commence par 'SQLite'","err");
+  // Strategy 3: Maybe blocks store SQLite pages sequentially (no offset in key)
+  log("Tentative reconstruction séquentielle...","info");
+  if(blocks.length>0){
+    var seqBlocks=[];
+    var totalLen=0;
+    for(var si=0;si<blocks.length;si++){
+      var sv=toBytes(blocks[si].value);
+      if(!sv||sv.length===0)continue;
+      seqBlocks.push({offset:totalLen,value:sv});
+      totalLen+=sv.length;
+    }
+    if(totalLen>0){
+      // Check first block for SQLite header
+      if(seqBlocks[0].value.length>=4&&seqBlocks[0].value[0]===0x53&&seqBlocks[0].value[1]===0x51){
+        log("✅ SQLite header trouvé (seq)!","ok");
+        buildAndParse({length:totalLen},seqBlocks);
+        return;
+      }
+    }
+  }
+
+  log("","err");
+  log("❌ Impossible de reconstruire SQLite.","err");
+  log("Les données existent mais dans un format non reconnu.","info");
+  log("Essayez de ré-ouvrir l'ancienne app Flutter pour forcer la synchro IndexedDB.","info");
 }
 
-function buildAndParse(mainFile,blocks){
-  var totalLen=mainFile.length;
+function toBytes(val){
+  if(val instanceof Uint8Array)return val;
+  if(val instanceof ArrayBuffer)return new Uint8Array(val);
+  if(val&&val.buffer)return new Uint8Array(val.buffer);
+  if(typeof val==="string"){
+    var arr=new Uint8Array(val.length);
+    for(var i=0;i<val.length;i++)arr[i]=val.charCodeAt(i)&0xff;
+    return arr;
+  }
+  if(Array.isArray(val)){
+    var arr2=new Uint8Array(val.length);
+    for(var i2=0;i2<val.length;i2++)arr2[i2]=val[i2]&0xff;
+    return arr2;
+  }
+  return null;
+}
+
+// ═══════════════════════════════════════════════════════════
+//  BUILD SQLITE FILE AND PARSE
+// ═══════════════════════════════════════════════════════════
+function buildAndParse(fileDesc,blocks){
+  var totalLen=fileDesc.length;
   var buf=new Uint8Array(totalLen);
   var filled=0;
 
   for(var i=0;i<blocks.length;i++){
-    var offset=blocks[i].key[1];
-    var val=blocks[i].value;
-    var blk;
-    if(val instanceof Uint8Array) blk=val;
-    else if(val instanceof ArrayBuffer) blk=new Uint8Array(val);
-    else continue;
-
-    var copyLen=Math.min(blk.length,totalLen-offset);
-    for(var j=0;j<copyLen;j++){
+    var offset=blocks[i].offset;
+    var blk=blocks[i].value;
+    if(offset+blk.length>totalLen){
+      // Extend buffer
+      var newBuf=new Uint8Array(offset+blk.length);
+      newBuf.set(buf);
+      buf=newBuf;
+      totalLen=buf.length;
+    }
+    for(var j=0;j<blk.length;j++){
       buf[offset+j]=blk[j];
     }
-    filled+=copyLen;
+    filled+=blk.length;
   }
 
-  log("Fichier reconstruit: "+filled+"/"+totalLen+" octets remplis","ok");
+  log("Fichier reconstruit: "+filled+"/"+totalLen+" octets","ok");
 
   // Check header
   var hdr="";
-  for(var k=0;k<Math.min(32,buf.length);k++) hdr+=String.fromCharCode(buf[k]);
-  log("Header complet: "+JSON.stringify(hdr.substring(0,30)));
+  for(var k=0;k<Math.min(16,buf.length);k++) hdr+=String.fromCharCode(buf[k]);
+  log("Header: "+JSON.stringify(hdr));
 
   if(buf[0]===0x53&&buf[1]===0x51&&buf[2]===0x4C&&buf[3]===0x69){
     log("✅ Fichier SQLite valide!","ok");
     parseSQLite(buf);
   } else {
-    log("❌ Header invalide: "+hdr.substring(0,16).replace(/[^\x20-\x7E]/g,"."),"err");
-    log("Premiers octets (hex):","");
-    var hex="";
-    for(var h=0;h<Math.min(64,buf.length);h++){
-      hex+=("0"+buf[h].toString(16)).slice(-2)+" ";
-      if(h%16===15) hex+="\n    ";
-    }
-    log("    "+hex);
+    log("❌ Header invalide","err");
   }
 }
 
 // ═══════════════════════════════════════════════════════════
-//  DIRECT EXTRACTION (for non-Drift data)
-// ═══════════════════════════════════════════════════════════
-function directExtract(allData,storeNames){
-  log("","info");
-  log("═══ EXTRACTION DIRECTE ═══","info");
-
-  storeNames.forEach(function(sname){
-    var data=allData[sname]||[];
-    if(data.length===0) return;
-    var first=data[0];
-    if(typeof first!=="object") return;
-    var keys=Object.keys(first);
-    var keyStr=keys.join(",").toLowerCase();
-
-    // Try to match known Flutter table structures
-    if(keyStr.indexOf("barcode")>=0&&keyStr.indexOf("name")>=0){
-      log("→ "+sname+": semble être des produits");
-      _old.products=data;
-    } else if(keyStr.indexOf("ticketnumber")>=0&&keyStr.indexOf("totalcents")>=0){
-      log("→ "+sname+": semble être des ventes");
-      _old.sales=data;
-    } else if(keyStr.indexOf("saleid")>=0&&keyStr.indexOf("productname")>=0){
-      log("→ "+sname+": semble être des articles de vente");
-      _old.saleItems=data;
-    } else if(keyStr.indexOf("saleid")>=0&&keyStr.indexOf("method")>=0){
-      log("→ "+sname+": semble être des paiements");
-      _old.payments=data;
-    } else if(keyStr.indexOf("storename")>=0||keyStr.indexOf("ticketfooter")>=0){
-      log("→ "+sname+": semble être les paramètres");
-      _old.settings=first;
-    } else if(keyStr.indexOf("id")>=0&&keyStr.indexOf("name")>=0&&sname.indexOf("cat")>=0){
-      log("→ "+sname+": semble être des catégories");
-      _old.categories=data;
-    }
-  });
-
-  showExtracted();
-}
-
-// ═══════════════════════════════════════════════════════════
-//  SQLITE PARSER (pure JS)
+//  SQLITE PARSER (pure JS, no dependencies)
 // ═══════════════════════════════════════════════════════════
 function parseSQLite(data){
   log("","info");
-  log("═══ PARSING SQLITE ═══","info");
+  log("═══ Parsing SQLite ═══","info");
 
   var pageSz=(data[16]<<8)|data[17];
   if(pageSz===1)pageSz=65536;
   if(pageSz===0)pageSz=4096;
-  log("Page size: "+pageSz);
+  log("Page size: "+pageSz+" bytes");
 
   try{
     var masterRows=readTable(data,pageSz,1);
     log("sqlite_master: "+masterRows.length+" lignes","ok");
 
+    // Convert master rows to objects
+    var masterFields=["type","name","tbl_name","rootpage","sql"];
+    var masterObjs=masterRows.map(function(r){return arrayToObj(r,masterFields);});
+
     var tables={};
-    for(var i=0;i<masterRows.length;i++){
-      var r=masterRows[i];
-      log("  table: '"+r.name+"' rootpage="+r.rootpage);
-      if(r.type==="table"&&r.name!=="sqlite_sequence"){
+    for(var i=0;i<masterObjs.length;i++){
+      var r=masterObjs[i];
+      if(r.type==="table"&&r.name!=="sqlite_sequence"&&r.name!=="_meta"){
         tables[r.name]={rootpage:r.rootpage,sql:r.sql};
+        log("  table: '"+r.name+"' rootpage="+r.rootpage);
       }
     }
 
@@ -533,31 +384,51 @@ function parseSQLite(data){
       try{
         var rows=readTable(data,pageSz,tables[tn].rootpage);
         log("  "+tn+": "+rows.length+" lignes","ok");
-        switch(tn){
-          case "products": _old.products=rows.map(function(r){return arrayToObj(r,["id","createdAt","updatedAt","deletedAt","isDirty","syncVersion","barcode","name","categoryId","purchasePriceCents","salePriceCents","stockQty","unit","lowStockThreshold","expiryDate","vatRateBp","lastSoldAt"]);}); break;
-          case "categories": _old.categories=rows.map(function(r){return arrayToObj(r,["id","name","color"]);}); break;
-          case "sales": _old.sales=rows.map(function(r){return arrayToObj(r,["id","createdAt","updatedAt","deletedAt","isDirty","syncVersion","ticketNumber","registerId","cashierId","subtotalCents","vatTotalCents","totalCents","discountCents","status","voidedAt","voidReason","soldAt"]);}); break;
-          case "sale_items": _old.saleItems=rows.map(function(r){return arrayToObj(r,["id","saleId","productId","productName","qty","unitPurchasePriceCents","unitSalePriceCents","vatRateBp","discountCents","lineTotalCents"]);}); break;
-          case "payments": _old.payments=rows.map(function(r){return arrayToObj(r,["id","saleId","method","amountCents","tenderedCents","changeCents"]);}); break;
-          case "settings": _old.settings=rows.length>0?arrayToObj(rows[0],["id","storeName","address","phone","logoPath","currency","defaultVatRateBp","ticketHeader","ticketFooter","registerId","nextTicketNumber","updatedAt"]):null; break;
+        // Show first 2 rows
+        for(var ri=0;ri<Math.min(2,rows.length);ri++){
+          log("    ["+ri+"]: "+JSON.stringify(rows[ri]).substring(0,200));
         }
+        mapTableToOld(tn,rows);
       }catch(e){
         log("  ❌ Erreur "+tn+": "+e.message,"err");
       }
     }
-    showExtracted();
+    showExtractedAndMigrate();
   }catch(e){
     log("❌ Erreur parsing: "+e.message,"err");
     console.error(e);
   }
 }
 
-function arrayToObj(arr,fields){
-  if(!arr||!Array.isArray(arr)) return arr;
-  var obj={};
-  for(var i=0;i<Math.min(arr.length,fields.length);i++){
-    obj[fields[i]]=arr[i];
+function mapTableToOld(tableName,rows){
+  var fieldMap={
+    "products":["id","createdAt","updatedAt","deletedAt","isDirty","syncVersion","barcode","name","categoryId","purchasePriceCents","salePriceCents","stockQty","unit","lowStockThreshold","expiryDate","vatRateBp","lastSoldAt"],
+    "categories":["id","name","color"],
+    "sales":["id","createdAt","updatedAt","deletedAt","isDirty","syncVersion","ticketNumber","registerId","cashierId","subtotalCents","vatTotalCents","totalCents","discountCents","status","voidedAt","voidReason","soldAt"],
+    "sale_items":["id","saleId","productId","productName","qty","unitPurchasePriceCents","unitSalePriceCents","vatRateBp","discountCents","lineTotalCents"],
+    "payments":["id","saleId","method","amountCents","tenderedCents","changeCents"],
+    "settings":["id","storeName","address","phone","logoPath","currency","defaultVatRateBp","ticketHeader","ticketFooter","registerId","nextTicketNumber","updatedAt"]
+  };
+  var fields=fieldMap[tableName];
+  if(!fields){
+    log("  (table inconnue: "+tableName+")","info");
+    return;
   }
+  var mapped=rows.map(function(r){return arrayToObj(r,fields);});
+  switch(tableName){
+    case"products":_old.products=mapped;break;
+    case"categories":_old.categories=mapped;break;
+    case"sales":_old.sales=mapped;break;
+    case"sale_items":_old.saleItems=mapped;break;
+    case"payments":_old.payments=mapped;break;
+    case"settings":_old.settings=mapped.length>0?mapped[0]:null;break;
+  }
+}
+
+function arrayToObj(arr,fields){
+  if(!arr||!Array.isArray(arr))return arr;
+  var obj={};
+  for(var i=0;i<Math.min(arr.length,fields.length);i++)obj[fields[i]]=arr[i];
   return obj;
 }
 
@@ -565,14 +436,14 @@ function readTable(data,pageSz,rootPage){
   var pageOff=(rootPage-1)*pageSz;
   if(pageOff>=data.length)return[];
   var pageType=data[pageOff];
-  if(pageType===13) return readLeafPage(data,pageOff,pageSz);
+  if(pageType===13)return readLeafPage(data,pageOff,pageSz);
   if(pageType===5){
     var rows=[];
     var nCells=(data[pageOff+3]<<8)|data[pageOff+4];
     var ptrStart=pageOff+8;
     for(var i=0;i<nCells;i++){
       var childPage=(data[ptrStart+i*2]<<8)|data[ptrStart+i*2+1];
-      if(childPage>0) rows=rows.concat(readTable(data,pageSz,childPage));
+      if(childPage>0)rows=rows.concat(readTable(data,pageSz,childPage));
     }
     return rows;
   }
@@ -583,10 +454,11 @@ function readLeafPage(data,pageOff,pageSz){
   var rows=[];
   var nCells=(data[pageOff+3]<<8)|data[pageOff+4];
   var cellStart=(data[pageOff+5]<<8)|data[pageOff+6];
-  if(cellStart===0||cellStart>pageSz) cellStart=pageSz;
+  if(cellStart===0||cellStart>pageSz)cellStart=pageSz;
   var off=pageOff+cellStart;
 
   for(var i=0;i<nCells;i++){
+    if(off>=data.length)break;
     var pv=readVarint(data,off);var payloadLen=pv.v;off=pv.o;
     pv=readVarint(data,off);var rowid=pv.v;off=pv.o;
     var payload=data.slice(off,off+payloadLen);
@@ -625,7 +497,7 @@ function readLeafPage(data,pageOff,pageSz){
   return rows;
 }
 
-// ─── Primitives ─────────────────────────────────────────
+// Primitives
 function readVarint(b,o){var v=0;for(var i=0;i<9;i++){var c=b[o+i];if(i<8){v=(v<<7)|(c&0x7f);if(c<0x80)return{v:v,o:o+i+1};}else{v=(v<<8)|c;return{v:v,o:o+i+1};}}return{v:v,o:o+9};}
 function readI8(b,o){return b[o];}
 function readI16(b,o){return(b[o]<<8)|b[o+1];}
@@ -637,13 +509,48 @@ function readF64(b,o){var a=new Uint8Array(8);for(var i=0;i<8;i++)a[i]=b[o+i];re
 function readStr(b,o,n){var s="";for(var i=0;i<n;i++)s+=String.fromCharCode(b[o+i]);return s;}
 
 // ═══════════════════════════════════════════════════════════
-//  SHOW EXTRACTED & MIGRATE
+//  DIRECT EXTRACTION (non-Drift data)
 // ═══════════════════════════════════════════════════════════
-function showExtracted(){
-  document.getElementById("step3").classList.remove("hidden");
-  document.getElementById("btn3").classList.remove("hidden");
+function directExtract(allData){
+  var storeNames=Object.keys(allData);
+  storeNames.forEach(function(sname){
+    var data=allData[sname]||[];
+    if(data.length===0)return;
+    var first=data[0];
+    if(typeof first!=="object")return;
+    var keys=Object.keys(first);
+    var keyStr=keys.join(",").toLowerCase();
+    if(keyStr.indexOf("barcode")>=0&&keyStr.indexOf("name")>=0){
+      log("→ "+sname+": produits","ok");
+      _old.products=data;
+    } else if(keyStr.indexOf("ticketnumber")>=0&&(keyStr.indexOf("totalcents")>=0||keyStr.indexOf("total")>=0)){
+      log("→ "+sname+": ventes","ok");
+      _old.sales=data;
+    } else if(keyStr.indexOf("saleid")>=0&&keyStr.indexOf("productname")>=0){
+      log("→ "+sname+": articles de vente","ok");
+      _old.saleItems=data;
+    } else if(keyStr.indexOf("saleid")>=0&&keyStr.indexOf("method")>=0){
+      log("→ "+sname+": paiements","ok");
+      _old.payments=data;
+    } else if(keyStr.indexOf("storename")>=0||keyStr.indexOf("ticketfooter")>=0){
+      log("→ "+sname+": paramètres","ok");
+      _old.settings=first;
+    } else if(keyStr.indexOf("id")>=0&&keyStr.indexOf("name")>=0&&(sname.indexOf("cat")>=0)){
+      log("→ "+sname+": catégories","ok");
+      _old.categories=data;
+    } else {
+      log("→ "+sname+": inconnu ("+keys.slice(0,5).join(", ")+")","info");
+    }
+  });
+  showExtractedAndMigrate();
+}
 
-  var h='<table><tr><th>Table</th><th>Nb</th><th>Champs</th></tr>';
+// ═══════════════════════════════════════════════════════════
+//  SHOW RESULTS AND MIGRATE
+// ═══════════════════════════════════════════════════════════
+function showExtractedAndMigrate(){
+  document.getElementById("step3").classList.remove("hidden");
+  var h='<table><tr><th>Table</th><th>Nb</th><th>Détails</th></tr>';
   function row(n,d){var c=d.length>0?(typeof d[0]==="object"?Object.keys(d[0]).length+" champs":"?"):0;return'<tr><td>'+n+'</td><td>'+d.length+'</td><td style="font-size:10px;color:#888;">'+c+'</td></tr>';}
   h+=row("📦 Produits",_old.products);
   h+=row("🏷️ Catégories",_old.categories);
@@ -654,28 +561,32 @@ function showExtracted(){
   h+='</table>';
 
   if(_old.products.length>0){
-    h+='<h3 style="font-size:13px;margin:10px 0 4px;">Produits (5 premiers):</h3>';
-    h+='<table><tr><th>Nom</th><th>Prix (cts)</th><th>Stock</th></tr>';
-    _old.products.slice(0,5).forEach(function(p){
-      h+='<tr><td>'+esc(p.name||"?")+'</td><td>'+(p.salePriceCents||0)+'</td><td>'+(p.stockQty!=null?p.stockQty:"?")+'</td></tr>';
+    h+='<h3 style="font-size:14px;margin:10px 0 4px;">Produits (10 premiers):</h3>';
+    h+='<table><tr><th>Nom</th><th>Barcode</th><th>Prix</th><th>Stock</th></tr>';
+    _old.products.slice(0,10).forEach(function(p){
+      h+='<tr><td>'+esc(p.name||"?")+'</td><td style="font-family:monospace;font-size:10px;">'+esc(p.barcode||"-")+'</td><td>'+(p.salePriceCents||0)+' cts</td><td>'+(p.stockQty!=null?p.stockQty:"?")+'</td></tr>';
     });
     h+='</table>';
   }
 
+  if(_old.products.length===0&&_old.sales.length===0){
+    h+='<div class="status status-err">❌ Aucune donnée extraite. Vérifiez le log ci-dessus.</div>';
+  } else {
+    h+='<button class="btn btn-success" onclick="runMigration()" style="margin-top:12px;">🚀 Migrer '+_old.products.length+' produits et '+_old.sales.length+' ventes</button>';
+  }
   document.getElementById("s3-content").innerHTML=h;
 }
 
+// ═══════════════════════════════════════════════════════════
+//  RUN MIGRATION
+// ═══════════════════════════════════════════════════════════
 function runMigration(){
-  document.getElementById("btn3").disabled=true;
-  var st=document.createElement("div");
-  st.className="status status-info";
-  st.textContent="🚀 Migration en cours...";
-  document.getElementById("step3").appendChild(st);
+  var btn=document.querySelector("#s3-content .btn-success");
+  if(btn)btn.disabled=true;
 
   var catMap={};
   for(var i=0;i<_old.categories.length;i++){
-    var c=_old.categories[i];
-    catMap[c.id]=c.name||"Divers";
+    catMap[_old.categories[i].id]=_old.categories[i].name||"Divers";
   }
 
   function mapCat(name){
@@ -683,32 +594,40 @@ function runMigration(){
     var l=name.toLowerCase();
     if(l.indexOf("viande")>=0||l.indexOf("frais")>=0||l.indexOf("boucherie")>=0||l.indexOf("volaille")>=0)return"viande";
     if(l.indexOf("laitier")>=0||l.indexOf("froid")>=0)return"laitier";
-    if(l.indexOf("épicerie")>=0||l.indexOf("epicerie")>=0||l.indexOf("sec")>=0)return"epicerie";
+    if(l.indexOf("epicerie")>=0||l.indexOf("sec")>=0)return"epicerie";
     if(l.indexOf("boulangerie")>=0)return"boulangerie";
     if(l.indexOf("boisson")>=0||l.indexOf("soda")>=0)return"boisson";
-    if(l.indexOf("surgelé")>=0||l.indexOf("congelé")>=0||l.indexOf("congele")>=0)return"surgelé";
+    if(l.indexOf("surgel")>=0||l.indexOf("congel")>=0)return"surgelé";
     if(l.indexOf("snack")>=0||l.indexOf("biscuit")>=0)return"snack";
-    if(l.indexOf("condiment")>=0||l.indexOf("épice")>=0)return"condiment";
-    if(l.indexOf("ménager")>=0||l.indexOf("menager")>=0)return"menager";
+    if(l.indexOf("condiment")>=0||l.indexOf("pice")>=0)return"condiment";
+    if(l.indexOf("nager")>=0||l.indexOf("menager")>=0)return"menager";
     if(l.indexOf("vin")>=0||l.indexOf("alcool")>=0)return"vin";
+    if(l.indexOf("volaille")>=0||l.indexOf("poulet")>=0||l.indexOf("canard")>=0||l.indexOf("dinde")>=0)return"volaille";
     return"autre";
   }
 
   var prodCount=0,salesCount=0,settingsOk=false;
   var promises=[];
 
+  // Migrate products
   for(var pi=0;pi<_old.products.length;pi++){
     var p=_old.products[pi];
     var name=p.name||"";
     var barcode=p.barcode||"";
     if(!name&&!barcode)continue;
     var catName=catMap[p.categoryId]||p.categoryId||"";
+    var salePrice=p.salePriceCents||0;
+    var purPrice=p.purchasePriceCents||0;
+    var stock=p.stockQty!=null?p.stockQty:0;
     promises.push(idbPut("acim-catalog","products",{
       barcode:barcode||("MIGR-"+Date.now()+"-"+pi),
       name:name,
-      sale_price_cents:p.salePriceCents||0,
+      sale_price_cents:salePrice,
+      purchase_price_cents:purPrice,
       category:mapCat(catName),
-      stockQty:p.stockQty||0,
+      stockQty:stock,
+      lowStockThreshold:p.lowStockThreshold||5,
+      expiryDate:p.expiryDate||null,
       unitType:p.unit||null,
       source:"flutter-migration",
       last_updated:Date.now()
@@ -718,6 +637,7 @@ function runMigration(){
 
   Promise.all(promises).then(function(){
     promises=[];
+    // Migrate sales
     for(var si=0;si<_old.sales.length;si++){
       var sale=_old.sales[si];
       if(sale.status==="voided"||sale.status==="cancelled")continue;
@@ -729,13 +649,13 @@ function runMigration(){
         if(it.saleId!==saleId)continue;
         items.push({name:it.productName||"",price:it.unitSalePriceCents||0,barcode:it.productId||"",cat:"autre",weight:null,unitType:null,pricePerUnit:null,discountCents:it.discountCents||0,qty:it.qty||1});
       }
-      var payments=[];
+      var payms=[];
       for(var ai=0;ai<_old.payments.length;ai++){
         var pa=_old.payments[ai];
         if(pa.saleId!==saleId)continue;
-        payments.push({method:pa.method||"especes",amountCents:pa.amountCents||0,tenderedCents:pa.tenderedCents||pa.amountCents||0,changeCents:pa.changeCents||0});
+        payms.push({method:pa.method||"especes",amountCents:pa.amountCents||0,tenderedCents:pa.tenderedCents||pa.amountCents||0,changeCents:pa.changeCents||0});
       }
-      promises.push(idbPut("acim-sales","sales",{ticketNumber:sale.ticketNumber||0,timestamp:ts,isoTime:new Date(ts).toISOString(),items:items,totalCents:sale.totalCents||0,discountCents:sale.discountCents||0,payments:payments,itemCount:items.length}));
+      promises.push(idbPut("acim-sales","sales",{ticketNumber:sale.ticketNumber||0,timestamp:ts,isoTime:new Date(ts).toISOString(),items:items,totalCents:sale.totalCents||0,discountCents:sale.discountCents||0,payments:payms,itemCount:items.length}));
       salesCount++;
     }
     return Promise.all(promises);
@@ -748,14 +668,12 @@ function runMigration(){
     }
     return Promise.all(promises);
   }).then(function(){
-    st.textContent="✅ Migration terminée!";
-    st.className="status status-ok";
-    document.getElementById("step4").classList.remove("hidden");
-    document.getElementById("s4-status").innerHTML="📦 <strong>"+prodCount+" produits</strong> migrés<br>💰 <strong>"+salesCount+" ventes</strong> migrées<br>⚙️ Paramètres: "+(settingsOk?"transférés":"non trouvés");
+    document.getElementById("step3").innerHTML='<div class="status status-ok" style="font-size:16px;">✅ Migration terminée !</div>'+
+      '<p style="margin:12px 0;">📦 <strong>'+prodCount+' produits</strong> migrés<br>💰 <strong>'+salesCount+' ventes</strong> migrées<br>⚙️ Paramètres: '+(settingsOk?"transférés":"non trouvés")+'</p>'+
+      '<a href="index.html" class="btn btn-info" style="display:inline-block;text-decoration:none;">🏪 Ouvrir AcimCaisse</a>'+
+      '<button class="btn btn-primary" onclick="location.reload()" style="margin-left:8px;">🔄 Revérifier</button>';
   }).catch(function(err){
-    st.textContent="❌ Erreur: "+err.message;
-    st.className="status status-err";
-    document.getElementById("btn3").disabled=false;
+    document.getElementById("step3").innerHTML='<div class="status status-err">❌ Erreur migration: '+err.message+'</div>';
   });
 }
 
@@ -773,6 +691,7 @@ function idbPut(dbName,storeName,data){
       };
       req.onsuccess=function(e){
         var db=e.target.result;
+        if(!db.objectStoreNames.contains(storeName)){ok();return;}
         var tx=db.transaction(storeName,"readwrite");
         tx.objectStore(storeName).put(data);
         tx.oncomplete=function(){ok();};
