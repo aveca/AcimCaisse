@@ -256,10 +256,17 @@
     }).then(function(data){
       var products=data.products||[];
       if(!Array.isArray(products)||products.length===0)return 0;
+      // Normalize supplier catalog for matching
+      _supplierCatalog=products.map(function(p){
+        return{
+          barcode:p.ean||"",name:p.name||"",code:p.code||"",
+          category:p.category||"",ean:p.ean||""
+        };
+      });
       var catMap={"Congele":"surgelé","Frais":"viande","Sec":"snack","Divers":"epicerie"};
       var chain=Promise.resolve();
       var count=0;
-      for(var i=0;i<products.length;i++){
+      for(var i=0;i<_supplierCatalog.length;i++){
         (function(p){
           chain=chain.then(function(){
             var bc=p.ean||"";
@@ -268,9 +275,17 @@
             if(!bc||!name)return;
             return _dbPut({barcode:bc,name:name,sale_price_cents:0,category:cat,stockQty:0,low_stock_threshold:5,source:"yarden-catalog",last_updated:Date.now()}).then(function(){count++;});
           });
-        })(products[i]);
+        })(_supplierCatalog[i]);
       }
-      return chain.then(function(){return count;});
+      return chain.then(function(){
+        // Save normalized catalog to meta for reload on startup
+        _openMeta().then(function(d){
+          if(!d)return;
+          var tx=d.transaction("meta","readwrite");
+          tx.objectStore("meta").put({key:"supplier-catalog",value:_supplierCatalog});
+        });
+        return count;
+      });
     });
   }
 
@@ -1331,7 +1346,7 @@
     desc.textContent="Sélectionnez un fichier PDF de facture fournisseur. Le texte sera extrait (OCR si nécessaire) puis vérifiable avant import.";
     card.appendChild(desc);
 
-    var fileInput=document.createElement("input");fileInput.type="file";fileInput.accept=".pdf,.json";
+    var fileInput=document.createElement("input");fileInput.type="file";fileInput.accept=".pdf,.json";fileInput.multiple=true;
     fileInput.style.cssText="width:100%;padding:10px;border:2px dashed #e0e0e0;border-radius:8px;font-size:14px;cursor:pointer;margin-bottom:12px;";
     card.appendChild(fileInput);
 
@@ -1342,7 +1357,7 @@
     var previewArea=document.createElement("div");previewArea.style.cssText="display:none;margin-bottom:12px;";
     var previewLabel=document.createElement("div");previewLabel.style.cssText="font-size:11px;color:#888;margin-bottom:4px;";
     previewLabel.textContent="Texte extrait (vérifiable) :";previewArea.appendChild(previewLabel);
-    var previewTA=document.createElement("textarea");previewTA.rows=8;
+    var previewTA=document.createElement("textarea");previewTA.rows=6;
     previewTA.style.cssText="width:100%;font-size:11px;font-family:monospace;padding:8px;border:1px solid #e0e0e0;border-radius:6px;resize:vertical;box-sizing:border-box;";
     previewArea.appendChild(previewTA);
     card.appendChild(previewArea);
@@ -1351,72 +1366,139 @@
     var countDiv=document.createElement("div");countDiv.style.cssText="font-size:13px;font-weight:700;color:#e65100;min-height:20px;margin-bottom:8px;";
     card.appendChild(countDiv);
 
+    var allParsedProducts=[];
+    var totalFiles=0;
+
     fileInput.onchange=function(e){
-      var file=e.target.files[0];
-      if(!file)return;
-      statusDiv.textContent="⏳ Chargement de "+file.name+"...";
+      var files=e.target.files;
+      if(!files||files.length===0)return;
+      allParsedProducts=[];
+      totalFiles=files.length;
+      statusDiv.textContent="⏳ Traitement de "+files.length+" fichier(s)...";
       previewArea.style.display="none";
       countDiv.textContent="";
+      var fileChain=Promise.resolve();
+      for(var fi=0;fi<files.length;fi++){
+        (function(file){
+          fileChain=fileChain.then(function(){return _processInvoiceFile(file,statusDiv,previewTA,previewArea).then(function(prods){
+            if(prods&&prods.length>0){
+              // Before adding, try to find real EAN from supplier catalog
+              var enriched=[];
+              for(var pi=0;pi<prods.length;pi++){
+                var pp=prods[pi];
+                // If no real barcode (made-up INV-...), try to find in supplier catalog
+                if(!pp.barcode||pp.barcode.indexOf("INV-")===0){
+                  var found=_findInSupplierCatalog(pp.name,pp.barcode);
+                  if(found&&found.ean){
+                    pp.barcode=found.ean;
+                  }
+                }
+                enriched.push(pp);
+              }
+              allParsedProducts=allParsedProducts.concat(enriched);
+            }
+          });});
+        })(files[fi]);
+      }
+      fileChain.then(function(){
+        if(allParsedProducts.length>0){
+          statusDiv.textContent="✅ "+totalFiles+" fichier(s) traités: "+allParsedProducts.length+" produit(s) extraits";
+          countDiv.textContent=allParsedProducts.length+" produit(s) détecté(s)";
+          window._acimParsedProducts=allParsedProducts;
+        }else{
+          statusDiv.textContent="❌ Aucun produit extrait des fichiers sélectionnés.";
+        }
+      });
+    };
 
-      var lowerName=file.name.toLowerCase();
-      if(lowerName.endsWith(".json")){
-        // JSON import
-        var reader=new FileReader();
-        reader.onload=function(ev){
-          try{
-            var data=JSON.parse(ev.target.result);
-            var products=data.products||data;
-            var count=0;
-            if(Array.isArray(products)){
+    function _findInSupplierCatalog(name,barcode){
+      if(!_supplierCatalog||!_supplierCatalog.length)return null;
+      // First try exact barcode match
+      if(barcode){
+        for(var si=0;si<_supplierCatalog.length;si++){
+          if(_supplierCatalog[si].ean===barcode||_supplierCatalog[si].code===barcode)return _supplierCatalog[si];
+        }
+      }
+      // Then try name match
+      if(name){
+        var best=null,bestScore=0;
+        var nLower=name.toLowerCase();
+        for(var si2=0;si2<_supplierCatalog.length;si2++){
+          var cn=(_supplierCatalog[si2].name||"").toLowerCase();
+          var score=_fuzzyNameScore(nLower,cn);
+          if(score>bestScore&&score>=60){bestScore=score;best=_supplierCatalog[si2];}
+        }
+        if(best)return best;
+      }
+      return null;
+    }
+    function _fuzzyNameScore(a,b){
+      if(a===b)return 100;
+      // Word overlap
+      var wa=a.split(/\s+/),wb=b.split(/\s+/);
+      var common=0;
+      for(var i=0;i<wa.length;i++){
+        for(var j=0;j<wb.length;j++){
+          if(wa[i].length>2&&wa[i]===wb[j]){common++;break;}
+        }
+      }
+      var maxLen=Math.max(wa.length,wb.length);
+      var wordScore=maxLen>0?Math.round(common/maxLen*100):0;
+      // Levenshtein
+      var lev=_levenshtein(a,b);
+      var max=Math.max(a.length,b.length);
+      var levScore=max>0?Math.round((1-lev/max)*100):0;
+      return Math.max(wordScore,levScore);
+    }
+    function _levenshtein(a,b){
+      if(a.length===0)return b.length;if(b.length===0)return a.length;
+      var m=[];for(var i=0;i<=b.length;i++)m[i]=[i];for(var j=0;j<=a.length;j++)m[0][j]=j;
+      for(i=1;i<=b.length;i++){for(j=1;j<=a.length;j++){m[i][j]=a[j-1]===b[i-1]?m[i-1][j-1]:Math.min(m[i-1][j-1],m[i-1][j],m[i][j-1])+1;}}
+      return m[b.length][a.length];
+    }
+    function _processInvoiceFile(file,statusDiv,previewTA,previewArea){
+      return new Promise(function(resolve){
+        var lowerName=file.name.toLowerCase();
+        if(lowerName.endsWith(".json")){
+          var reader=new FileReader();
+          reader.onload=function(ev){
+            try{
+              var data=JSON.parse(ev.target.result);
+              var products=data.products||data;
+              if(!Array.isArray(products)){resolve([]);return;}
+              var result=[];
               products.forEach(function(p){
                 var name=p.name||p.n||p.designation||"";
                 var price=p.sale_price_cents||p.p||p.price_cents||0;
                 var barcode=p.barcode||p.bc||"INV-"+Date.now()+"-"+Math.floor(Math.random()*9999);
+                var qty=p.qty||p.quantity||1;
                 var stock=p.stockQty||p.s||0;
-                if(name){
-                  _dbPut({barcode:barcode,name:name,sale_price_cents:price,category:"epicerie",stockQty:stock,source:"invoice-import",last_updated:Date.now()});
-                  count++;
-                }
+                result.push({barcode:barcode,name:name,unitPrice:price/100,qty:qty,stockQty:stock,totalCents:Math.round(price*qty)});
               });
-            }
-            statusDiv.textContent="✅ "+count+" produits importés!";
-            _refreshAndFilter();
-          }catch(ex){statusDiv.textContent="❌ Erreur JSON: "+ex.message;}
-        };
-        reader.readAsText(file);
-      }else if(lowerName.endsWith(".pdf")){
-        // PDF import via acimExtractPdfText
-        if(!window.acimExtractPdfText){
-          statusDiv.textContent="❌ Module d'extraction PDF non chargé. Rechargez la page.";
-          return;
+              resolve(result);
+            }catch(ex){resolve([]);}
+          };
+          reader.readAsText(file);
+        }else if(lowerName.endsWith(".pdf")){
+          if(!window.acimExtractPdfText){statusDiv.textContent="❌ Module PDF non chargé.";resolve([]);return;}
+          var reader2=new FileReader();
+          reader2.onload=function(ev){
+            statusDiv.textContent="⏳ Extraction PDF: "+file.name+"...";
+            var bytes=new Uint8Array(ev.target.result);
+            window.acimExtractPdfText(bytes).then(function(rawText){
+              if(!rawText||!rawText.trim()){resolve([]);return;}
+              previewArea.style.display="block";
+              previewTA.value+=rawText+"\n\n--- "+file.name+" ---\n\n";
+              var products=_parseInvoiceText(rawText);
+              resolve(products);
+            }).catch(function(){resolve([]);});
+          };
+          reader2.readAsArrayBuffer(file);
+        }else{
+          resolve([]);
         }
-        var reader2=new FileReader();
-        reader2.onload=function(ev){
-          statusDiv.textContent="⏳ Extraction du texte du PDF (OCR si nécessaire)...";
-          var bytes=new Uint8Array(ev.target.result);
-          window.acimExtractPdfText(bytes).then(function(rawText){
-            if(!rawText||!rawText.trim()){
-              statusDiv.textContent="❌ Aucun texte extrait du PDF.";
-              return;
-            }
-            statusDiv.textContent="✅ Texte extrait! Vérifiez puis importez.";
-            previewTA.value=rawText;
-            previewArea.style.display="block";
-
-            // Parse products from extracted text
-            var products=_parseInvoiceText(rawText);
-            countDiv.textContent=products.length+" produit(s) détecté(s)";
-            window._acimParsedProducts=products;
-          }).catch(function(err){
-            statusDiv.textContent="❌ Erreur extraction: "+err.message;
-            console.error("[AcimCaisse] PDF extraction error:",err);
-          });
-        };
-        reader2.readAsArrayBuffer(file);
-      }else{
-        statusDiv.textContent="❌ Format non supporté. Utilisez PDF ou JSON.";
-      }
-    };
+      });
+    }
 
     // Parse invoice text into products (flexible parser)
     function _parseInvoiceText(text){
