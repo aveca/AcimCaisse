@@ -465,7 +465,7 @@
   function _cartSubtotal(){
     var t=0;for(var i=0;i<_myCart.length;i++)t+=_myCart[i].priceCents;return t;
   }
-  function _cartTotal(){return _cartSubtotal()-_cartDiscountCents;}
+  function _cartTotal(){return Math.max(0,_cartSubtotal()-_cartDiscountCents);}
 
   // ─── WEIGHT HELPERS ──────────────────────────────────
   function _isWeightProduct(item){return item.weight!=null&&item.unitType!=null&&item.pricePerUnit!=null;}
@@ -769,7 +769,6 @@
       };
       ic.appendChild(ub);
       card.appendChild(ic);
-      card.appendChild(ic);
 
       var nm=document.createElement("div");
       nm.style.cssText="font-size:15px;font-weight:600;color:#1a1a2e;line-height:1.2;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;";
@@ -910,17 +909,21 @@
   }
 
   // ─── SCANNER BUFFER ──────────────────────────────────
-  var _scanBuf="",_scanTimer=null;
+  var _scanBuf="",_scanTimer=null,_scanning=false;
   document.addEventListener("keydown",function(e){
     if(!_pos||_pos.style.display==="none")return;
-    var tag=document.activeElement?document.activeElement.tagName:"";
-    if(tag==="INPUT"||tag==="TEXTAREA"||tag==="SELECT")return;
     if(/^[0-9]$/.test(e.key)){
+      if(!_scanning){
+        var tag=document.activeElement?document.activeElement.tagName:"";
+        if(tag==="INPUT"||tag==="TEXTAREA"||tag==="SELECT")return;
+      }
+      _scanning=true;
       _scanBuf+=e.key;
-      _posSearch.value=_scanBuf;_posSearch.focus();
+      _posSearch.value=_scanBuf;
       _filterProducts();
       clearTimeout(_scanTimer);_scanTimer=setTimeout(function(){
         var bc=_scanBuf;
+        _scanning=false;
         if(bc.length>=4){_posSearch.value="";_processBarcode(bc);}
         else{_posSearch.value="";}
         _scanBuf="";
