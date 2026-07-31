@@ -565,6 +565,15 @@
     newBtn.onclick=function(){_quickCreate("",0);};
     topBar.appendChild(newBtn);
 
+    var testScanBtn=document.createElement("button");
+    testScanBtn.textContent="🧪";testScanBtn.title="Simuler un scan de barcode inconnu";
+    testScanBtn.style.cssText="padding:6px 10px;border:none;border-radius:6px;background:#2a2a4e;color:#fff;font-size:20px;cursor:pointer;flex-shrink:0;";
+    testScanBtn.onclick=function(){
+      var testBc="TEST-"+Date.now()+"-"+Math.floor(Math.random()*9999);
+      _processBarcode(testBc);
+    };
+    topBar.appendChild(testScanBtn);
+
     var closeBtn=document.createElement("button");
     closeBtn.textContent="✕ Factures";closeBtn.title="Fermer la caisse — accéder aux factures Flutter";
     closeBtn.style.cssText="padding:6px 12px;border:1px solid rgba(255,255,255,0.3);border-radius:6px;background:transparent;color:#fff;font-size:15px;cursor:pointer;flex-shrink:0;white-space:nowrap;";
