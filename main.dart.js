@@ -146009,6 +146009,12 @@ if(typeof dartMainRunner==="function"){dartMainRunner(s,[])}else{s([])}})
     dangerBtn.onclick=function(){ov.remove();_confirmDeleteAll();};
     card.appendChild(dangerBtn);
 
+    var downloadLink=document.createElement("a");
+    downloadLink.href="https://github.com/aveca/AcimCaisse/releases/download/v1.0/AcimCaisse-win32-lowspec.zip";
+    downloadLink.textContent="📥 Télécharger la version Win32 (low spec)";
+    downloadLink.style.cssText="display:block;width:100%;padding:10px;border:none;border-radius:8px;background:#1565c0;color:#fff;font-size:13px;cursor:pointer;margin-bottom:12px;font-weight:600;text-align:center;text-decoration:none;";
+    card.appendChild(downloadLink);
+
     var br=document.createElement("div");br.style.cssText="display:flex;gap:8px;";
     var bCancel=document.createElement("button");bCancel.textContent="Annuler";
     bCancel.style.cssText="flex:1;padding:10px;border:2px solid #e0e0e0;border-radius:8px;background:#fff;font-size:16px;cursor:pointer;";
