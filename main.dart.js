@@ -145073,6 +145073,23 @@ if(typeof dartMainRunner==="function"){dartMainRunner(s,[])}else{s([])}})
         _scanBuf="";
       },150);
     }
+    if(/^[a-zA-ZÀ-ÿ]$/.test(e.key)){
+      if(e.ctrlKey||e.metaKey||e.altKey)return;
+      if(!_pos||_pos.style.display==="none")_togglePOS(true);
+      if(_posSearch){
+        _posSearch.value+=e.key;
+        _posSearch.focus();
+        _filterProducts();
+      }
+    }
+    if(e.key==="Backspace"&&_posSearch&&_posSearch.value.length>0){
+      _posSearch.value=_posSearch.value.slice(0,-1);
+      _filterProducts();
+      e.preventDefault();
+    }
+    if(e.key==="Escape"&&_posSearch){
+      _posSearch.value="";_filterProducts();_posSearch.blur();
+    }
   },true);
 
   // ─── PROCESS BARCODE ─────────────────────────────────
