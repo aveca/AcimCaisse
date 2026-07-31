@@ -2093,13 +2093,13 @@
         var ppuCents=Math.round(ppu*100);
         _addToCart(nn,0,useBc,selCat,null,unitType,ppuCents);
         _dbPut({barcode:useBc,name:nn,sale_price_cents:0,category:selCat,stockQty:stockQty,pricePerUnit:ppuCents,unitType:unitType,purchase_price_cents:Math.round((parseFloat(ppIn.value)||0)*100),low_stock_threshold:parseInt(thIn.value)||5,expiry_date:expIn.value||null,source:"manual-weight",last_updated:Date.now()});
-        ov.remove();_toast("⚖️ "+nn+" — "+_formatPricePerUnit(ppuCents,unitType));
+        ov.remove();_refreshAndFilter();_toast("⚖️ "+nn+" — "+_formatPricePerUnit(ppuCents,unitType));
       }else{
         var np=parseFloat(pi.value);
         var pc=isNaN(np)?0:Math.round(np*100);
         _addToCart(nn,pc,useBc,selCat);
         _dbPut({barcode:useBc,name:nn,sale_price_cents:pc,category:selCat,stockQty:stockQty,purchase_price_cents:Math.round((parseFloat(ppIn.value)||0)*100),low_stock_threshold:parseInt(thIn.value)||5,expiry_date:expIn.value||null,source:"manual",last_updated:Date.now()});
-        ov.remove();_toast("✅ "+nn+(pc>0?" "+(pc/100).toFixed(2)+"€":""));
+        ov.remove();_refreshAndFilter();_toast("✅ "+nn+(pc>0?" "+(pc/100).toFixed(2)+"€":""));
       }
     };
     br.appendChild(bCancel);br.appendChild(bOk);card.appendChild(br);
