@@ -2015,6 +2015,19 @@
       card.remove();
       _myCart[idx].name=nn;_myCart[idx].priceCents=pc;_myCart[idx].cat=selCat;
       _myCart[idx].weight=weight;_myCart[idx].unitType=unitType;_myCart[idx].pricePerUnit=pricePerUnit;
+      if(item.bc){
+        _dbGet(item.bc).then(function(existing){
+          if(existing){
+            existing.name=nn;
+            if(pc>0)existing.sale_price_cents=pc;
+            existing.category=selCat;
+            if(weight!=null)existing.pricePerUnit=pricePerUnit;
+            if(unitType)existing.unitType=unitType;
+            existing.last_updated=Date.now();
+            _dbPut(existing).then(function(){_refreshAndFilter();});
+          }
+        });
+      }
       _toast("✅ "+nn+(pc>0?" "+(pc/100).toFixed(2)+"€":""));
       _renderPOS();
     };
