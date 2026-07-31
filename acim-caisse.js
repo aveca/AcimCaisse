@@ -2135,12 +2135,44 @@
     document.body.appendChild(a);a.click();document.body.removeChild(a);
     URL.revokeObjectURL(url);
   }
+  function _exportDartFormat(){
+    return _dbGetAll().then(function(products){
+      var catMap={"frais":"Frais","epicerie":"Sec","surgele":"Congele","autre":"Divers","vin":"Vin","alcool":"Alcool"};
+      var catIds={};var cats=[];
+      ["frais","epicerie","surgele","autre","vin","alcool"].forEach(function(c){
+        var id="cat-"+c;catIds[c]=id;
+        cats.push({id:id,createdAt:Date.now(),updatedAt:Date.now(),deletedAt:null,isDirty:true,syncVersion:0,name:catMap[c]||"Divers",color:null});
+      });
+      var dartProducts=(products||[]).map(function(p){
+        return {
+          id:"p-"+(p.barcode||"").replace(/[^a-zA-Z0-9]/g,""),
+          createdAt:p.last_updated||Date.now(),updatedAt:p.last_updated||Date.now(),
+          deletedAt:null,isDirty:true,syncVersion:0,
+          barcode:p.barcode||null,name:p.name||"Sans nom",
+          categoryId:catIds[p.category]||catIds["autre"],
+          purchasePriceCents:p.purchase_price_cents||0,
+          salePriceCents:p.sale_price_cents||0,
+          stockQty:p.stockQty||0,unit:p.unitType||"pc",
+          lowStockThreshold:p.low_stock_threshold||5,
+          expiryDate:p.expiry_date||null,vatRateBp:2000,lastSoldAt:null
+        };
+      });
+      return {
+        format:1,schemaVersion:3,exportedAt:new Date().toISOString(),
+        categories:cats,products:dartProducts,sales:[],saleItems:[],
+        payments:[],stockMovements:[],
+        users:[{id:"u-admin",createdAt:Date.now(),updatedAt:Date.now(),deletedAt:null,isDirty:true,syncVersion:0,name:"Administrateur",role:"admin",pinHash:null,pinSalt:null}],
+        settings:[{id:"default",storeName:"Mon magasin",address:null,phone:null,logoPath:null,currency:"EUR",defaultVatRateBp:2000,ticketHeader:null,ticketFooter:null,registerId:""+Date.now(),nextTicketNumber:1,updatedAt:Date.now()}],
+        orders:[]
+      };
+    });
+  }
   function _showExportDialog(){
     var old=document.getElementById("acim-export");if(old)old.remove();
     var ov=document.createElement("div");ov.id="acim-export";
     ov.style.cssText="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:10000002;display:flex;align-items:center;justify-content:center;";
     var card=document.createElement("div");
-    card.style.cssText="background:#fff;border-radius:14px;padding:20px;width:380px;max-width:95vw;box-shadow:0 8px 24px rgba(0,0,0,0.3);font-family:Segoe UI,Arial,sans-serif;";
+    card.style.cssText="background:#fff;border-radius:14px;padding:20px;width:420px;max-width:95vw;box-shadow:0 8px 24px rgba(0,0,0,0.3);font-family:Segoe UI,Arial,sans-serif;";
     var ti=document.createElement("div");ti.style.cssText="font-size:22px;font-weight:700;margin-bottom:12px;color:#1a1a2e;text-align:center;";
     ti.textContent="📤 Exporter mes données";card.appendChild(ti);
     var desc=document.createElement("div");desc.style.cssText="font-size:12px;color:#666;margin-bottom:16px;text-align:center;";
@@ -2148,28 +2180,48 @@
     card.appendChild(desc);
     var statusDiv=document.createElement("div");statusDiv.style.cssText="font-size:13px;color:#666;min-height:20px;margin-bottom:12px;text-align:center;";
     card.appendChild(statusDiv);
-    var br=document.createElement("div");br.style.cssText="display:flex;gap:8px;";
-    var bClose=document.createElement("button");bClose.textContent="Annuler";
-    bClose.style.cssText="flex:1;padding:10px;border:2px solid #e0e0e0;border-radius:8px;background:#fff;font-size:14px;cursor:pointer;";
-    bClose.onclick=function(){ov.remove();};
-    var bExport=document.createElement("button");bExport.textContent="📤 Télécharger le fichier";
-    bExport.style.cssText="flex:2;padding:10px;border:none;border-radius:8px;background:#1565c0;color:#fff;font-size:14px;cursor:pointer;font-weight:700;";
-    bExport.onclick=function(){
-      statusDiv.textContent="⏳ Préparation de l'export...";
-      bExport.disabled=true;bExport.style.opacity="0.5";
+
+    var bExportJS=document.createElement("button");bExportJS.textContent="📤 Format JS (caisse)";
+    bExportJS.style.cssText="width:100%;padding:10px;border:none;border-radius:8px;background:#1565c0;color:#fff;font-size:14px;cursor:pointer;font-weight:700;margin-bottom:8px;";
+    bExportJS.onclick=function(){
+      statusDiv.textContent="⏳ Préparation de l'export JS...";
+      bExportJS.disabled=true;bExportJS.style.opacity="0.5";
       _exportAllData().then(function(data){
         var dateStr=new Date().toISOString().slice(0,10);
-        var filename="acimcaisse-backup-"+dateStr+".json";
+        var filename="acimcaisse-backup-js-"+dateStr+".json";
         _downloadJSON(data,filename);
         statusDiv.textContent="✅ Fichier téléchargé: "+filename;
         statusDiv.style.color="#2e7d32";
       }).catch(function(err){
         statusDiv.textContent="❌ Erreur: "+err.message;
         statusDiv.style.color="#c62828";
-        bExport.disabled=false;bExport.style.opacity="1";
-      });
+      }).then(function(){bExportJS.disabled=false;bExportJS.style.opacity="1";});
     };
-    br.appendChild(bClose);br.appendChild(bExport);card.appendChild(br);
+    card.appendChild(bExportJS);
+
+    var bExportDart=document.createElement("button");bExportDart.textContent="📤 Format Flutter (version B)";
+    bExportDart.style.cssText="width:100%;padding:10px;border:none;border-radius:8px;background:#2e7d32;color:#fff;font-size:14px;cursor:pointer;font-weight:700;margin-bottom:8px;";
+    bExportDart.onclick=function(){
+      statusDiv.textContent="⏳ Préparation de l'export Flutter...";
+      bExportDart.disabled=true;bExportDart.style.opacity="0.5";
+      _exportDartFormat().then(function(data){
+        var dateStr=new Date().toISOString().slice(0,10);
+        var filename="acimcaisse-backup-flutter-"+dateStr+".json";
+        _downloadJSON(data,filename);
+        statusDiv.textContent="✅ Fichier téléchargé: "+filename;
+        statusDiv.style.color="#2e7d32";
+      }).catch(function(err){
+        statusDiv.textContent="❌ Erreur: "+err.message;
+        statusDiv.style.color="#c62828";
+      }).then(function(){bExportDart.disabled=false;bExportDart.style.opacity="1";});
+    };
+    card.appendChild(bExportDart);
+
+    var br=document.createElement("div");br.style.cssText="display:flex;gap:8px;margin-top:8px;";
+    var bClose=document.createElement("button");bClose.textContent="Annuler";
+    bClose.style.cssText="flex:1;padding:10px;border:2px solid #e0e0e0;border-radius:8px;background:#fff;font-size:14px;cursor:pointer;";
+    bClose.onclick=function(){ov.remove();};
+    br.appendChild(bClose);card.appendChild(br);
     ov.appendChild(card);ov.onclick=function(e){if(e.target===ov)ov.remove();};
     document.body.appendChild(ov);
   }
@@ -2234,6 +2286,31 @@
       if(!parsedData)return;
       bImport.disabled=true;bImport.style.opacity="0.5";
       statusDiv.textContent="⏳ Importation en cours...";
+
+      // Converter: Flutter format → JS format
+      if(parsedData.schemaVersion&&parsedData.format){
+        var catMap={};
+        (parsedData.categories||[]).forEach(function(c){
+          var catName=(c.name||"divers").toLowerCase().replace(/[^a-z]/g,"");
+          var mapped="autre";
+          if(catName.indexOf("frais")>=0)mapped="frais";
+          else if(catName.indexOf("sec")>=0)mapped="epicerie";
+          else if(catName.indexOf("congel")>=0)mapped="surgele";
+          else if(catName.indexOf("vin")>=0)mapped="vin";
+          else if(catName.indexOf("alcool")>=0)mapped="alcool";
+          else if(catName.indexOf("divers")>=0)mapped="autre";
+          catMap[c.id]=mapped;
+        });
+        (parsedData.products||[]).forEach(function(p){
+          if(!p.barcode&&p.barcode!==0)return;
+          p.category=catMap[p.categoryId]||p.category||"autre";
+          if(p.salePriceCents!==undefined)p.sale_price_cents=p.salePriceCents;
+          if(p.purchasePriceCents!==undefined)p.purchase_price_cents=p.purchasePriceCents;
+          if(p.stockQty!==undefined)p.stockQty=p.stockQty;
+          if(p.lowStockThreshold!==undefined)p.low_stock_threshold=p.lowStockThreshold;
+        });
+      }
+
       var products=parsedData.products||[];
       var sales=parsedData.sales||[];
       var meta=parsedData.meta||{};
