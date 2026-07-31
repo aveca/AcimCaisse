@@ -920,7 +920,6 @@
   // ─── SCANNER BUFFER ──────────────────────────────────
   var _scanBuf="",_scanTimer=null,_scanning=false;
   document.addEventListener("keydown",function(e){
-    if(!_pos||_pos.style.display==="none")return;
     if(/^[0-9]$/.test(e.key)){
       if(!_scanning){
         var tag=document.activeElement?document.activeElement.tagName:"";
@@ -928,13 +927,20 @@
       }
       _scanning=true;
       _scanBuf+=e.key;
-      _posSearch.value=_scanBuf;
-      _filterProducts();
+      if(_pos&&_pos.style.display!=="none"&&_posSearch){
+        _posSearch.value=_scanBuf;
+        _filterProducts();
+      }
       clearTimeout(_scanTimer);_scanTimer=setTimeout(function(){
         var bc=_scanBuf;
         _scanning=false;
-        if(bc.length>=4){_posSearch.value="";_processBarcode(bc);}
-        else{_posSearch.value="";}
+        if(bc.length>=4){
+          if(_pos&&_pos.style.display!=="none"&&_posSearch)_posSearch.value="";
+          _processBarcode(bc);
+          if(!_pos||_pos.style.display==="none")_togglePOS(true);
+        }else{
+          if(_pos&&_pos.style.display!=="none"&&_posSearch)_posSearch.value="";
+        }
         _scanBuf="";
       },150);
     }
