@@ -846,7 +846,8 @@
       var row=document.createElement("div");
       var isZero=item.price===0;
       var isWeighed=_isWeightProduct(item);
-      row.style.cssText="display:flex;align-items:center;padding:8px 10px;border-bottom:1px solid #f0f0f0;transition:background .15s;";
+      row.style.cssText="display:flex;align-items:center;padding:8px 10px;border-bottom:1px solid #f0f0f0;transition:background .15s;cursor:pointer;";
+      row.onclick=function(){_inlineEdit(item.idx,50,50);};
       row.onmouseenter=function(){this.style.background="#fafafa";};
       row.onmouseleave=function(){this.style.background="transparent";};
 
