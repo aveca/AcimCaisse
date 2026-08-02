@@ -920,11 +920,8 @@
   // ─── SCANNER BUFFER ──────────────────────────────────
   var _scanBuf="",_scanTimer=null,_scanning=false;
   document.addEventListener("keydown",function(e){
+    // Scan toujours prioritaire, quel que soit le focus
     if(/^[0-9]$/.test(e.key)){
-      if(!_scanning){
-        var tag=document.activeElement?document.activeElement.tagName:"";
-        if(tag==="INPUT"||tag==="TEXTAREA"||tag==="SELECT")return;
-      }
       _scanning=true;
       _scanBuf+=e.key;
       if(_pos&&_pos.style.display!=="none"&&_posSearch){
@@ -946,8 +943,6 @@
     }
     if(/^[a-zA-ZÀ-ÿ]$/.test(e.key)){
       if(e.ctrlKey||e.metaKey||e.altKey)return;
-      var tag=document.activeElement?document.activeElement.tagName:"";
-      if(tag==="INPUT"||tag==="TEXTAREA"||tag==="SELECT")return;
       if(!_pos||_pos.style.display==="none")_togglePOS(true);
       if(_posSearch){
         _posSearch.value+=e.key;
