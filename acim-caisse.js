@@ -25,7 +25,7 @@
   setInterval(_refreshTabLock,3000);
 
   // ─── AUTO-BARCODE ────────────────────────────────────
-  var _bcSeq=1000;
+  var _bcSeq=2000;
   var _bcSeqKey="acim-bc-seq";
   function _nextBarcode(){return "ACIM-"+(_bcSeq++);}
   function _loadBcSeq(){
@@ -47,7 +47,7 @@
   _nextBarcode=function(){var bc=_origNextBarcode();_saveBcSeq();return bc;};
 
   // ─── TICKET NUMBER ───────────────────────────────────
-  var _ticketSeq=1;
+  var _ticketSeq=100;
   var _ticketSeqKey="acim-ticket-seq";
   function _nextTicket(){return _ticketSeq++;}
   function _loadTicketSeq(){
