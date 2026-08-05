@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>ACIM Caisse — Dashboard métier</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; margin: 0; padding: 0; background: #f5f7fa; color: #1a1a1a; line-height: 1.4; }
+  .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+  header { background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); color: #fff; padding: 30px 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+  header h1 { margin: 0; font-size: 28px; }
+  header .subtitle { opacity: 0.8; font-size: 13px; margin-top: 5px; }
+  h2 { font-size: 18px; margin: 25px 0 12px 0; color: #1e3c72; border-bottom: 2px solid #1e3c72; padding-bottom: 5px; }
+  .row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; }
+  .card { background: #fff; border-radius: 10px; padding: 18px; box-shadow: 0 2px 6px rgba(0,0,0,0.05); border: 1px solid #e5e8ec; }
+  .card .metric { font-size: 28px; font-weight: 700; color: #1e3c72; margin: 5px 0; }
+  .card .label { font-size: 12px; color: #666; text-transform: uppercase; letter-spacing: 0.5px; }
+  .card.alert { border-left: 4px solid #dc3545; }
+  .card.success { border-left: 4px solid #28a745; }
+  .card.warning { border-left: 4px solid #ffc107; }
+  .card.info { border-left: 4px solid #17a2b8; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 6px rgba(0,0,0,0.05); }
+  th { background: #1e3c72; color: #fff; padding: 10px 12px; text-align: left; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+  td { padding: 8px 12px; border-bottom: 1px solid #e5e8ec; }
+  tr:hover { background: #f8fafe; }
+  .badge { display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; color: #fff; }
+  .badge.void { background: #dc3545; }
+  .badge.cash { background: #28a745; }
+  .badge.card { background: #17a2b8; }
+  .badge.alert { background: #ffc107; color: #000; }
+  .bar-chart { display: flex; flex-direction: column; gap: 8px; padding: 0; }
+  .bar-row { display: flex; align-items: center; }
+  .bar-row .date { width: 90px; font-size: 12px; color: #666; }
+  .bar-row .bar-bg { flex: 1; height: 22px; background: #f0f0f0; border-radius: 4px; position: relative; }
+  .bar-row .bar-fill { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(90deg, #2a5298, #1e3c72); border-radius: 4px; }
+  .bar-row .bar-label { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); font-size: 11px; color: #fff; font-weight: 600; }
+  .bar-row .bar-label.outside { right: -75px; color: #1e3c72; }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  @media (max-width: 800px) { .two-col { grid-template-columns: 1fr; } }
+  .footer { text-align: center; padding: 30px 0 10px 0; color: #999; font-size: 12px; }
+  .no-print { text-align: right; margin-top: -20px; padding: 0 0 20px 20px; }
+  .no-print button { padding: 8px 16px; cursor: pointer; background: #1e3c72; color: #fff; border: 0; border-radius: 6px; font-size: 14px; }
+  @media print {
+    .no-print { display: none; }
+    .card { box-shadow: none; }
+    body { background: #fff; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="no-print"><button onclick="window.print()">🖨️ Imprimer le rapport</button></div>
+
+  <header>
+    <h1>ACIM Caisse — Dashboard métier</h1>
+    <div class="subtitle">Période : 16/07/2026 → 04/08/2026 (3 semaines) — Rapport généré le 04/08/2026</div>
+  </header>
+
+  <!-- ============ KPI ============ -->
+  <h2>📊 Indicateurs clés</h2>
+  <div class="row">
+    <div class="card info">
+      <div class="label">Total des ventes</div>
+      <div class="metric">15297,99 €</div>
+      <div style="font-size: 11px; color: #999;">89 ventes valides</div>
+    </div>
+    <div class="card success">
+      <div class="label">Panier moyen</div>
+      <div class="metric">171,89 €</div>
+      <div style="font-size: 11px; color: #999;">89 tickets</div>
+    </div>
+    <div class="card warning">
+      <div class="label">Annulations</div>
+      <div class="metric">2</div>
+      <div style="font-size: 11px; color: #999;">Pertes : 497,50 € (2.2%)</div>
+    </div>
+    <div class="card info">
+      <div class="label">Items vendus</div>
+      <div class="metric">173</div>
+      <div style="font-size: 11px; color: #999;">78 produits distincts</div>
+    </div>
+    <div class="card">
+      <div class="label">Catalogue total</div>
+      <div class="metric">1264</div>
+      <div style="font-size: 11px; color: #999;">12 catégories</div>
+    </div>
+  </div>
+
+  <!-- ============ VENTES PAR DATE ============ -->
+  <h2>📅 Ventes par date</h2>
+  <div class="card bar-chart">
+    <div class="bar-row">
+      <div class="date">2026-07-16</div>
+      <div class="bar-bg">
+        <div class="bar-fill" style="width: 0%"></div>
+        <div class="bar-label outside">27,44 €</div>
+      </div>
+    </div>
+    <div class="bar-row">
+      <div class="date">2026-07-17</div>
+      <div class="bar-bg">
+        <div class="bar-fill" style="width: 0%"></div>
+        <div class="bar-label outside">13,72 €</div>
+      </div>
+    </div>
+    <div class="bar-row">
+      <div class="date">2026-07-20</div>
+      <div class="bar-bg">
+        <div class="bar-fill" style="width: 0%"></div>
+        <div class="bar-label outside">40,00 €</div>
+      </div>
+    </div>
+    <div class="bar-row">
+      <div class="date">2026-07-21</div>
+      <div class="bar-bg">
+        <div class="bar-fill" style="width: 1%"></div>
+        <div class="bar-label outside">184,00 €</div>
+      </div>
+    </div>
+    <div class="bar-row">
+      <div class="date">2026-07-22</div>
+      <div class="bar-bg">
+        <div class="bar-fill" style="width: 0%"></div>
+        <div class="bar-label outside">24,00 €</div>
+      </div>
+    </div>
+    <div class="bar-row">
+      <div class="date">2026-07-23</div>
+      <div class="bar-bg">
+        <div class="bar-fill" style="width: 1%"></div>
+        <div class="bar-label outside">175,00 €</div>
+      </div>
+    </div>
+    <div class="bar-row">
+      <div class="date">2026-07-24</div>
+      <div class="bar-bg">
+        <div class="bar-fill" style="width: 0%"></div>
+        <div class="bar-label outside">20,00 €</div>
+      </div>
+    </div>
+    <div class="bar-row">
+      <div class="date">2026-07-30</div>
+      <div class="bar-bg">
+        <div class="bar-fill" style="width: 1%"></div>
+        <div class="bar-label outside">101,14 €</div>
+      </div>
+    </div>
+    <div class="bar-row">
+      <div class="date">2026-08-04</div>
+      <div class="bar-bg">
+        <div class="bar-fill" style="width: 100%"></div>
+        <div class="bar-label ">14712,69 €</div>
+      </div>
+    </div>
+  </div>
+  <table style="margin-top: 20px;">
+    <thead>
+      <tr><th>Date</th><th>Ventes</th><th>Items</th><th>Total</th><th>Panier moyen</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>2026-07-16</td><td>2</td><td>0</td><td><strong>27,44 €</strong></td><td>13,72 €</td></tr>
+      <tr><td>2026-07-17</td><td>1</td><td>0</td><td><strong>13,72 €</strong></td><td>13,72 €</td></tr>
+      <tr><td>2026-07-20</td><td>2</td><td>0</td><td><strong>40,00 €</strong></td><td>20,00 €</td></tr>
+      <tr><td>2026-07-21</td><td>7</td><td>0</td><td><strong>184,00 €</strong></td><td>26,29 €</td></tr>
+      <tr><td>2026-07-22</td><td>2</td><td>0</td><td><strong>24,00 €</strong></td><td>12,00 €</td></tr>
+      <tr><td>2026-07-23</td><td>4</td><td>0</td><td><strong>175,00 €</strong></td><td>43,75 €</td></tr>
+      <tr><td>2026-07-24</td><td>1</td><td>0</td><td><strong>20,00 €</strong></td><td>20,00 €</td></tr>
+      <tr><td>2026-07-30</td><td>1</td><td>1</td><td><strong>101,14 €</strong></td><td>101,14 €</td></tr>
+      <tr><td>2026-08-04</td><td>69</td><td>172</td><td><strong>14712,69 €</strong></td><td>213,23 €</td></tr>
+      <tr style="background: #e3f2fd; font-weight: 700;">
+        <td>TOTAL</td><td>89</td><td>173</td>
+        <td>15297,99 €</td><td>171,89 €</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- ============ PAIEMENTS ============ -->
+  <h2>💳 Méthodes de paiement</h2>
+  <table>
+    <thead>
+      <tr><th>Méthode</th><th>Transactions</th><th>Montant</th><th>%</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><span class="badge cash">Espèces</span></td><td>19</td><td><strong>919,66 €</strong></td><td>94.1 %</td></tr>
+      <tr><td><span class="badge card">Carte</span></td><td>2</td><td><strong>58,00 €</strong></td><td>5.9 %</td></tr>
+    </tbody>
+  </table>
+
+  <!-- ============ ANNNULATIONS ============ -->
+  <h2>❌ Ventes annulées</h2>
+  <table>
+    <thead>
+      <tr><th>Date</th><th>Caissier</th><th>Détails</th><th>Mode paiement</th><th>Montant annulé</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>15/07/2026 19:53:38</td><td>Admin</td><td><em style="color:#999">Aucun item</em></td><td><em style="color:#999">—</em></td><td><strong style="color:#dc3545">410,00 €</strong></td></tr>
+      <tr><td>21/07/2026 13:06:51</td><td>Admin</td><td><em style="color:#999">Aucun item</em></td><td><em style="color:#999">—</em></td><td><strong style="color:#dc3545">87,50 €</strong></td></tr>
+    </tbody>
+  </table>
+
+  <!-- ============ COMMANDES ============ -->
+  <h2>⏳ Commandes clients</h2>
+  <table>
+    <thead>
+      <tr><th>Client</th><th>Note</th><th>Statut</th><th>Montant</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>daniel</td><td>222</td><td><span class="badge cash">livrée</span></td><td>2,00 €</td></tr>
+      <tr><td>yacov</td><td>2</td><td><span class="badge cash">livrée</span></td><td>13,72 €</td></tr>
+    </tbody>
+  </table>
+
+  <!-- ============ TOP PRODUITS ============ -->
+  <h2>🏆 Top 15 produits par CA</h2>
+  <div class="two-col">
+  <table>
+    <thead>
+      <tr><th>#</th><th>Produit</th><th>Ventes</th><th>Unités</th><th>CA</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>1</td><td>FILET DE POULET 0.800 kg 0.800 kg 1.120 </td><td>10</td><td>10,00 kg</td><td><strong>281,35 €</strong></td></tr>
+      <tr><td>2</td><td>ENTRECOTE TAL 0.411 kg</td><td>8</td><td>8,00 kg</td><td><strong>184,87 €</strong></td></tr>
+      <tr><td>3</td><td>PILON DE POULET 0.800 kg 1.156 kg</td><td>6</td><td>6,00 kg</td><td><strong>138,80 €</strong></td></tr>
+      <tr><td>4</td><td>BOURGUIGNON DE BOEUF 1.070 kg</td><td>5</td><td>5,00 kg</td><td><strong>127,17 €</strong></td></tr>
+      <tr><td>5</td><td>STEACK HACHE X2 ANGUS</td><td>9</td><td>9,00 pcs</td><td><strong>117,00 €</strong></td></tr>
+      <tr><td>6</td><td>Parguits de poulet KOSHER MEAT 4U 0.800 </td><td>4</td><td>4,00 kg</td><td><strong>115,35 €</strong></td></tr>
+      <tr><td>7</td><td>ENTRECOTE 2.600 kg</td><td>1</td><td>1,00 kg</td><td><strong>101,14 €</strong></td></tr>
+      <tr><td>8</td><td>VIANDE HACHEE 500G</td><td>6</td><td>6,00 pcs</td><td><strong>90,00 €</strong></td></tr>
+      <tr><td>9</td><td>POULET ENTIER 1.760 kg</td><td>4</td><td>4,00 kg</td><td><strong>89,16 €</strong></td></tr>
+      <tr><td>10</td><td>HAUT DE CUISSES 0.800 kg 1.188 kg</td><td>4</td><td>4,00 kg</td><td><strong>76,12 €</strong></td></tr>
+      <tr><td>11</td><td>EPAULE AGNEAU ROTI 1.730 kg</td><td>1</td><td>1,00 kg</td><td><strong>74,22 €</strong></td></tr>
+      <tr><td>12</td><td>CREVETTES 700G</td><td>3</td><td>3,00 pcs</td><td><strong>60,00 €</strong></td></tr>
+      <tr><td>13</td><td>DINAUSAURES NUGGETS</td><td>3</td><td>3,00 pcs</td><td><strong>51,00 €</strong></td></tr>
+      <tr><td>14</td><td>TENDERS</td><td>3</td><td>3,00 pcs</td><td><strong>51,00 €</strong></td></tr>
+      <tr><td>15</td><td>ROTI DE DINDE BBQ</td><td>2</td><td>2,00 pcs</td><td><strong>50,00 €</strong></td></tr>
+    </tbody>
+  </table>
+
+  <!-- ============ PREVOISIONS ============ -->
+  <div>
+    <h2 style="margin-top: 0;">🔮 Prévisions de réapprovisionnement</h2>
+    <table>
+      <thead>
+        <tr><th>Produit</th><th>Velocité (sem)</th><th>Stock actuel</th><th>Rupture</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>FILET DE POULET 0.800 kg 0.800 kg 1</td><td>23,33 kg/sem</td><td>0,00 kg</td><td><span style="color:#dc3545;font-weight:700">0 j</span></td></tr>
+        <tr><td>ENTRECOTE TAL 0.411 kg</td><td>18,67 kg/sem</td><td>0,00 kg</td><td><span style="color:#dc3545;font-weight:700">0 j</span></td></tr>
+        <tr><td>PILON DE POULET 0.800 kg 1.156 kg</td><td>14,00 kg/sem</td><td>3,00 kg</td><td><span style="color:#dc3545;font-weight:700">2 j</span></td></tr>
+        <tr><td>BOURGUIGNON DE BOEUF 1.070 kg</td><td>11,67 kg/sem</td><td>0,00 kg</td><td><span style="color:#dc3545;font-weight:700">0 j</span></td></tr>
+        <tr><td>STEACK HACHE X2 ANGUS</td><td>21,00 pcs/sem</td><td>0,00 pcs</td><td><span style="color:#dc3545;font-weight:700">0 j</span></td></tr>
+        <tr><td>Parguits de poulet KOSHER MEAT 4U 0</td><td>9,33 kg/sem</td><td>0,00 kg</td><td><span style="color:#dc3545;font-weight:700">0 j</span></td></tr>
+        <tr><td>ENTRECOTE 2.600 kg</td><td>2,33 kg/sem</td><td>0,00 kg</td><td><span style="color:#dc3545;font-weight:700">0 j</span></td></tr>
+        <tr><td>VIANDE HACHEE 500G</td><td>14,00 pcs/sem</td><td>0,00 pcs</td><td><span style="color:#dc3545;font-weight:700">0 j</span></td></tr>
+        <tr><td>POULET ENTIER 1.760 kg</td><td>9,33 kg/sem</td><td>0,00 kg</td><td><span style="color:#dc3545;font-weight:700">0 j</span></td></tr>
+        <tr><td>HAUT DE CUISSES 0.800 kg 1.188 kg</td><td>9,33 kg/sem</td><td>0,00 kg</td><td><span style="color:#dc3545;font-weight:700">0 j</span></td></tr>
+      </tbody>
+    </table>
+
+    <h2>📊 Prévisions globales</h2>
+    <div class="row">
+      <div class="card">
+        <div class="label">CA Moyen / jour actif</div>
+        <div class="metric">5023,90 €</div>
+        <div style="font-size: 11px; color: #999;">3 jours réels</div>
+      </div>
+      <div class="card info">
+        <div class="label">Prévision 7 jours</div>
+        <div class="metric">35167,28 €</div>
+      </div>
+      <div class="card info">
+        <div class="label">Prévision 30 jours</div>
+        <div class="metric">150716,90 €</div>
+      </div>
+      <div class="card info">
+        <div class="label">Prévision 365 jours</div>
+        <div class="metric">1833722,28 €</div>
+      </div>
+    </div>
+  </div>
+  </div>
+
+  <!-- ============ STOCKS ============ -->
+  <h2>📦 Stocks actuels (top 25 produits les mieux stockés)</h2>
+  <table>
+    <thead>
+      <tr><th>Produit</th><th>Restant</th><th>Entré</th><th>Sorti</th><th>Type</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Pâte feuilletée x x</td><td><strong>324,00 pcs</strong></td><td>216,00</td><td>0,00</td><td>pcs</td></tr>
+      <tr><td>Pizza La FABULEUSE PROMO x</td><td><strong>324,00 pcs</strong></td><td>216,00</td><td>0,00</td><td>pcs</td></tr>
+      <tr><td>VIANDE HACHEE SURG</td><td><strong>302,88 kg</strong></td><td>151,44</td><td>0,00</td><td>kg</td></tr>
+      <tr><td>FILET DE POULET IQF</td><td><strong>249,70 kg</strong></td><td>124,85</td><td>0,00</td><td>kg</td></tr>
+      <tr><td>Steack Boeuf Rav Pewsner</td><td><strong>240,00 pcs</strong></td><td>160,00</td><td>0,00</td><td>pcs</td></tr>
+      <tr><td>Façons Crevette Nature</td><td><strong>240,00 pcs</strong></td><td>160,00</td><td>0,00</td><td>pcs</td></tr>
+      <tr><td>CUISSE DE POULET IQF</td><td><strong>221,74 kg</strong></td><td>111,52</td><td>0,65</td><td>kg</td></tr>
+      <tr><td>Fèves sans peau Talia eu</td><td><strong>216,00 pcs</strong></td><td>144,00</td><td>0,00</td><td>pcs</td></tr>
+      <tr><td>HAUT DE CUISSE DE POULET IQF</td><td><strong>215,78 kg</strong></td><td>108,89</td><td>1,00</td><td>kg</td></tr>
+      <tr><td>PILONS DE POULET IQF</td><td><strong>213,68 kg</strong></td><td>106,84</td><td>0,00</td><td>kg</td></tr>
+      <tr><td>Nuggets de volaille Of Tov</td><td><strong>210,00 pcs</strong></td><td>140,00</td><td>0,00</td><td>pcs</td></tr>
+      <tr><td>Dinosaures Dinde Panés Of Tov x</td><td><strong>210,00 pcs</strong></td><td>140,00</td><td>0,00</td><td>pcs</td></tr>
+      <tr><td>POULET PAC</td><td><strong>204,44 kg</strong></td><td>103,72</td><td>3,00</td><td>kg</td></tr>
+      <tr><td>Maxi Tendre Aciop</td><td><strong>180,00 pcs</strong></td><td>120,00</td><td>0,00</td><td>pcs</td></tr>
+      <tr><td>Pizza tomate pesto</td><td><strong>162,00 pcs</strong></td><td>108,00</td><td>0,00</td><td>pcs</td></tr>
+      <tr><td>Pizza égumes grillés moza -</td><td><strong>162,00 pcs</strong></td><td>108,00</td><td>0,00</td><td>pcs</td></tr>
+      <tr><td>Pizza Champignons Truffes</td><td><strong>162,00 pcs</strong></td><td>108,00</td><td>0,00</td><td>pcs</td></tr>
+      <tr><td>PARGUIT DE POULET IQF</td><td><strong>161,70 kg</strong></td><td>80,85</td><td>0,00</td><td>kg</td></tr>
+      <tr><td>Coeur de dos de Colin PROMO X</td><td><strong>155,00 pcs</strong></td><td>104,00</td><td>1,00</td><td>pcs</td></tr>
+      <tr><td>Filet de cabillaud PROMO ,</td><td><strong>154,00 pcs</strong></td><td>104,00</td><td>2,00</td><td>pcs</td></tr>
+      <tr><td>Fond d&#39;Arichauts POTAGER PROMO</td><td><strong>144,00 pcs</strong></td><td>96,00</td><td>0,00</td><td>pcs</td></tr>
+      <tr><td>ANGUS STEAK HACHE BOEUF SKIN SURG</td><td><strong>137,80 kg</strong></td><td>71,40</td><td>5,00</td><td>kg</td></tr>
+      <tr><td>Pizza MamaMia par grs</td><td><strong>135,00 pcs</strong></td><td>90,00</td><td>0,00</td><td>pcs</td></tr>
+      <tr><td>Batonnet de Mozarella Garbo x</td><td><strong>117,00 pcs</strong></td><td>78,00</td><td>0,00</td><td>pcs</td></tr>
+      <tr><td>ENTRECOTE SECONDE SK SURGE</td><td><strong>116,81 kg</strong></td><td>58,40</td><td>0,00</td><td>kg</td></tr>
+    </tbody>
+  </table>
+
+  <!-- ============ ALERTES ============ -->
+  <h2>⚠️ Alertes rupture (produits vendus & en stock bas)</h2>
+  <table>
+    <thead>
+      <tr><th>Produit</th><th>Stock</th><th>Seuil</th><th>Catégorie</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>FILET DE POULET 0.800 kg 0.800 kg 1.120 kg <span class="badge alert">Alerte</span></td><td><strong style="color:#dc3545">0 kg</strong></td><td>5</td><td>volaille</td></tr>
+      <tr><td>ENTRECOTE TAL 0.411 kg <span class="badge alert">Alerte</span></td><td><strong style="color:#dc3545">0 kg</strong></td><td>5</td><td>viande</td></tr>
+      <tr><td>PILON DE POULET 0.800 kg 1.156 kg <span class="badge alert">Alerte</span></td><td><strong style="color:#dc3545">3 kg</strong></td><td>5</td><td>volaille</td></tr>
+      <tr><td>BOURGUIGNON DE BOEUF 1.070 kg <span class="badge alert">Alerte</span></td><td><strong style="color:#dc3545">0 kg</strong></td><td>5</td><td>viande</td></tr>
+      <tr><td>STEACK HACHE X2 ANGUS <span class="badge alert">Alerte</span></td><td><strong style="color:#dc3545">0 pcs</strong></td><td>5</td><td>viande</td></tr>
+      <tr><td>Parguits de poulet KOSHER MEAT 4U 0.800 kg 0. <span class="badge alert">Alerte</span></td><td><strong style="color:#dc3545">0 kg</strong></td><td>5</td><td>volaille</td></tr>
+      <tr><td>ENTRECOTE 2.600 kg <span class="badge alert">Alerte</span></td><td><strong style="color:#dc3545">0 kg</strong></td><td>5</td><td>viande</td></tr>
+      <tr><td>VIANDE HACHEE 500G <span class="badge alert">Alerte</span></td><td><strong style="color:#dc3545">0 pcs</strong></td><td>5</td><td>autre</td></tr>
+      <tr><td>POULET ENTIER 1.760 kg <span class="badge alert">Alerte</span></td><td><strong style="color:#dc3545">0 kg</strong></td><td>5</td><td>volaille</td></tr>
+      <tr><td>HAUT DE CUISSES 0.800 kg 1.188 kg <span class="badge alert">Alerte</span></td><td><strong style="color:#dc3545">0 kg</strong></td><td>5</td><td>volaille</td></tr>
+      <tr><td>EPAULE AGNEAU ROTI 1.730 kg <span class="badge alert">Alerte</span></td><td><strong style="color:#dc3545">0 kg</strong></td><td>5</td><td>viande</td></tr>
+      <tr><td>CREVETTES 700G <span class="badge alert">Alerte</span></td><td><strong style="color:#dc3545">0 pcs</strong></td><td>5</td><td>surgele</td></tr>
+      <tr><td>DINAUSAURES NUGGETS <span class="badge alert">Alerte</span></td><td><strong style="color:#dc3545">0 pcs</strong></td><td>5</td><td>surgele</td></tr>
+      <tr><td>TENDERS <span class="badge alert">Alerte</span></td><td><strong style="color:#dc3545">0 pcs</strong></td><td>5</td><td>surgele</td></tr>
+      <tr><td>ROTI DE DINDE BBQ <span class="badge alert">Alerte</span></td><td><strong style="color:#dc3545">0 pcs</strong></td><td>5</td><td>surgele</td></tr>
+    </tbody>
+  </table>
+
+  <div class="footer">
+    Rapport généré le 04/08/2026 21:52:25 — Source : 7 backups consolidés (Flutter + JS, 16/07 → 04/08/2026)
+  </div>
+</div>
+</body>
+</html>
