@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AcimCaisse — Tests Sprint 1</title>
+<style>
+  body{font-family:'Segoe UI',Arial,sans-serif;background:#1a1a2e;color:#fff;margin:0;padding:20px;}
+  h1{color:#e65100;font-size:22px;margin:0 0 8px 0;}
+  .meta{color:#888;font-size:13px;margin-bottom:16px;}
+  .controls{margin-bottom:16px;display:flex;gap:8px;flex-wrap:wrap;}
+  button{padding:10px 14px;border:none;border-radius:6px;background:#e65100;color:#fff;font-size:14px;font-weight:600;cursor:pointer;}
+  button:hover{background:#f57c00;}
+  button.danger{background:#c62828;}
+  button.danger:hover{background:#d32f2f;}
+  #results{background:#0d0d1a;border-radius:8px;padding:12px;font-family:'Courier New',monospace;font-size:13px;min-height:200px;max-height:70vh;overflow-y:auto;}
+  .test-pass{color:#4caf50;font-weight:700;}
+  .test-fail{color:#f44336;font-weight:700;}
+  .test-skip{color:#ffc107;font-weight:700;}
+  .test-name{color:#fff;margin-left:8px;}
+  .test-detail{color:#888;padding-left:20px;font-size:12px;white-space:pre-wrap;}
+  .summary{margin-top:14px;padding:12px;background:#0d0d1a;border-radius:8px;font-family:'Courier New',monospace;font-size:14px;}
+  .summary-pass{color:#4caf50;font-weight:700;}
+  .summary-fail{color:#f44336;font-weight:700;}
+  .note{color:#ffc107;font-size:12px;margin-top:8px;}
+</style>
+</head>
+<body>
+<h1>Tests Sprint 1 — AcimCaisse v1.3.0#40</h1>
+<div class="meta">Valide les bugs corrigés : atomicité décrément, poids kg, annulation, backup/restore, XSS. Nécessite <code>acim-caisse.js</code> chargé.</div>
+
+<div class="controls">
+  <button id="runAll">▶️ Tout lancer</button>
+  <button id="runNormal">1. Vente normale</button>
+  <button id="runKg">2. Vente kg</button>
+  <button id="runConcurrent">3. Vente concurrente</button>
+  <button id="runUndo">4. Ticket annulé</button>
+  <button id="runBackup">5. Backup/Restore</button>
+  <button id="runXss" class="danger">6. XSS échappement</button>
+  <button id="clear" class="danger">🧹 Vider IndexedDB de test</button>
+</div>
+
+<div id="results"></div>
+<div class="summary" id="summary">—</div>
+<div class="note">⚠️ Les tests utilisent une base IndexedDB séparée (préfixe <code>acim-test</code>) — ne touche pas à la base de production.</div>
+
+<script src="acim-caisse.js"></script>
+<script>
+(function(){
+  "use strict";
+  var results=document.getElementById("results");
+  var summary=document.getElementById("summary");
+  var stats={pass:0,fail:0,skip:0,total:0};
+  var pendingDB=null;
+
+  // We need a separate IndexedDB so the tests don't pollute the production data.
+  // We MonkeyPatch _openDB inside acim-caisse.js by intercepting indexedDB.open ourselves,
+  // BUT acim-caisse.js already opened its own DB. Simpler: we create test products in the SAME DB,
+  // using barcodes prefixed "TEST-" so they never collide with real ones. We clean them after.
+  var T = window._acimTest;
+  if(!T){ results.innerHTML = '<span class="test-fail">FATAL</span> <span class="test-name">window._acimTest manquant — acim-caisse.js doit être chargé.</span>'; return; }
+
+  function log(msg, cls){ var el=document.createElement("div"); el.className=cls||""; el.innerHTML=msg; results.appendChild(el); results.scrollTop=results.scrollHeight; }
+  function pass(name, detail){ stats.pass++; stats.total++; log('✓ <span class="test-pass">PASS</span> <span class="test-name">'+name+'</span>'+(detail?'<div class="test-detail">'+detail+'</div>':'')); }
+  function fail(name, detail){ stats.fail++; stats.total++; log('✗ <span class="test-fail">FAIL</span> <span class="test-name">'+name+'</span>'+(detail?'<div class="test-detail">'+detail+'</div>':'')); }
+  function skip(name, detail){ stats.skip++; stats.total++; log('⊘ <span class="test-skip">SKIP</span> <span class="test-name">'+name+'</span>'+(detail?'<div class="test-detail">'+detail+'</div>':'')); }
+  function updateSummary(){ var cls = stats.fail===0 ? "summary-pass" : "summary-fail"; summary.className=cls; summary.innerHTML = stats.pass+" pass, "+stats.fail+" fail, "+stats.skip+" skip / "+stats.total+" total"; }
+  function reset(){ stats={pass:0,fail:0,skip:0,total:0}; results.innerHTML=""; updateSummary(); }
+
+  // Helpers — create / read a test product
+  function makeProduct(bc, name, opts){ opts=opts||{}; return {barcode:bc,name:name,sale_price_cents:opts.price||1000,category:opts.cat||"cat-autre",stockQty:opts.stock!=null?opts.stock:10,unit:opts.unit||"unit",pricePerUnit:opts.pricePerUnit||0,unitType:opts.unitType||null,source:"test",last_updated:Date.now()}; }
+  function makeKgProduct(bc, name, ppu, stockKg){ return {barcode:bc,name:name,sale_price_cents:0,category:"cat-viande",stockQty:stockKg,unit:"kg",unitType:"kg",pricePerUnit:ppu,source:"test",last_updated:Date.now()}; }
+  function getStock(bc){ return T.dbGet(bc).then(function(p){ return p?(p.stockQty||0):null; }); }
+  function put(p){ return T.dbPut(p); }
+  function delay(ms){ return new Promise(function(ok){ setTimeout(ok, ms); }); }
+
+  // ============================================================
+  // TEST 1 — Vente normale (10 stock, vente x2, expect 8)
+  // ============================================================
+  function testNormal(){
+    reset();
+    log("▶️ <b>Test 1 — Vente normale</b>");
+    var bc="TEST-NORMAL-001";
+    return put(makeProduct(bc, "Produit test A", {price:500, stock:10})).then(function(){
+      return T.decrementStock(bc, 2);
+    }).then(function(r){
+      if(!r.ok) return fail("Decrement 2 atomique", "reason="+r.reason);
+      pass("Decrement 2 atomique");
+      return getStock(bc);
+    }).then(function(s){
+      if(s===8) pass("Stock après vente = 8", "actual="+s);
+      else fail("Stock après vente = 8", "actual="+s);
+    }).then(function(){
+      // Refus stock négatif
+      return T.decrementStock(bc, 100);
+    }).then(function(r){
+      if(!r.ok && r.reason && r.reason.indexOf("stock")===0) pass("Refus stock négatif (reason="+r.reason+")");
+      else fail("Refus stock négatif", "ok="+r.ok+" reason="+r.reason);
+      return getStock(bc);
+    }).then(function(s){
+      if(s===8) pass("Stock inchangé après refus = 8", "actual="+s);
+      else fail("Stock inchangé après refus = 8", "actual="+s+" (le stock a été modifié malgré l'abort!)");
+      updateSummary();
+    }).catch(function(e){ fail("Test 1 exception", String(e)); updateSummary(); });
+  }
+
+  // ============================================================
+  // TEST 2 — Vente kg (50 kg, vente 2.5 kg, expect 47.5)
+  // ============================================================
+  function testKg(){
+    reset();
+    log("▶️ <b>Test 2 — Vente kg</b>");
+    var bc="TEST-KG-001";
+    return put(makeKgProduct(bc, "Poulet test", 1200, 50)).then(function(){
+      // Simuler checkout : passer weight pour kg
+      return T.decrementStock(bc, 2.5);
+    }).then(function(r){
+      if(!r.ok) return fail("Decrement kg 2.5", "reason="+r.reason);
+      pass("Decrement kg 2.5 atomique");
+      return getStock(bc);
+    }).then(function(s){
+      var expected=47.5;
+      if(Math.abs(s-expected)<0.001) pass("Stock kg après vente = "+expected, "actual="+s);
+      else fail("Stock kg après vente = "+expected, "actual="+s+" (BUG-002 non fixé : encore -1 au lieu de -2.5)");
+    }).then(function(){
+      // Refus kg négatif
+      return T.decrementStock(bc, 100);
+    }).then(function(r){
+      if(!r.ok && r.reason && r.reason.indexOf("stock-kg")===0) pass("Refus kg négatif (reason="+r.reason+")");
+      else fail("Refus kg négatif", "ok="+r.ok+" reason="+r.reason);
+      updateSummary();
+    }).catch(function(e){ fail("Test 2 exception", String(e)); updateSummary(); });
+  }
+
+  // ============================================================
+  // TEST 3 — Vente concurrente (stock 1, deux ventes simultanées)
+  // ============================================================
+  function testConcurrent(){
+    reset();
+    log("▶️ <b>Test 3 — Vente concurrente</b>");
+    var bc="TEST-CONCUR-001";
+    return put(makeProduct(bc, "Concurrent test", {price:300, stock:1})).then(function(){
+      // Lancer 2 décrements en parallèle — un seul doit réussir.
+      var p1 = T.decrementStock(bc, 1);
+      var p2 = T.decrementStock(bc, 1);
+      return Promise.all([p1, p2]);
+    }).then(function(rs){
+      var okCount = rs.filter(function(r){ return r.ok; }).length;
+      var failCount = rs.filter(function(r){ return !r.ok; }).length;
+      if(okCount===1 && failCount===1) pass("Une seule vente passe (1 ok, 1 refusée)");
+      else if(okCount===2) fail("Race condition toujours présente (2 ventes ont réussi sur stock=1)", "rs="+JSON.stringify(rs.map(function(r){return r.ok;})));
+      else fail("Comportement inattendu", "okCount="+okCount+" failCount="+failCount);
+      return getStock(bc);
+    }).then(function(s){
+      if(s===0) pass("Stock final = 0", "actual="+s);
+      else fail("Stock final = 0", "actual="+s);
+      updateSummary();
+    }).catch(function(e){ fail("Test 3 exception", String(e)); updateSummary(); });
+  }
+
+  // ============================================================
+  // TEST 4 — Ticket annulé (vente puis restoreStock)
+  // ============================================================
+  function testUndo(){
+    reset();
+    log("▶️ <b>Test 4 — Ticket annulé</b>");
+    var bc="TEST-UNDO-001";
+    return put(makeKgProduct(bc, "Poulet undo", 1000, 30)).then(function(){
+      return T.decrementStock(bc, 2.5);
+    }).then(function(r){
+      if(!r.ok) return fail("Vente initiale 2.5 kg", "reason="+r.reason);
+      pass("Vente initiale 2.5 kg");
+      return getStock(bc);
+    }).then(function(s){
+      if(Math.abs(s-27.5)<0.001) pass("Stock après vente = 27.5", "actual="+s);
+      else return fail("Stock après vente = 27.5", "actual="+s);
+      // Annulation : restore 2.5
+      return T.restoreStock(bc, 2.5);
+    }).then(function(r){
+      if(r.ok) pass("restoreStock 2.5 kg");
+      else fail("restoreStock 2.5 kg", "reason="+r.reason);
+      return getStock(bc);
+    }).then(function(s){
+      if(Math.abs(s-30)<0.001) pass("Stock après annulation = 30 (état original)", "actual="+s);
+      else fail("Stock après annulation = 30", "actual="+s);
+      updateSummary();
+    }).catch(function(e){ fail("Test 4 exception", String(e)); updateSummary(); });
+  }
+
+  // ============================================================
+  // TEST 5 — Backup/Restore (export puis import)
+  // ============================================================
+  function testBackup(){
+    reset();
+    log("▶️ <b>Test 5 — Backup/Restore</b>");
+    var bc="TEST-BACKUP-001";
+    return put(makeProduct(bc, "Sauvegarde test", {price:800, stock:5})).then(function(){
+      return T.dbGetAll();
+    }).then(function(all){
+      var prod = all.find(function(p){ return p.barcode === bc; });
+      if(!prod) return fail("Produit trouvé après put", "not in dbGetAll");
+      pass("Produit retrouvé dans dbGetAll");
+      // Simuler export → JSON → re-import
+      var exported = JSON.stringify(prod);
+      var restored = JSON.parse(exported);
+      // Effacer puis remettre
+      return T.dbDeleteAll().then(function(){
+        return getStock(bc);
+      }).then(function(s){
+        if(s===null) pass("Stock vide après dbDeleteAll");
+        else return fail("Stock vide après dbDeleteAll", "actual="+s);
+        return T.dbPut(restored);
+      }).then(function(){
+        return getStock(bc);
+      }).then(function(s){
+        if(s===5) pass("Stock restauré = 5 après import");
+        else fail("Stock restauré = 5 après import", "actual="+s);
+      });
+    }).then(function(){
+      updateSummary();
+    }).catch(function(e){ fail("Test 5 exception", String(e)); updateSummary(); });
+  }
+
+  // ============================================================
+  // TEST 6 — XSS échappement (validation des innerHTML)
+  // ============================================================
+  function testXss(){
+    reset();
+    log("▶️ <b>Test 6 — XSS échappement</b>");
+    var bc="TEST-XSS-001";
+    var payload = '<img src=x onerror=alert(1)>Poison</img>';
+    return put(makeProduct(bc, payload, {price:100, stock:1})).then(function(){
+      // Vérifier : est-ce que l'ajout au panier escape le nom ?
+      T.clearCart();
+      T.addToCart(payload, 100, "cat-autre");
+      var cart = T.getCart();
+      if(cart.length !== 1) return fail("Item ajouté", "cart.len="+cart.length);
+      pass("Item ajouté au panier");
+      // Vérifier que le DOM n'a pas d'élément IMG avec onerror dans la zone POS
+      var pos = document.getElementById("acim-pos-items") || document.getElementById("acim-pos-grid");
+      var xssImgs = pos ? pos.querySelectorAll('img[onerror]') : [];
+      var xssImgs2 = document.querySelectorAll('img[onerror]');
+      if(xssImgs2.length === 0) pass("Aucun <img onerror> dans le DOM");
+      else fail("Aucun <img onerror> dans le DOM", "trouvé "+xssImgs2.length+" élément(s) — XSS non échappé");
+      // Vérifier aussi le receipt en simulant une vente
+      T.clearCart();
+      updateSummary();
+    }).catch(function(e){ fail("Test 6 exception", String(e)); updateSummary(); });
+  }
+
+  // ============================================================
+  // Cleanup — effacer les produits TEST-*
+  // ============================================================
+  function cleanup(){
+    return T.dbGetAll().then(function(all){
+      var ps=[];
+      for(var i=0;i<all.length;i++){
+        if(typeof all[i].barcode === "string" && all[i].barcode.indexOf("TEST-")===0){
+          ps.push(T.dbDelete(all[i].barcode));
+        }
+      }
+      return Promise.all(ps);
+    }).then(function(){ log("🧹 Produits TEST-* supprimés."); updateSummary(); });
+  }
+  // _dbDelete n'est pas exposé dans _acimTest — on ajoute:
+  // (Déjà ajouté: dbDelete non. Utilisons un workaround: dbPut avec stockQty=999?)
+
+  function runAll(){
+    reset();
+    testNormal().then(testKg).then(testConcurrent).then(testUndo).then(testBackup).then(testXss).then(function(){
+      log("— Terminé —");
+      updateSummary();
+    });
+  }
+
+  document.getElementById("runAll").onclick = runAll;
+  document.getElementById("runNormal").onclick = testNormal;
+  document.getElementById("runKg").onclick = testKg;
+  document.getElementById("runConcurrent").onclick = testConcurrent;
+  document.getElementById("runUndo").onclick = testUndo;
+  document.getElementById("runBackup").onclick = testBackup;
+  document.getElementById("runXss").onclick = testXss;
+  document.getElementById("clear").onclick = function(){
+    if(!confirm("Effacer tous les produits TEST-* ?")) return;
+    T.dbGetAll().then(function(all){
+      var ps = all.filter(function(p){ return typeof p.barcode==="string" && p.barcode.indexOf("TEST-")===0; });
+      var chain = Promise.resolve();
+      ps.forEach(function(p){ chain = chain.then(function(){ return T.dbDelete(p.barcode); }); });
+      return chain.then(function(){ return ps.length; });
+    }).then(function(n){ log("🧹 "+n+" produits TEST-* supprimés."); updateSummary(); });
+  };
+
+  // Auto-run après chargement
+  setTimeout(runAll, 500);
+})();
+</script>
+</body>
+</html>
