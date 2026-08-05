@@ -1532,39 +1532,135 @@
   }
 
   function _finalizeSale(payments){
+    // Sprint 4.1 PR B — single unified IDB transaction (sales + products + meta + audit_events).
+    // Atomicity: if any step fails (incl. audit append), the entire TX aborts →
+    // no sale persisted, no stock mutated, no audit event emitted.
     var total=_cartTotal();
-    var ticketNum=_nextTicket();
-    _saveTicketSeq();
+    var ticketNum=_nextTicket();          // optimistically increments in-memory; we persist in-TX
     var saleItems=_myCart.slice();
-    _persistSale(ticketNum,saleItems,total,_cartDiscountCents,payments).then(function(){
-      // Decrement stock — atomic per item. For kg products, decrement by weight.
-      // IIFE captures it/amount per iteration (var is function-scoped, not block-scoped).
-      var decPromises=[];
-      var failures=[];
-      for(var i=0;i<saleItems.length;i++){
-        (function(it,amount){
-          if(!it.bc)return;
-          decPromises.push(_decrementStock(it.bc,amount).then(function(r){
-            if(!r.ok){
-              var reason=r.reason||"unknown";
-              failures.push({bc:it.bc,name:it.name,reason:reason,currentStock:r.currentStock,requested:amount});
-              if(reason.indexOf("stock")===0){
-                _toast("⚠️ Stock insuffisant: "+it.name+" (reste "+(r.currentStock||0)+", demandé "+amount+")");
-              }
-            }
-          }));
-        })(saleItems[i],(_isWeightProduct(saleItems[i])&&saleItems[i].weight!=null)?saleItems[i].weight:(saleItems[i].qty||1));
+    var discountCents=_cartDiscountCents;
+    var salePayload={
+      ticketNumber:ticketNum,
+      timestamp:Date.now(),
+      isoTime:new Date().toISOString(),
+      items:saleItems.map(function(it){return{
+        name:it.name,price:it.priceCents,barcode:it.bc||"",cat:it.cat,
+        weight:it.weight||null,unitType:it.unitType||null,pricePerUnit:it.pricePerUnit||null,
+        discountCents:it.discountCents||0,qty:it.qty||1
+      };}),
+      totalCents:total,
+      discountCents:discountCents||0,
+      payments:payments||[],
+      itemCount:saleItems.length,
+      status:"COMPLETED"
+    };
+    var paymentMethods=(payments||[]).map(function(p){return p.method;});
+    _openUnifiedDB().then(function(db){
+      if(!db){_toast("❌ Base inaccessible");return;}
+      var tx;
+      try{
+        tx=db.transaction(["sales","products","meta","audit_events"],"readwrite");
+      }catch(e){_toast("❌ TX ouverture impossible");return;}
+      var sSales=tx.objectStore("sales");
+      var sProd=tx.objectStore("products");
+      var sMeta=tx.objectStore("meta");
+      // 1) Persist ticket sequence (instead of separate _saveTicketSeq() call).
+      try{ sMeta.put({key:_ticketSeqKey,value:_ticketSeq}); }catch(e){}
+      // 2) Insert sale.
+      var salePutReq=sSales.put(salePayload);
+      // 3) For each item: decrement stock + emit STOCK_DECREMENT audit event.
+      //    All synchronous within the IDB transaction — uses request callbacks but
+      //    does not yield to the microtask queue between ops (cursor/await would
+      //    risk invalidating the transaction context on some browsers).
+      var decProbes=[];
+      var i=0;
+      function processItem(){
+        if(i>=saleItems.length){ afterItems(); return; }
+        var it=saleItems[i++];
+        if(!it.bc){ processItem(); return; }
+        var amount=(_isWeightProduct(it)&&it.weight!=null)?it.weight:(it.qty||1);
+        var req=sProd.get(it.bc);
+        req.onsuccess=function(){
+          var p=req.result;
+          if(!p){
+            // mark failure — abort the TX
+            try{tx.abort();}catch(_){}
+            _toast("⚠️ Produit introuvable: "+it.name);
+            return;
+          }
+          var cur=(p.stockQty||0);
+          var next=cur-amount;
+          if(next<0){
+            var unit=(p.unitType||"unit");
+            var isKg=(unit==="kg"||unit==="g"||unit==="L");
+            try{tx.abort();}catch(_){}
+            _toast("⚠️ Stock insuffisant: "+it.name+" (reste "+cur+", demandé "+amount+")");
+            return;
+          }
+          p.stockQty=next;
+          p.last_updated=Date.now();
+          sProd.put(p);
+          // Audit STOCK_DECREMENT within the same TX.
+          try{
+            window._acimAudit.logInTx(tx,{
+              type:window._acimAudit.TYPE.STOCK_DECREMENT,
+              entityType:"stock",
+              entityId:it.bc,
+              action:"decrement",
+              payload:{barcode:it.bc,amount:amount,reason:"sale"},
+              previousState:{stockQty:cur},
+              newState:{stockQty:next}
+            });
+          }catch(e){
+            _err("Audit STOCK_DECREMENT append failed — aborting TX:",e);
+            try{tx.abort();}catch(_){}
+          }
+          processItem();
+        };
+        req.onerror=function(){ try{tx.abort();}catch(_){} _toast("❌ Lecture stock échouée"); };
       }
-      Promise.all(decPromises).then(function(){
-        if(failures.length>0){
-          _log("Stock decrement failures:",failures);
+      function afterItems(){
+        // 4) Emit SALE_COMPLETED audit event for the sale as a whole.
+        try{
+          window._acimAudit.logInTx(tx,{
+            type:window._acimAudit.TYPE.SALE_COMPLETED,
+            entityType:"sale",
+            entityId:String(ticketNum),
+            action:"complete",
+            payload:{
+              ticket:ticketNum,
+              itemCount:saleItems.length,
+              totalCents:total,
+              discountCents:discountCents||0,
+              paymentMethods:paymentMethods
+            },
+            previousState:null,
+            newState:null
+          });
+        }catch(e){
+          _err("Audit SALE_COMPLETED append failed — aborting TX:",e);
+          try{tx.abort();}catch(_){}
+          return;
         }
-      });
-      // Show receipt
-      _showReceipt(ticketNum,saleItems,total,_cartDiscountCents,payments);
-      _broadcastClear();
-      _myCart=[];_realBcMap={};_cartDiscountCents=0;
-      _renderPOS();
+        // 5) Wait for commit. tx.oncomplete fires → receipt + cleanup.
+      }
+      tx.oncomplete=function(){
+        _showReceipt(ticketNum,saleItems,total,discountCents,payments);
+        _broadcastClear();
+        _myCart=[];_realBcMap={};_cartDiscountCents=0;
+        _renderPOS();
+      };
+      tx.onabort=function(){
+        // Roll back the in-memory ticket sequence since the sale failed.
+        _ticketSeq--;
+        try{ sMeta.put({key:_ticketSeqKey,value:_ticketSeq}); }catch(_){}  // best-effort; will be re-synced next boot
+      };
+      tx.onerror=function(){ _toast("❌ Erreur transaction vente"); };
+      // Kick off the chain after setup so oncomplete/onabort are wired first.
+      processItem();
+    }).catch(function(e){
+      _err("Finalize sale error:",e);
+      _toast("❌ Vente échouée: "+(e&&e.message||"erreur"));
     });
   }
 
@@ -3105,63 +3201,154 @@
   }
 
   // ─── UNDO LAST SALE ─────────────────────────────────
+  // Sprint 4.1 PR B — atomic undo: stock restore + sale delete + audit events
+  // all in ONE IDB transaction. The cursor + confirmation modal flow was split:
+  // 1) Read last sale (read-only TX).
+  // 2) Show confirmation modal (async UI, can take seconds).
+  // 3) On confirm: open a fresh readwrite TX scoped on sale's id, restore stock,
+  //    emit audit events, delete the sale — all atomic.
+  // This avoids keeping a cursor alive across an async UI confirmation (which
+  // IDB does not support reliably across browsers).
   function _undoLastSale(){
-    _openSalesDB().then(function(d){
-      if(!d){_toast("❌ Base inaccessible");return;}
-      return new Promise(function(ok){
-        var tx=d.transaction("sales","readwrite");
-        var store=tx.objectStore("sales");
-        var r=store.openCursor(null,"prev");
-        r.onsuccess=function(e){
-          var cursor=e.target.result;
-          if(!cursor){_toast("❌ Aucune vente à annuler");ok();return;}
-          var sale=cursor.value;
-          // Show confirmation
-          var old=document.getElementById("acim-undo");if(old)old.remove();
-          var ov=document.createElement("div");ov.id="acim-undo";
-          ov.style.cssText="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);z-index:10000004;display:flex;align-items:center;justify-content:center;";
-          var card=document.createElement("div");
-          card.style.cssText="background:#fff;border-radius:14px;padding:20px;width:380px;max-width:95vw;box-shadow:0 8px 24px rgba(0,0,0,0.3);font-family:Segoe UI,Arial,sans-serif;";
-          var ti=document.createElement("div");ti.style.cssText="font-size:20px;font-weight:700;margin-bottom:12px;color:#c62828;text-align:center;";
-          ti.textContent="↩️ Annuler cette vente ?";card.appendChild(ti);
-          var info=document.createElement("div");info.style.cssText="font-size:15px;color:#666;margin-bottom:12px;text-align:center;";
-          var saleDate=sale.isoTime?new Date(sale.isoTime).toLocaleString("fr-FR"):(sale.timestamp?new Date(sale.timestamp).toLocaleString("fr-FR"):"?");
-          info.innerHTML='<strong>Ticket n°'+esc(sale.ticketNumber||"?")+'</strong><br>'+esc(saleDate)+'<br>'+(sale.itemCount||0)+' article(s) — '+esc((sale.totalCents/100).toFixed(2).replace(".",","))+' €';
-          card.appendChild(info);
-          var br=document.createElement("div");br.style.cssText="display:flex;gap:8px;";
-          var bCancel=document.createElement("button");bCancel.textContent="Non, garder";
-          bCancel.style.cssText="flex:1;padding:12px;border:2px solid #e0e0e0;border-radius:8px;background:#fff;font-size:16px;cursor:pointer;";
-          bCancel.onclick=function(){ov.remove();};
-          var bUndo=document.createElement("button");bUndo.textContent="↩️ Oui, annuler";
-          bUndo.style.cssText="flex:1;padding:12px;border:none;border-radius:8px;background:#c62828;color:#fff;font-size:16px;cursor:pointer;font-weight:700;";
-          bUndo.onclick=function(){
-            // Restore stock for each item — atomic per item, weight-aware for kg products.
-            var stockChain=Promise.resolve();
-            if(sale.items){
-              sale.items.forEach(function(item){
-                stockChain=stockChain.then(function(){
-                  if(item.barcode){
-                    var amount=(item.unitType&&item.weight!=null&&item.pricePerUnit!=null)?item.weight:(item.qty||1);
-                    return _restoreStock(item.barcode,amount);
-                  }
-                });
-              });
-            }
-            stockChain.then(function(){
-              cursor.delete();
-              ov.remove();
-              _toast("↩️ Vente n°"+(sale.ticketNumber||"?")+" annulée");
-              _refreshAndFilter();
-              ok();
-            });
-          };
-          br.appendChild(bCancel);br.appendChild(bUndo);card.appendChild(br);
-          ov.appendChild(card);ov.onclick=function(e){if(e.target===ov)ov.remove();};
-          document.body.appendChild(ov);
-        };
-        r.onerror=function(){ok();};
-      });
+    _openUnifiedDB().then(function(db){
+      if(!db){_toast("❌ Base inaccessible");return;}
+      // Step 1: read-only snapshot of the last sale.
+      var readTx=db.transaction("sales","readonly");
+      var cursorReq=readTx.objectStore("sales").openCursor(null,"prev");
+      cursorReq.onsuccess=function(e){
+        var cursor=e.target.result;
+        if(!cursor){_toast("❌ Aucune vente à annuler");return;}
+        var sale=cursor.value; // snapshot — do not retain the cursor
+        _showUndoConfirm(db, sale);
+      };
+      cursorReq.onerror=function(){ _toast("❌ Lecture ventes échouée"); };
     });
+  }
+
+  function _showUndoConfirm(db, sale){
+    var old=document.getElementById("acim-undo");if(old)old.remove();
+    var ov=document.createElement("div");ov.id="acim-undo";
+    ov.style.cssText="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);z-index:10000004;display:flex;align-items:center;justify-content:center;";
+    var card=document.createElement("div");
+    card.style.cssText="background:#fff;border-radius:14px;padding:20px;width:380px;max-width:95vw;box-shadow:0 8px 24px rgba(0,0,0,0.3);font-family:Segoe UI,Arial,sans-serif;";
+    var ti=document.createElement("div");ti.style.cssText="font-size:20px;font-weight:700;margin-bottom:12px;color:#c62828;text-align:center;";
+    ti.textContent="↩️ Annuler cette vente ?";card.appendChild(ti);
+    var info=document.createElement("div");info.style.cssText="font-size:15px;color:#666;margin-bottom:12px;text-align:center;";
+    var saleDate=sale.isoTime?new Date(sale.isoTime).toLocaleString("fr-FR"):(sale.timestamp?new Date(sale.timestamp).toLocaleString("fr-FR"):"?");
+    info.innerHTML='<strong>Ticket n°'+esc(sale.ticketNumber||"?")+'</strong><br>'+esc(saleDate)+'<br>'+(sale.itemCount||0)+' article(s) — '+esc((sale.totalCents/100).toFixed(2).replace(".",","))+' €';
+    card.appendChild(info);
+    var br=document.createElement("div");br.style.cssText="display:flex;gap:8px;";
+    var bCancel=document.createElement("button");bCancel.textContent="Non, garder";
+    bCancel.style.cssText="flex:1;padding:12px;border:2px solid #e0e0e0;border-radius:8px;background:#fff;font-size:16px;cursor:pointer;";
+    bCancel.onclick=function(){ov.remove();};
+    var bUndo=document.createElement("button");bUndo.textContent="↩️ Oui, annuler";
+    bUndo.style.cssText="flex:1;padding:12px;border:none;border-radius:8px;background:#c62828;color:#fff;font-size:16px;cursor:pointer;font-weight:700;";
+    bUndo.onclick=function(){
+      _executeUndoSaleAtomic(db, sale, function(ok){
+        ov.remove();
+        if(ok){
+          _toast("↩️ Vente n°"+(sale.ticketNumber||"?")+" annulée");
+          _refreshAndFilter();
+        } else {
+          _toast("❌ Annulation impossible");
+        }
+      });
+    };
+    br.appendChild(bCancel);br.appendChild(bUndo);card.appendChild(br);
+    ov.appendChild(card);ov.onclick=function(e){if(e.target===ov)ov.remove();};
+    document.body.appendChild(ov);
+  }
+
+  // Performs the actual undo in a single readwrite TX.
+  // `sale` is a snapshot read previously; we re-fetch it inside the TX by id
+  // to ensure consistency (the id is the autoIncrement key, captured in snapshot.saleId).
+  function _executeUndoSaleAtomic(db, sale, done){
+    var saleId=sale.id;
+    if(saleId==null){done(false);return;}
+    var tx;
+    try{
+      tx=db.transaction(["sales","products","audit_events"],"readwrite");
+    }catch(e){done(false);return;}
+    var sSales=tx.objectStore("sales");
+    var sProd=tx.objectStore("products");
+    // Re-fetch the sale within the TX.
+    var getReq=sSales.get(saleId);
+    getReq.onsuccess=function(){
+      var fresh=getReq.result;
+      if(!fresh){ try{tx.abort();}catch(_){} done(false); return; }
+      var items=fresh.items||[];
+      var idx=0;
+      function restoreNext(){
+        if(idx>=items.length){ emitSaleCancelled(); return; }
+        var it=items[idx++];
+        if(!it.barcode){ restoreNext(); return; }
+        var amount=(it.unitType&&it.weight!=null&&it.pricePerUnit!=null)?it.weight:(it.qty||1);
+        var r=sProd.get(it.barcode);
+        r.onsuccess=function(){
+          var p=r.result;
+          if(!p){
+            // Product disappeared from catalog — still allow undo, just skip restore
+            // but DO emit a STOCK_INCREMENT event with null previousState to keep trace.
+            try{
+              window._acimAudit.logInTx(tx,{
+                type:window._acimAudit.TYPE.STOCK_INCREMENT,
+                entityType:"stock",
+                entityId:it.barcode,
+                action:"increment",
+                payload:{barcode:it.barcode,amount:amount,reason:"undo",warning:"product-missing"},
+                previousState:null,
+                newState:null
+              });
+            }catch(e){ try{tx.abort();}catch(_){} done(false); return; }
+            restoreNext();
+            return;
+          }
+          var cur=(p.stockQty||0);
+          var nextv=cur+amount;
+          p.stockQty=nextv;
+          p.last_updated=Date.now();
+          sProd.put(p);
+          try{
+            window._acimAudit.logInTx(tx,{
+              type:window._acimAudit.TYPE.STOCK_INCREMENT,
+              entityType:"stock",
+              entityId:it.barcode,
+              action:"increment",
+              payload:{barcode:it.barcode,amount:amount,reason:"undo"},
+              previousState:{stockQty:cur},
+              newState:{stockQty:nextv}
+            });
+          }catch(e){ try{tx.abort();}catch(_){} done(false); return; }
+          restoreNext();
+        };
+        r.onerror=function(){ try{tx.abort();}catch(_){} done(false); };
+      }
+      function emitSaleCancelled(){
+        try{
+          window._acimAudit.logInTx(tx,{
+            type:window._acimAudit.TYPE.SALE_CANCELLED,
+            entityType:"sale",
+            entityId:String(fresh.ticketNumber||saleId),
+            action:"cancel",
+            payload:{
+              ticket:fresh.ticketNumber,
+              itemCount:fresh.itemCount||items.length,
+              totalCents:fresh.totalCents,
+              reason:"undo"
+            },
+            previousState:null,
+            newState:null
+          });
+        }catch(e){ try{tx.abort();}catch(_){} done(false); return; }
+        // Delete the sale within the same TX.
+        try{ sSales.delete(saleId); }catch(e){ try{tx.abort();}catch(_){} done(false); return; }
+      }
+      tx.oncomplete=function(){ done(true); };
+      tx.onabort  =function(){ done(false); };
+      tx.onerror =function(){ done(false); };
+      restoreNext();
+    };
+    getReq.onerror=function(){ try{tx.abort();}catch(_){} done(false); };
   }
 
   // ─── SUPPLIER CATALOG ────────────────────────────────
@@ -4197,6 +4384,8 @@
     calcWeightPrice:_calcWeightPrice,
     finalizeSale:_finalizeSale,
     persistSale:_persistSale,
+    undoLastSale:_undoLastSale,
+    executeUndoSaleAtomic:_executeUndoSaleAtomic,
     clearCart:function(){_myCart=[];_realBcMap={};_cartDiscountCents=0;_renderPOS();},
     getCart:function(){return _myCart.slice();},
     formatWeight:_formatWeight,
