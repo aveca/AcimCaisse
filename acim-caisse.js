@@ -630,7 +630,7 @@
       weight:weight||null,unitType:unitType||null,pricePerUnit:pricePerUnit||null,
       discountCents:0,qty:1});
     _realBcMap[myId]=barcode||"";
-    try{document.dispatchEvent(new CustomEvent("acim:add",{detail:{name:name,price:priceCents,barcode:barcode,cat:categoryId}}));}catch(e){}
+    try{document.dispatchEvent(new CustomEvent("acim:add",{detail:{name:name,price:priceCents,barcode:barcode,cat:categoryId,weight:weight,unitType:unitType,pricePerUnit:pricePerUnit}}));}catch(e){}
     _renderPOS();return true;
   }
   function _cartInfo(){
@@ -1099,6 +1099,20 @@
 
   // ─── SCANNER BUFFER ──────────────────────────────────
   var _scanBuf="",_scanTimer=null,_scanning=false;
+  function _scanCommit(){
+    if(_scanTimer){clearTimeout(_scanTimer);_scanTimer=null;}
+    var bc=_scanBuf;
+    if(!bc)return;
+    _scanning=false;
+    if(bc.length>=4){
+      if(_pos&&_pos.style.display!=="none"&&_posSearch)_posSearch.value="";
+      if(_processBarcode)_processBarcode(bc);
+      if(!_pos||_pos.style.display==="none")_togglePOS(true);
+    }else{
+      if(_pos&&_pos.style.display!=="none"&&_posSearch)_posSearch.value="";
+    }
+    _scanBuf="";
+  }
   document.addEventListener("keydown",function(e){
     // Scan toujours prioritaire, quel que soit le focus
     if(/^[0-9]$/.test(e.key)){
@@ -1108,18 +1122,15 @@
         _posSearch.value=_scanBuf;
         _filterProducts();
       }
-      clearTimeout(_scanTimer);_scanTimer=setTimeout(function(){
-        var bc=_scanBuf;
-        _scanning=false;
-        if(bc.length>=4){
-          if(_pos&&_pos.style.display!=="none"&&_posSearch)_posSearch.value="";
-          _processBarcode(bc);
-          if(!_pos||_pos.style.display==="none")_togglePOS(true);
-        }else{
-          if(_pos&&_pos.style.display!=="none"&&_posSearch)_posSearch.value="";
-        }
-        _scanBuf="";
-      },150);
+      // Enter-terminator scanners commit immediately; else 80ms timeout (was 150ms — caused rapid-scan concat).
+      clearTimeout(_scanTimer);_scanTimer=setTimeout(_scanCommit,80);
+      return;
+    }
+    // Enter commits the scan buffer immediately (most USB/BT scanners send Enter after digits).
+    if(e.key==="Enter"&&_scanning&&_scanBuf.length>=4){
+      e.preventDefault();
+      _scanCommit();
+      return;
     }
     if(/^[a-zA-ZÀ-ÿ]$/.test(e.key)){
       if(e.ctrlKey||e.metaKey||e.altKey)return;
@@ -1144,6 +1155,50 @@
   },true);
 
   // ─── PROCESS BARCODE ─────────────────────────────────
+  // ── 3-choice price modal (Sprint 3) — for products scanned without a price
+  function _chooseProductPrice(product,barcode){
+    var old=document.getElementById("acim-price-choice");if(old)old.remove();
+    var ov=document.createElement("div");ov.id="acim-price-choice";
+    ov.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:10000005;display:flex;align-items:center;justify-content:center;";
+    var card=document.createElement("div");
+    card.style.cssText="background:#fff;border-radius:16px;padding:24px;width:560px;max-width:95vw;box-shadow:0 12px 36px rgba(0,0,0,0.4);font-family:Segoe UI,Arial,sans-serif;text-align:center;";
+    var ti=document.createElement("div");ti.style.cssText="font-size:22px;font-weight:700;color:#1a1a2e;margin-bottom:8px;";
+    ti.textContent="💸 "+product.name||"Produit";
+    card.appendChild(ti);
+    var sub=document.createElement("div");sub.style.cssText="font-size:14px;color:#666;margin-bottom:18px;";
+    sub.innerHTML="Code barre: "+esc(barcode)+"<br>Choisissez le mode de tarification:";
+    card.appendChild(sub);
+    var bc=document.createElement("div");bc.style.cssText="display:flex;gap:12px;flex-wrap:wrap;justify-content:center;";
+    function mkBtn(label,sub,color,fn){
+      var b=document.createElement("button");
+      b.style.cssText="flex:1;min-width:160px;padding:18px 12px;border:none;border-radius:12px;background:"+color+";color:#fff;font-size:16px;font-weight:700;cursor:pointer;transition:transform .1s,box-shadow .15s;box-shadow:0 4px 12px "+color+"99;";
+      b.innerHTML=label+(sub?'<div style="font-size:12px;font-weight:400;opacity:0.85;margin-top:4px;">'+sub+"</div>":"");
+      b.onmouseenter=function(){this.style.transform="translateY(-2px)";};
+      b.onmouseleave=function(){this.style.transform="translateY(0)";};
+      b.onclick=function(){ov.remove();fn();};
+      return b;
+    }
+    bc.appendChild(mkBtn("🏷️ Prix fixe","Saisir le prix unitaire","#e65100",function(){
+      // Inline edit flow (re-input price)
+      _addToCart(product.name,0,barcode,product.category);
+      // open inline edit on the freshly-added row
+      setTimeout(function(){
+        var idx=_myCart.length-1;
+        _inlineEdit(idx,50,50);
+      },100);
+    }));
+    bc.appendChild(mkBtn("⚖️ Produit pesé","Prix au kg + poids","#1976d2",function(){
+      // Open weigh modal pre-filled with product info (no pricePerUnit in DB yet)
+      var fake={name:product.name,barcode:barcode,category:product.category,pricePerUnit:0,unitType:"kg"};
+      _weighProduct(fake);
+    }));
+    bc.appendChild(mkBtn("✕ Annuler","Ne pas ajouter","#9e9e9e",function(){ /* no-op */ }));
+    card.appendChild(bc);
+    ov.appendChild(card);
+    ov.onclick=function(e){if(e.target===ov)ov.remove();};
+    document.body.appendChild(ov);
+  }
+
   function _processBarcode(bc){
     _log("Scanner: "+bc);
     try{document.dispatchEvent(new CustomEvent("acim:scan",{detail:{barcode:bc}}));}catch(e){}
@@ -1157,8 +1212,7 @@
         _toast("✅ "+local.name+" "+(local.sale_price_cents/100).toFixed(2)+"€");return;
       }
       if(local&&local.name){
-        _addToCart(local.name,0,bc,local.category);
-        _toast("✏️ "+local.name+" — cliquez dans le ticket pour le prix");return;
+        _chooseProductPrice(local,bc);return;
       }
       _quickCreate("",0,bc,"");
       _toast("🆕 Nouveau produit — code: "+bc);
@@ -3899,6 +3953,52 @@
   window._acimProcessBarcode=_processBarcode;
   window._acimAddToCart=function(name,price,cat){_addToCart(name,price,"",cat);};
   window._acimWeighProduct=_weighProduct;
+  // Voice sprint-3: lookup products by fuzzy name and add via confirm.
+  window._acimAddToCartByVoice=function(prodName,qty,unit){
+    if(!prodName){return;}
+    var q=prodName.toLowerCase().trim();
+    return _dbGetAll().then(function(all){
+      var matches=[];
+      for(var i=0;i<all.length;i++){var p=all[i];
+        var n=(p.name||"").toLowerCase();
+        if(n.indexOf(q)>=0||q.indexOf(n)>=0){matches.push(p);}
+      }
+      if(matches.length===0){
+        if(window._acimS3&&window._acimS3.speak)window._acimS3.speak("Produit introuvable: "+prodName);
+        return;
+      }
+      if(matches.length===1){
+        var p=matches[0];
+        var promptTxt=(qty!=null?"Ajouter "+qty+" "+(unit||"unité")+" de ":"Ajouter ")+p.name+" à "+((p.sale_price_cents||0)/100).toFixed(2).replace(".",",")+" euros ?";
+        if(window._acimS3&&window._acimS3.confirmVoice){
+          window._acimS3.confirmVoice(promptTxt,function(){
+            if(unit==="kg"&&p.pricePerUnit>0){
+              // kg add: compute total via _calcWeightPrice
+              var w=parseFloat(qty)||0;
+              var total=_calcWeightPrice(w,"kg",p.pricePerUnit);
+              _addToCart(p.name+" "+w.toFixed(3).replace(".",",")+" kg",total,p.barcode,p.category,w,"kg",p.pricePerUnit);
+            }else if(qty!=null&&unit==="pc"){
+              var tpc=(p.sale_price_cents||0)*qty;
+              _addToCart(p.name+" × "+qty,tpc,p.barcode,p.category,null,null,null);
+            }else{
+              _addToCart(p.name,p.sale_price_cents||0,p.barcode,p.category);
+            }
+          });
+        }else{
+          // tests/sandbox: just add directly
+          _addToCart(p.name,p.sale_price_cents||0,p.barcode,p.category);
+        }
+        return;
+      }
+      // Multiple matches → flash list (max 3) — user can scan or click the right one
+      var top3=matches.slice(0,3);
+      var listTxt=top3.map(function(p){
+        return p.name+" — "+((p.sale_price_cents||0)/100).toFixed(2).replace(".",",")+" euros";
+      }).join(" / ");
+      if(window._acimS3&&window._acimS3.speak)window._acimS3.speak("Plusieurs matchs: "+listTxt+". Précisez le nom.");
+      if(window._acimS3)window._acimS3.showFlash({name:prodName+" — "+matches.length+" matchs",priceCents:0,warn:"Précisez: "+listTxt,duration:4000,error:true});
+    }).catch(function(e){_err("Voice add error:",e);});
+  };
   // Test surface — used by tests.html. Not stable API for app code.
   window._acimTest={
     decrementStock:_decrementStock,
