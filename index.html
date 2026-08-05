@@ -21,13 +21,12 @@
   <script src="fix-negative-stock.js"></script>
 </head>
 <body>
-  <script src="flutter_bootstrap.js?v=42" async></script>
-
-  <!-- Stock fix — runs once, deferred -->
-  <script>
-    setTimeout(function() {
-      if (window.AcimCaisseStockFix) window.AcimCaisseStockFix.fix();
-    }, 4000);
-  </script>
+  <div id="acim-redirect" style="font-family:'Segoe UI',Arial,sans-serif;background:#1a1a2e;color:#fff;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;margin:0;padding:20px;">
+    <h1 style="color:#e65100;font-size:36px;margin:0 0 12px 0;">🏪 AcimCaisse</h1>
+    <p style="font-size:18px;color:#ccc;margin:0 0 24px 0;text-align:center;max-width:400px;">Redirection vers la caisse en cours…</p>
+    <a href="pos.html" style="padding:14px 28px;background:#e65100;color:#fff;border-radius:10px;text-decoration:none;font-size:18px;font-weight:700;">Ouvrir la caisse →</a>
+    <p style="font-size:12px;color:#666;margin-top:32px;">Si la redirection ne se fait pas automatiquement, cliquez sur le bouton ci-dessus.</p>
+  </div>
+  <script>setTimeout(function(){window.location.replace('pos.html');},800);</script>
 </body>
 </html>

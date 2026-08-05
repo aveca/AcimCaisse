@@ -1,10 +1,13 @@
-{
+﻿{
   "name": "acimcaisse-repo",
-  "version": "1.0.0",
-  "description": "",
+  "version": "1.3.0",
+  "description": "AcimCaisse - POS offline pour epicerie/boucherie",
   "main": "electron-main.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "electron .",
+    "test": "node tests/run-e2e.js",
+    "test:e2e": "node tests/run-e2e.js",
+    "test:html": "echo Open tests.html in a browser"
   },
   "repository": {
     "type": "git",
@@ -20,6 +23,7 @@
   "homepage": "https://github.com/aveca/AcimCaisse#readme",
   "devDependencies": {
     "electron": "^43.2.0",
-    "electron-packager": "^17.1.2"
+    "electron-packager": "^17.1.2",
+    "playwright": "^1.40.0"
   }
 }
