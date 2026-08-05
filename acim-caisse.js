@@ -86,14 +86,206 @@
   }
 
   // ─── META STORE ──────────────────────────────────────
+  // Sprint 4.1 PR A — unified DB "acim" (v2). Stores products + sales + meta + audit_events.
+  // Old DBs (acim-catalog, acim-sales, acim-meta) are migrated in-place then deleted.
+  var _UNIFIED_DB="acim";
+  var _UNIFIED_VERSION=2;
+  var _unifiedDb=null;
+  var _MIGRATED_KEY="acim-migrated-v2";
+
+  function _openUnifiedDB(){
+    if(_unifiedDb)return Promise.resolve(_unifiedDb);
+    return new Promise(function(ok){
+      try{
+        var r=indexedDB.open(_UNIFIED_DB,_UNIFIED_VERSION);
+        r.onupgradeneeded=function(e){
+          var d=e.target.result;
+          if(!d.objectStoreNames.contains("products")) d.createObjectStore("products",{keyPath:"barcode"});
+          if(!d.objectStoreNames.contains("sales"))    d.createObjectStore("sales",{keyPath:"id",autoIncrement:true});
+          if(!d.objectStoreNames.contains("meta"))     d.createObjectStore("meta",{keyPath:"key"});
+          if(!d.objectStoreNames.contains("audit_events")){
+            var s=d.createObjectStore("audit_events",{keyPath:"id"});
+            s.createIndex("by_timestamp","timestamp",{unique:false});
+            s.createIndex("by_type","type",{unique:false});
+            s.createIndex("by_actorId","actorId",{unique:false});
+            s.createIndex("by_sessionId","sessionId",{unique:false});
+            s.createIndex("by_entityType","entityType",{unique:false});
+            s.createIndex("by_entityId","entityId",{unique:false});
+          }
+          _log("Unified DB upgrade — stores: "+Array.prototype.slice.call(d.objectStoreNames).join(", "));
+        };
+        r.onsuccess=function(e){_unifiedDb=e.target.result;ok(_unifiedDb);};
+        r.onerror=function(e){_err("Unified DB open error:",e);ok(null);};
+        r.onblocked=function(){_err("Unified DB open blocked");ok(null);};
+      }catch(e){_err("Unified DB open exception:",e);ok(null);}
+    });
+  }
+
+  // Backward-compat shim — kept the same name so all existing callers work unchanged.
+  // Returned handle is the unified DB; transactions target the "meta" store as before.
   var _metaDb=null;
   function _openMeta(){
+    if(_unifiedDb)return Promise.resolve(_unifiedDb);
     if(_metaDb)return Promise.resolve(_metaDb);
-    return new Promise(function(ok){
-      try{var r=indexedDB.open("acim-meta",1);
-        r.onupgradeneeded=function(e){var d=e.target.result;if(!d.objectStoreNames.contains("meta"))d.createObjectStore("meta",{keyPath:"key"});};
-        r.onsuccess=function(e){_metaDb=e.target.result;ok(_metaDb);};r.onerror=function(){ok(null);};
-      }catch(e){ok(null);}
+    return _openUnifiedDB().then(function(db){
+      _metaDb=db;
+      return db;
+    });
+  }
+
+  // ─── LEGACY DB MIGRATION (in-place, idempotent) ──────
+  // See docs/PR_A_PLAN.md §5. Copies acim-catalog/products, acim-sales/sales,
+  // acim-meta/meta into the unified DB, then deletes the legacy DBs.
+  function _maybeMigrateLegacy(){
+    return _openUnifiedDB().then(function(db){
+      if(!db)return {ok:false,reason:"no-db"};
+      // First check if already migrated
+      return new Promise(function(done){
+        var tx0=db.transaction("meta","readonly");
+        var r0=tx0.objectStore("meta").get(_MIGRATED_KEY);
+        r0.onsuccess=function(){
+          if(r0.result&&r0.result.value===true){done({ok:true,alreadyMigrated:true});return;}
+          // Not yet migrated — open the three legacy DBs and copy.
+          _copyLegacyIntoUnified(db).then(done).catch(function(e){
+            _err("Legacy migration failed:",e);
+            if(window._acimAudit)window._acimAudit.log({type:"SYSTEM_ERROR",entityType:"system",action:"error",payload:{message:"migration error: "+String(e&&e.message||e)}});
+            done({ok:false,error:String(e&&e.message||e)});
+          });
+        };
+        r0.onerror=function(){done({ok:false,error:"meta-read-error"});};
+      });
+    });
+  }
+
+  function _openLegacyIfExist(name){
+    // Probe WITHOUT onupgradeneeded — if the DB doesn't exist, return null without creating it.
+    return new Promise(function(resolve){
+      try{
+        // open() without version opens existing latest version OR triggers
+        // onupgradeneeded only if DB doesn't exist (the docs say: requests a
+        // database without changing the version). When the DB is absent,
+        // onupgradeneeded fires with version 0→1; we abort to avoid creating it.
+        var r=indexedDB.open(name);
+        r.onupgradeneeded=function(e){
+          try{ e.target.transaction.abort(); }catch(_){}
+        };
+        r.onsuccess=function(e){resolve(e.target.result);};
+        r.onerror=function(){resolve(null);};
+        r.onblocked=function(){resolve(null);};
+      }catch(e){resolve(null);}
+    });
+  }
+
+  function _openLegacy(name,upgradeFn){
+    return new Promise(function(resolve){
+      try{
+        var r=indexedDB.open(name,1);
+        r.onupgradeneeded=function(e){upgradeFn(e.target.result);};
+        r.onsuccess=function(e){resolve(e.target.result);};
+        r.onerror=function(){resolve(null);};
+      }catch(e){resolve(null);}
+    });
+  }
+
+  function _copyLegacyIntoUnified(unifiedDb){
+    // FIRST: probe each legacy DB without creating it. If none exist, skip migration entirely.
+    return Promise.all([
+      _openLegacyIfExist("acim-catalog"),
+      _openLegacyIfExist("acim-sales"),
+      _openLegacyIfExist("acim-meta")
+    ]).then(function(probes){
+      if(!probes[0] && !probes[1] && !probes[2]){
+        // No legacy DBs at all — mark migration done and emit event, skip copy.
+        return new Promise(function(resolve){
+          var tx=unifiedDb.transaction(["meta","audit_events"],"readwrite");
+          tx.objectStore("meta").put({key:_MIGRATED_KEY,value:true,migratedAt:Date.now(),reason:"no-legacy"});
+          try{
+            if(window._acimAudit){
+              var evt={
+                id:(typeof crypto!=="undefined"&&crypto.randomUUID)?crypto.randomUUID():("m-"+Date.now()+"-"+Math.random().toString(36).slice(2)),
+                schemaVersion:window._acimAudit.SCHEMA_VERSION,
+                timestamp:Date.now(),
+                type:window._acimAudit.TYPE.MIGRATION_COMPLETED,
+                actorId:null,
+                sessionId:window._acimAudit.getSessionId(),
+                entityType:"system",
+                entityId:null,
+                action:"migrate",
+                payload:{fromVersion:1,toVersion:_UNIFIED_VERSION,copied:{products:0,sales:0,meta:0},reason:"no-legacy"},
+                previousState:null,
+                newState:null,
+                status:"COMMITTED"
+              };
+              tx.objectStore("audit_events").add(evt);
+            }
+          }catch(e){_err("audit event during migration (no-legacy) failed:",e);}
+          tx.oncomplete=function(){resolve({ok:true,alreadyMigrated:false,reason:"no-legacy",copied:{products:0,sales:0,meta:0}});};
+          tx.onerror=function(e){resolve({ok:false,error:"no-legacy-tx-error",detail:String(e&&e.target&&e.target.error&&e.target.error.name||"unknown")});};
+        });
+      }
+      // Open the legacy DBs that do exist (with upgradeFn for safety) and copy.
+      return Promise.all([
+        probes[0] ? Promise.resolve(probes[0]) : _openLegacy("acim-catalog",function(d){if(!d.objectStoreNames.contains("products"))d.createObjectStore("products",{keyPath:"barcode"});}),
+        probes[1] ? Promise.resolve(probes[1]) : _openLegacy("acim-sales",  function(d){if(!d.objectStoreNames.contains("sales"))d.createObjectStore("sales",{keyPath:"id",autoIncrement:true});}),
+        probes[2] ? Promise.resolve(probes[2]) : _openLegacy("acim-meta",   function(d){if(!d.objectStoreNames.contains("meta"))d.createObjectStore("meta",{keyPath:"key"});})
+      ]).then(function(results){
+        var catDb=results[0], salesDb=results[1], metaDb=results[2];
+        return Promise.all([
+          catDb   ? new Promise(function(ok){var rq=catDb.transaction("products","readonly").objectStore("products").getAll();rq.onsuccess=function(){ok(rq.result||[]);};rq.onerror=function(){ok([]);};}) : Promise.resolve([]),
+          salesDb ? new Promise(function(ok){var rq=salesDb.transaction("sales","readonly").objectStore("sales").getAll();rq.onsuccess=function(){ok(rq.result||[]);};rq.onerror=function(){ok([]);};}) : Promise.resolve([]),
+          metaDb  ? new Promise(function(ok){var rq=metaDb.transaction("meta","readonly").objectStore("meta").getAll();rq.onsuccess=function(){ok(rq.result||[]);};rq.onerror=function(){ok([]);};}) : Promise.resolve([])
+        ]).then(function(arr){
+          var products=arr[0]||[], sales=arr[1]||[], meta=arr[2]||[];
+          return new Promise(function(resolve){
+            var tx=unifiedDb.transaction(["products","sales","meta","audit_events"],"readwrite");
+            var sProd=tx.objectStore("products");
+            var sSal=tx.objectStore("sales");
+            var sMet=tx.objectStore("meta");
+            var sAud=tx.objectStore("audit_events");
+            for(var i=0;i<products.length;i++) sProd.put(products[i]);
+            for(var j=0;j<sales.length;j++){
+              var sale=Object.assign({},sales[j]);
+              if(sale.id!=null) sSal.put(sale);
+            }
+            for(var k=0;k<meta.length;k++){
+              if(meta[k].key===_MIGRATED_KEY) continue;
+              sMet.put(meta[k]);
+            }
+            sMet.put({key:_MIGRATED_KEY,value:true,migratedAt:Date.now()});
+            try {
+              if(window._acimAudit){
+                var evt={
+                  id:(typeof crypto!=="undefined"&&crypto.randomUUID)?crypto.randomUUID():("m-"+Date.now()+"-"+Math.random().toString(36).slice(2)),
+                  schemaVersion:window._acimAudit.SCHEMA_VERSION,
+                  timestamp:Date.now(),
+                  type:window._acimAudit.TYPE.MIGRATION_COMPLETED,
+                  actorId:null,
+                  sessionId:window._acimAudit.getSessionId(),
+                  entityType:"system",
+                  entityId:null,
+                  action:"migrate",
+                  payload:{fromVersion:1,toVersion:_UNIFIED_VERSION,copied:{products:products.length,sales:sales.length,meta:meta.length}},
+                  previousState:null,
+                  newState:null,
+                  status:"COMMITTED"
+                };
+                sAud.add(evt);
+              }
+            } catch(e){ _err("audit event during migration failed:", e); }
+            tx.oncomplete=function(){
+              try{ indexedDB.deleteDatabase("acim-catalog"); }catch(e){}
+              try{ indexedDB.deleteDatabase("acim-sales"); }catch(e){}
+              try{ indexedDB.deleteDatabase("acim-meta"); }catch(e){}
+              if(catDb) try{catDb.close();}catch(e){}
+              if(salesDb) try{salesDb.close();}catch(e){}
+              if(metaDb) try{metaDb.close();}catch(e){}
+              resolve({ok:true,copied:{products:products.length,sales:sales.length,meta:meta.length}});
+            };
+            tx.onerror=function(e){resolve({ok:false,error:"copy-tx-error",detail:String(e&&e.target&&e.target.error&&e.target.error.name||"unknown")});};
+            tx.onabort=function(e){resolve({ok:false,error:"copy-tx-aborted",detail:String(e&&e.target&&e.target.error&&e.target.error.name||"aborted")});};
+          });
+        });
+      });
     });
   }
 
@@ -183,35 +375,12 @@
 
   var _db=null;
   function _openDB(){
+    // Sprint 4.1 PR A — return unified DB; "products" store lives there now.
+    if(_unifiedDb)return Promise.resolve(_unifiedDb);
     if(_db)return Promise.resolve(_db);
-    return new Promise(function(ok){
-      try{
-        var r=indexedDB.open("acim-catalog",1);
-        r.onupgradeneeded=function(e){
-          _log("DB upgrade needed — creating stores");
-          var d=e.target.result;
-          if(!d.objectStoreNames.contains("products")){
-            d.createObjectStore("products",{keyPath:"barcode"});
-            _log("Created 'products' object store");
-          }
-        };
-        r.onsuccess=function(e){
-          _db=e.target.result;
-          _log("DB opened successfully");
-          ok(_db);
-        };
-        r.onerror=function(e){
-          _err("DB open error:",e);
-          ok(null);
-        };
-        r.onblocked=function(){
-          _err("DB open blocked by another connection");
-          ok(null);
-        };
-      }catch(e){
-        _err("DB open exception:",e);
-        ok(null);
-      }
+    return _openUnifiedDB().then(function(d){
+      _db=d;
+      return d;
     });
   }
   function _dbGet(bc){return _openDB().then(function(d){if(!d)return null;
@@ -226,14 +395,10 @@
     return new Promise(function(ok){var tx=d.transaction("products","readwrite");tx.objectStore("products").clear();tx.oncomplete=ok;tx.onerror=ok;});});}
 
   // ─── SALES STORE ─────────────────────────────────────
+  // Sprint 4.1 PR A — sales store now lives in unified DB "acim".
   function _openSalesDB(){
-    return new Promise(function(ok){
-      try{var r=indexedDB.open("acim-sales",1);
-        r.onupgradeneeded=function(e){var d=e.target.result;
-          if(!d.objectStoreNames.contains("sales"))d.createObjectStore("sales",{keyPath:"id",autoIncrement:true});};
-        r.onsuccess=function(e){ok(e.target.result);};r.onerror=function(){ok(null);};
-      }catch(e){ok(null);}
-    });
+    if(_unifiedDb)return Promise.resolve(_unifiedDb);
+    return _openUnifiedDB();
   }
   function _persistSale(ticketNumber,items,totalCents,discountCents,payments){
     return _openSalesDB().then(function(d){
@@ -3909,7 +4074,21 @@
   // ─── INIT ────────────────────────────────────────────
   function init(){
     if(!_acquireTabLock()){_toast("⚠ Caisse déjà ouverte dans un autre onglet");return;}
-    Promise.all([_loadBcSeq(),_loadTicketSeq(),_loadSettings()]).then(function(){
+    // Sprint 4.1 PR A — open unified DB + migrate legacy DBs before anything else.
+    _openUnifiedDB().then(function(db){
+      if(!db){_err("Unified DB open failed at init");return null;}
+      if(window._acimAudit)window._acimAudit._bind(db);
+      if(window._acimAudit)return window._acimAudit.ensureSession();
+      return null;
+    }).then(function(sessionId){
+      if(window._acimAudit&&sessionId){
+        window._acimAudit.log({type:window._acimAudit.TYPE.SESSION_START,entityType:"session",entityId:sessionId,action:"start",payload:{bootTime:Date.now()}});
+      }
+      return _maybeMigrateLegacy();
+    }).then(function(migRes){
+      if(migRes) _log("Migration: "+(migRes.ok?(migRes.alreadyMigrated?"already migrated":"done: "+JSON.stringify(migRes.copied)):("FAILED: "+migRes.error)));
+      return Promise.all([_loadBcSeq(),_loadTicketSeq(),_loadSettings()]);
+    }).then(function(){
       _log("v1.3.0#40 — transactional stock + kg weight fix + version unification");
       _migrateSchema().then(function(mig){
         if(mig&&mig.applied>0)_log("Schema migrated: "+mig.applied+" step(s), v"+mig.from+"→"+mig.to);
@@ -3939,6 +4118,8 @@
         _createPOS();
         _renderPOS();
       });
+    }).catch(function(e){
+      _err("DB migration init failed:",e);
     });
     document.addEventListener("keydown",function(e){
       if(e.ctrlKey&&e.key==="k"){e.preventDefault();if(_posSearch)_posSearch.focus();}
