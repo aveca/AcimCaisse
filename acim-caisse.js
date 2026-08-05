@@ -1,4 +1,4 @@
-// ─── AcimCaisse v37 — Bug fixes + catégorisation Yarden améliorée + photos ──
+// ─── AcimCaisse v1.3.0#40 — Transactional stock + kg weight fix + version unification ──
 ;(function(){
   "use strict";
   var _log=function(m){console.log("[Acim] "+m);};
@@ -198,14 +198,64 @@
   }
 
   // ─── STOCK HELPERS ───────────────────────────────────
-  function _decrementStock(barcode,qty){
-    if(!barcode)return;
-    _dbGet(barcode).then(function(p){
-      if(!p)return;
-      var newQty=(p.stockQty||0)-(qty||1);
-      p.stockQty=newQty;
-      p.last_updated=Date.now();
-      _dbPut(p);
+  // BUG-001 fix: atomic read-modify-write via single readwrite transaction.
+  // BUG-002 fix: caller passes the weight for kg products; qty for unit products.
+  // Returns a Promise<{ok:boolean,newStock:number,reason:string}> so callers can react.
+  function _decrementStock(barcode, qtyOrWeight){
+    if(!barcode)return Promise.resolve({ok:false,reason:"no-barcode"});
+    var amount=qtyOrWeight||1;
+    return _openDB().then(function(d){
+      if(!d)return {ok:false,reason:"no-db"};
+      return new Promise(function(ok){
+        var tx=d.transaction("products","readwrite");
+        var store=tx.objectStore("products");
+        var req=store.get(barcode);
+        tx.oncomplete=function(){
+          ok({ok:true,newStock:req.result?(req.result.stockQty||0):0,reason:"ok"});
+        };
+        tx.onerror=function(){ok({ok:false,reason:"tx-error"});};
+        tx.onabort=function(){ok({ok:false,reason:"tx-aborted"});};
+        req.onsuccess=function(){
+          var p=req.result;
+          if(!p){ok({ok:false,reason:"not-found"});tx.abort();return;}
+          var cur=(p.stockQty||0);
+          var next=cur-amount;
+          if(next<0){
+            var unit=(p.unitType||"unit");
+            var isKg=(unit==="kg"||unit==="g"||unit==="L");
+            ok({ok:false,reason:isKg?("stock-kg:"+cur):("stock:"+cur),currentStock:cur,requested:amount});
+            tx.abort();return;
+          }
+          p.stockQty=next;
+          p.last_updated=Date.now();
+          store.put(p);
+        };
+        req.onerror=function(){ok({ok:false,reason:"get-error"});};
+      });
+    });
+  }
+  // Inverse of _decrementStock — used on ticket void / cancellation.
+  function _restoreStock(barcode, qtyOrWeight){
+    if(!barcode)return Promise.resolve({ok:false,reason:"no-barcode"});
+    var amount=qtyOrWeight||1;
+    return _openDB().then(function(d){
+      if(!d)return {ok:false,reason:"no-db"};
+      return new Promise(function(ok){
+        var tx=d.transaction("products","readwrite");
+        var store=tx.objectStore("products");
+        var req=store.get(barcode);
+        tx.oncomplete=function(){ok({ok:true,newStock:req.result?(req.result.stockQty||0):0,reason:"ok"});};
+        tx.onerror=function(){ok({ok:false,reason:"tx-error"});};
+        tx.onabort=function(){ok({ok:false,reason:"tx-aborted"});};
+        req.onsuccess=function(){
+          var p=req.result;
+          if(!p){ok({ok:false,reason:"not-found"});tx.abort();return;}
+          p.stockQty=(p.stockQty||0)+amount;
+          p.last_updated=Date.now();
+          store.put(p);
+        };
+        req.onerror=function(){ok({ok:false,reason:"get-error"});};
+      });
     });
   }
 
@@ -1180,11 +1230,29 @@
     _saveTicketSeq();
     var saleItems=_myCart.slice();
     _persistSale(ticketNum,saleItems,total,_cartDiscountCents,payments).then(function(){
-      // Decrement stock
+      // Decrement stock — atomic per item. For kg products, decrement by weight.
+      // IIFE captures it/amount per iteration (var is function-scoped, not block-scoped).
+      var decPromises=[];
+      var failures=[];
       for(var i=0;i<saleItems.length;i++){
-        var it=saleItems[i];
-        if(it.bc)_decrementStock(it.bc,it.qty||1);
+        (function(it,amount){
+          if(!it.bc)return;
+          decPromises.push(_decrementStock(it.bc,amount).then(function(r){
+            if(!r.ok){
+              var reason=r.reason||"unknown";
+              failures.push({bc:it.bc,name:it.name,reason:reason,currentStock:r.currentStock,requested:amount});
+              if(reason.indexOf("stock")===0){
+                _toast("⚠️ Stock insuffisant: "+it.name+" (reste "+(r.currentStock||0)+", demandé "+amount+")");
+              }
+            }
+          }));
+        })(saleItems[i],(_isWeightProduct(saleItems[i])&&saleItems[i].weight!=null)?saleItems[i].weight:(saleItems[i].qty||1));
       }
+      Promise.all(decPromises).then(function(){
+        if(failures.length>0){
+          _log("Stock decrement failures:",failures);
+        }
+      });
       // Show receipt
       _showReceipt(ticketNum,saleItems,total,_cartDiscountCents,payments);
       _broadcastClear();
@@ -2229,7 +2297,7 @@
       return{
         version:1,
         exportDate:new Date().toISOString(),
-        source:"acim-caisse-v34",
+        source:"acim-caisse-v1.3.0",
         products:results[0]||[],
         sales:results[1]||[],
         meta:results[2]||{}
@@ -2760,19 +2828,14 @@
           var bUndo=document.createElement("button");bUndo.textContent="↩️ Oui, annuler";
           bUndo.style.cssText="flex:1;padding:12px;border:none;border-radius:8px;background:#c62828;color:#fff;font-size:16px;cursor:pointer;font-weight:700;";
           bUndo.onclick=function(){
-            // Restore stock for each item
+            // Restore stock for each item — atomic per item, weight-aware for kg products.
             var stockChain=Promise.resolve();
             if(sale.items){
               sale.items.forEach(function(item){
                 stockChain=stockChain.then(function(){
                   if(item.barcode){
-                    return _dbGet(item.barcode).then(function(p){
-                      if(p){
-                        p.stockQty=(p.stockQty||0)+(item.qty||1);
-                        p.last_updated=Date.now();
-                        return _dbPut(p);
-                      }
-                    });
+                    var amount=(item.unitType&&item.weight!=null&&item.pricePerUnit!=null)?item.weight:(item.qty||1);
+                    return _restoreStock(item.barcode,amount);
                   }
                 });
               });
@@ -3705,7 +3768,7 @@
   function init(){
     if(!_acquireTabLock()){_toast("⚠ Caisse déjà ouverte dans un autre onglet");return;}
     Promise.all([_loadBcSeq(),_loadTicketSeq(),_loadSettings()]).then(function(){
-      _log("v37 — bug fixes + catégorisation + photos");
+      _log("v1.3.0#40 — transactional stock + kg weight fix + version unification");
       _importBackupFromEmbedded().then(function(imported){
         if(imported)_toast("✅ Catalogue importé (38 produits)");
         return _importSupplierCatalogFromMeta();

@@ -7,9 +7,9 @@ function createWindow() {
     height: 800,
     backgroundColor: '#1a1a2e',
     webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false,
-      webSecurity: false,
+      nodeIntegration: false,
+      contextIsolation: true,
+      webSecurity: true,
     },
   });
 
