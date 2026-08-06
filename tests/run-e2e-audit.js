@@ -116,7 +116,7 @@ async function seedLegacyDBs(p, products, sales, meta){
     const probe = await p.evaluate(async () => {
       return await new Promise(res => {
         try {
-          const r = indexedDB.open("acim", 2);
+          const r = indexedDB.open("acim", 3);
           r.onsuccess = (e) => {
             const d = e.target.result;
             const stores = Array.prototype.slice.call(d.objectStoreNames);
@@ -133,8 +133,9 @@ async function seedLegacyDBs(p, products, sales, meta){
       });
     });
     await shot(p, 'audit-01-fresh-db');
-    await ok('Unified DB "acim" contains 4 stores (got: '+(probe.stores||[]).join(',')+')', probe.stores && probe.stores.length === 4, JSON.stringify(probe));
-    await ok('Stores are products/sales/meta/audit_events', probe.stores && ["audit_events","meta","products","sales"].every(s => probe.stores.includes(s)));
+    // V3 (PR C) added the "users" store. The 4 mandatory stores from PR A plus users.
+    await ok('Unified DB "acim" contains >= 4 stores (got: '+(probe.stores||[]).join(',')+')', probe.stores && probe.stores.length >= 4, JSON.stringify(probe));
+    await ok('Required stores present (products/sales/meta/audit_events)', probe.stores && ["audit_events","meta","products","sales"].every(s => probe.stores.includes(s)));
     await ok('audit_events has 6 indexes (got '+(probe.indexes && probe.indexes.names ? probe.indexes.names.length : -1)+')', probe.indexes && probe.indexes.names && probe.indexes.names.length === 6, JSON.stringify(probe.indexes));
     await ok('Required indexes present', probe.indexes && probe.indexes.names && ["by_timestamp","by_type","by_actorId","by_sessionId","by_entityType","by_entityId"].every(i => probe.indexes.names.includes(i)));
     // Legacy absence — non-mutating probe via indexedDB.databases(). Skips if the
@@ -175,7 +176,7 @@ async function seedLegacyDBs(p, products, sales, meta){
     await p.waitForTimeout(6500);
     const probe = await p.evaluate(async () => {
       return await new Promise(res => {
-        const r = indexedDB.open("acim", 2);
+        const r = indexedDB.open("acim", 3);
         r.onsuccess = async (e) => {
           const d = e.target.result;
           const out = { counts: {}, migrationEvent: null, legProducts: [] };
@@ -240,7 +241,7 @@ async function seedLegacyDBs(p, products, sales, meta){
     await p.evaluate(async () => {
       // Clear audit_events via a tx (allowed from tests — proves we can wipe for isolation)
       return await new Promise(res => {
-        const r = indexedDB.open("acim", 2);
+        const r = indexedDB.open("acim", 3);
         r.onsuccess = (e) => {
           const d = e.target.result;
           const tx = d.transaction("audit_events","readwrite");
@@ -270,7 +271,7 @@ async function seedLegacyDBs(p, products, sales, meta){
     await p.evaluate(async () => {
       // Clear and seed 3 events.
       await new Promise(res => {
-        const r = indexedDB.open("acim", 2);
+        const r = indexedDB.open("acim", 3);
         r.onsuccess = (e) => {
           const d = e.target.result;
           const tx = d.transaction("audit_events","readwrite");
@@ -329,7 +330,7 @@ async function seedLegacyDBs(p, products, sales, meta){
       const last = await window._acimAudit.last();
       if (!last) return { error: "no-event-to-test-immutable" };
       return await new Promise(res => {
-        const r0 = indexedDB.open("acim", 2);
+        const r0 = indexedDB.open("acim", 3);
         r0.onsuccess = (e) => {
           const d = e.target.result;
           const tx = d.transaction("audit_events","readwrite");
@@ -380,7 +381,7 @@ async function seedLegacyDBs(p, products, sales, meta){
     const probe = await p.evaluate(async () => {
       // Count CR-* products — should be 5, not 10
       return await new Promise(res => {
-        const r = indexedDB.open("acim", 2);
+        const r = indexedDB.open("acim", 3);
         r.onsuccess = (e) => {
           const d = e.target.result;
           const tx = d.transaction("products","readonly");

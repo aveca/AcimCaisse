@@ -88,8 +88,9 @@
   // ─── META STORE ──────────────────────────────────────
   // Sprint 4.1 PR A — unified DB "acim" (v2). Stores products + sales + meta + audit_events.
   // Old DBs (acim-catalog, acim-sales, acim-meta) are migrated in-place then deleted.
+  // Sprint 4.1 PR C — bump to v3: add "users" store for operator identity (PIN salé).
   var _UNIFIED_DB="acim";
-  var _UNIFIED_VERSION=2;
+  var _UNIFIED_VERSION=3;
   var _unifiedDb=null;
   var _MIGRATED_KEY="acim-migrated-v2";
 
@@ -112,7 +113,15 @@
             s.createIndex("by_entityType","entityType",{unique:false});
             s.createIndex("by_entityId","entityId",{unique:false});
           }
-          _log("Unified DB upgrade — stores: "+Array.prototype.slice.call(d.objectStoreNames).join(", "));
+          // PR C — users store for operator identity. Schema:
+          //   { id:string (IMMUABLE), salt:base64(16 octets), pinHash:base64(SHA-256(salt||pin)),
+          //     name:string (modifiable), role:"cashier"|"manager", active:boolean, createdAt:number }
+          // Invariant d'identité: audit_events.actorId = users.id (jamais le name).
+          if(!d.objectStoreNames.contains("users")){
+            var u=d.createObjectStore("users",{keyPath:"id"});
+            u.createIndex("by_active","active",{unique:false});
+          }
+          _log("Unified DB upgrade v"+e.target.result.version+" — stores: "+Array.prototype.slice.call(d.objectStoreNames).join(", "));
         };
         r.onsuccess=function(e){_unifiedDb=e.target.result;ok(_unifiedDb);};
         r.onerror=function(e){_err("Unified DB open error:",e);ok(null);};
@@ -918,6 +927,12 @@
     };
     topBar.appendChild(testScanBtn);
 
+    // PR C — opérateur badge (login/logout)
+    var actorBadge = document.createElement("div");
+    actorBadge.id = "acim-actor-badge";
+    actorBadge.style.cssText = "display:flex;align-items:center;flex-shrink:0;margin-left:4px;";
+    topBar.appendChild(actorBadge);
+
     var closeBtn=document.createElement("button");
     closeBtn.textContent="✕ Factures";closeBtn.title="Fermer la caisse — accéder aux factures Flutter";
     closeBtn.style.cssText="padding:6px 12px;border:1px solid rgba(255,255,255,0.3);border-radius:6px;background:transparent;color:#fff;font-size:15px;cursor:pointer;flex-shrink:0;white-space:nowrap;";
@@ -1663,6 +1678,337 @@
       _toast("❌ Vente échouée: "+(e&&e.message||"erreur"));
     });
   }
+
+  // ─── PR C — MANUAL STOCK ADJUSTMENT + OPERATOR IDENTITY ───────────
+  // Stock adjust reasons: shared constants for UI métier + tests + audit.
+  // Construit comme frozen object pour empêcher la dérive runtime.
+  var STOCK_ADJUST_REASON = Object.freeze({
+    RESTOCK:    "restock",     // réception marchandise
+    INVENTORY:  "inventory",   // ajustement d'inventaire
+    LOSS:       "loss",        // casse / perte
+    CORRECTION: "correction",  // correction d'erreur de saisie
+    MANUAL:     "manual"       // autre raison manuelle
+  });
+  var _VALID_REASONS = Object.keys(STOCK_ADJUST_REASON).map(function(k){return STOCK_ADJUST_REASON[k];});
+  var _USER_META_KEY = "acim-current-actor-id";
+  var _PIN_REGEX = /^\d{4,8}$/;
+
+  // Convertit un Uint8Array (taille arbitraire) en base64 — robuste pour tout
+  // buffer, sans risque de stack overflow sur apply() pour longs tableaux.
+  function _bytesToBase64(bytes){
+    var binary = "";
+    for (var i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+    return btoa(binary);
+  }
+
+  // Hash un PIN salé via SHA-256 (crypto.subtle). Retourne Promise<{salt, pinHash}> en base64.
+  function _hashPin(pin, saltBytes){
+    return new Promise(function(resolve, reject){
+      try {
+        var salt = saltBytes || crypto.getRandomValues(new Uint8Array(16));
+        var pinBytes = new TextEncoder().encode(String(pin));
+        var buf = new Uint8Array(salt.length + pinBytes.length);
+        buf.set(salt, 0);
+        buf.set(pinBytes, salt.length);
+        crypto.subtle.digest("SHA-256", buf).then(function(hashBuf){
+          resolve({
+            salt: _bytesToBase64(salt),
+            pinHash: _bytesToBase64(new Uint8Array(hashBuf))
+          });
+        }).catch(reject);
+      } catch(e){ reject(e); }
+    });
+  }
+
+  // Vérifie un PIN candidat contre {salt, pinHash} stockés. Resolve true/false.
+  function _verifyPin(pin, saltB64, pinHashB64){
+    return new Promise(function(resolve){
+      try {
+        var saltStr = atob(saltB64);
+        var saltBytes = new Uint8Array(saltStr.length);
+        for (var i = 0; i < saltStr.length; i++) saltBytes[i] = saltStr.charCodeAt(i);
+        _hashPin(pin, saltBytes).then(function(h){
+          resolve(h.pinHash === pinHashB64);
+        }).catch(function(){ resolve(false); });
+      } catch(e){ resolve(false); }
+    });
+  }
+
+  // Crée un employé. id immuable, name modifiable, PIN salé.
+  // Retourne Promise<{ok, userId?, error?}>.
+  function _createUser(userId, pin, name, role){
+    if(!userId) return Promise.resolve({ok:false, error:"missing-id"});
+    if(!_PIN_REGEX.test(String(pin||""))) return Promise.resolve({ok:false, error:"pin-invalid"});
+    if(!name) return Promise.resolve({ok:false, error:"missing-name"});
+    if(role !== "cashier" && role !== "manager") role = "cashier";
+    return _hashPin(pin).then(function(h){
+      return _openUnifiedDB().then(function(db){
+        if(!db) return {ok:false, error:"no-db"};
+        return new Promise(function(resolve){
+          var tx = db.transaction("users", "readwrite");
+          var s = tx.objectStore("users");
+          // Resolution policy: ONE resolve() per Promise, always. Either
+          //   - oncomplete → {ok:true, userId}, OR
+          //   - onabort / onerror → {ok:false, error: …}
+          // We never resolve() then abort() then resolve() again. The first
+          // event that fires wins; the others are no-ops (Promise semantics).
+          // PR C invariant: install tx-level handlers BEFORE issuing any request
+          // that may abort the tx — otherwise the abort event fires with no
+          // listener and the Promise never resolves (Playwright timeout +
+          // garbage collection). This is what_caused_ the_duplicate_id bug.
+          var done = false;
+          var abortReason = "tx-aborted";
+          function settle(value){ if(!done){ done = true; resolve(value); } }
+          tx.oncomplete = function(){ settle({ok:true, userId:userId}); };
+          tx.onerror   = function(e){ settle({ok:false, error:"tx-error", detail:String(e&&e.target&&e.target.error&&e.target.error.name||"unknown")}); };
+          tx.onabort   = function(e){ settle({ok:false, error:abortReason, detail:String(e&&e.target&&e.target.error&&e.target.error.name||"aborted")}); };
+          var getReq = s.get(userId);
+          getReq.onsuccess = function(){
+            if(getReq.result){
+              abortReason = "id-exists";
+              try{ tx.abort(); }catch(_){ settle({ok:false, error:abortReason}); }
+              return;
+            }
+            s.put({id:userId, salt:h.salt, pinHash:h.pinHash, name:String(name), role:role, active:true, createdAt:Date.now()});
+          };
+          getReq.onerror = function(){ settle({ok:false, error:"get-error"}); };
+        });
+      });
+    }).catch(function(e){ return {ok:false, error:"hash-error", detail:String(e&&e.message||e)}; });
+  }
+
+  function _listUsers(){
+    return _openUnifiedDB().then(function(db){
+      if(!db) return [];
+      return new Promise(function(resolve){
+        var tx = db.transaction("users", "readonly");
+        var req = tx.objectStore("users").getAll();
+        req.onsuccess = function(){ resolve((req.result||[]).map(function(u){return {id:u.id, name:u.name, role:u.role, active:u.active, createdAt:u.createdAt};})); };
+        req.onerror   = function(){ resolve([]); };
+      });
+    });
+  }
+
+  // Login via PIN. Resolve {ok, actor?} où actor = {id, name, role}.
+  function _loginWithPin(pin){
+    if(!_PIN_REGEX.test(String(pin||""))) return Promise.resolve({ok:false, error:"pin-invalid"});
+    return _openUnifiedDB().then(function(db){
+      if(!db) return {ok:false, error:"no-db"};
+      return new Promise(function(resolve){
+        var readTx = db.transaction("users", "readonly");
+        var req = readTx.objectStore("users").getAll();
+        req.onsuccess = function(){
+          var users = req.result || [];
+          // Probe each active user sequentially — salt pinned, async digest.
+          // Note: readTx auto-commits once we let the event loop return; we do
+          // NOT open any new tx on the same db *during* this readonly tx.
+          var i = 0;
+          function tryNext(){
+            if(i >= users.length){ resolve({ok:false, error:"no-match"}); return; }
+            var u = users[i++];
+            if(!u.active){ tryNext(); return; }
+            _verifyPin(pin, u.salt, u.pinHash).then(function(match){
+              if(match){
+                // Populate audit actorId immediately (in-memory only).
+                if(window._acimAudit) window._acimAudit.setActor(u.id);
+                // Persist session — fresh tx after read-only auto-closed.
+                var wtx = db.transaction("meta", "readwrite");
+                wtx.objectStore("meta").put({key:_USER_META_KEY, value:u.id, loginAt:Date.now()});
+                wtx.oncomplete = function(){ resolve({ok:true, actor:{id:u.id, name:u.name, role:u.role}}); };
+                wtx.onerror   = function(){ resolve({ok:true, actor:{id:u.id, name:u.name, role:u.role}}); };
+              } else { tryNext(); }
+            });
+          }
+          // Use setTimeout(0) to ensure readTx has released before opening the
+          // next tx if the digest resolves synchronously (it doesn't, but be safe).
+          tryNext();
+        };
+        req.onerror = function(){ resolve({ok:false, error:"db-error"}); };
+      });
+    });
+  }
+
+  function _logout(){
+    if(window._acimAudit) window._acimAudit.setActor(null);
+    return _openUnifiedDB().then(function(db){
+      if(!db) return;
+      return new Promise(function(resolve){
+        var tx = db.transaction("meta", "readwrite");
+        tx.objectStore("meta").delete(_USER_META_KEY);
+        tx.oncomplete = function(){ resolve(); };
+        tx.onerror   = function(){ resolve(); };
+      });
+    });
+  }
+
+  function _getCurrentActor(){
+    var actorId = window._acimAudit ? window._acimAudit.getActorId() : null;
+    if(!actorId) return null;
+    // Sync fetch (cached map if any) — but we need the name. Lightweight read.
+    // For UI display: return cached actor name when possible.
+    // Since this is sync, we hit the cache only; full info via _getCurrentActorAsync.
+    return {id: actorId};
+  }
+
+  function _getCurrentActorAsync(){
+    var actorId = window._acimAudit ? window._acimAudit.getActorId() : null;
+    if(!actorId) return Promise.resolve(null);
+    return _openUnifiedDB().then(function(db){
+      if(!db) return null;
+      return new Promise(function(resolve){
+        var tx = db.transaction("users", "readonly");
+        var req = tx.objectStore("users").get(actorId);
+        req.onsuccess = function(){ if(req.result && req.result.active) resolve({id:req.result.id, name:req.result.name, role:req.result.role}); else resolve(null); };
+        req.onerror   = function(){ resolve(null); };
+      });
+    });
+  }
+
+  // Restore session from meta on boot — called by init(). Best-effort, never blocks the app.
+  function _restoreSessionIfAny(){
+    return _openUnifiedDB().then(function(db){
+      if(!db) return null;
+      return new Promise(function(resolve){
+        var tx = db.transaction("meta", "readonly");
+        var req = tx.objectStore("meta").get(_USER_META_KEY);
+        req.onsuccess = function(){
+          if(req.result && req.result.value){
+            // Validate that the user still exists and is active.
+            var uTx = db.transaction("users", "readonly");
+            var uReq = uTx.objectStore("users").get(req.result.value);
+            uReq.onsuccess = function(){
+              if(uReq.result && uReq.result.active && window._acimAudit){
+                window._acimAudit.setActor(uReq.result.id);
+                resolve({id:uReq.result.id, name:uReq.result.name, role:uReq.result.role});
+              } else {
+                if(window._acimAudit) window._acimAudit.setActor(null);
+                resolve(null);
+              }
+            };
+            uReq.onerror = function(){ resolve(null); };
+          } else { resolve(null); }
+        };
+        req.onerror = function(){ resolve(null); };
+      });
+    });
+  }
+
+  // _adjustStock — point d'entrée unique pour ajustement manuel de stock.
+  // TX atomique sur [products, audit_events]. Si logInTx throw → tx.abort.
+  // Retourne Promise<{ok, newStock?, reason?}>.
+  function _adjustStock(barcode, delta, reason){
+    if(!barcode) return Promise.resolve({ok:false, reason:"no-barcode"});
+    if(typeof delta !== "number" || isNaN(delta) || !isFinite(delta)) return Promise.resolve({ok:false, reason:"delta-invalid"});
+    if(_VALID_REASONS.indexOf(reason) < 0) return Promise.resolve({ok:false, reason:"reason-invalid"});
+    return _openUnifiedDB().then(function(db){
+      if(!db) return {ok:false, reason:"no-db"};
+      return new Promise(function(resolve){
+        var tx;
+        try {
+          tx = db.transaction(["products","audit_events"], "readwrite");
+        } catch(e){ resolve({ok:false, reason:"tx-open-error"}); return; }
+        var sProd = tx.objectStore("products");
+        var req = sProd.get(barcode);
+        req.onsuccess = function(){
+          var p = req.result;
+          if(!p){ try{tx.abort();}catch(_){} resolve({ok:false, reason:"not-found"}); return; }
+          var cur = (typeof p.stockQty === "number") ? p.stockQty : 0;
+          var nextv = cur + delta;
+          if(nextv < 0){
+            try{tx.abort();}catch(_){}
+            var unit = (p.unitType || "unit");
+            var isKg = (unit === "kg" || unit === "g" || unit === "L");
+            resolve({ok:false, reason: isKg ? "stock-kg:"+cur : "stock:"+cur, currentStock:cur, requested:delta});
+            return;
+          }
+          p.stockQty = nextv;
+          p.last_updated = Date.now();
+          sProd.put(p);
+          try {
+            window._acimAudit.logInTx(tx, {
+              type: window._acimAudit.TYPE.STOCK_ADJUSTED,
+              entityType: "stock",
+              entityId: barcode,
+              action: "adjust",
+              payload: {barcode:barcode, delta:delta, reason:reason},
+              previousState: {stockQty: cur},
+              newState: {stockQty: nextv}
+            });
+          } catch(e){
+            _err("Audit STOCK_ADJUSTED append failed — aborting TX:", e);
+            try{tx.abort();}catch(_){}
+            resolve({ok:false, reason:"audit-error"});
+            return;
+          }
+          tx.oncomplete = function(){ resolve({ok:true, newStock:nextv, reason:"ok"}); };
+          tx.onabort   = function(){ resolve({ok:false, reason:"tx-aborted"}); };
+          tx.onerror   = function(){ resolve({ok:false, reason:"tx-error"}); };
+        };
+        req.onerror = function(){ try{tx.abort();}catch(_){} resolve({ok:false, reason:"get-error"}); };
+      });
+    });
+  }
+
+  // ─── PR C — UI minimale (login + badge opérateur) ─────────────────
+  function _showLogin(){
+    var old=document.getElementById("acim-login"); if(old) old.remove();
+    var ov=document.createElement("div"); ov.id="acim-login";
+    ov.style.cssText="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);z-index:10000005;display:flex;align-items:center;justify-content:center;";
+    var card=document.createElement("div");
+    card.style.cssText="background:#fff;border-radius:14px;padding:20px;width:320px;max-width:95vw;box-shadow:0 8px 24px rgba(0,0,0,0.3);font-family:Segoe UI,Arial,sans-serif;";
+    var ti=document.createElement("div"); ti.style.cssText="font-size:18px;font-weight:700;margin-bottom:12px;color:#1a1a2e;text-align:center;";
+    ti.textContent="👤 Connexion opérateur"; card.appendChild(ti);
+    var err=document.createElement("div"); err.style.cssText="font-size:13px;color:#c62828;min-height:18px;margin-bottom:6px;text-align:center;"; card.appendChild(err);
+    var inp=document.createElement("input"); inp.type="password"; inp.inputMode="numeric"; inp.pattern="[0-9]*";
+    inp.placeholder="PIN"; inp.style.cssText="width:100%;font-size:22px;font-weight:700;padding:10px;border:3px solid #e0e0e0;border-radius:8px;outline:none;text-align:center;letter-spacing:8px;box-sizing:border-box;";
+    card.appendChild(inp);
+    var br=document.createElement("div"); br.style.cssText="display:flex;gap:8px;margin-top:12px;";
+    var bCancel=document.createElement("button"); bCancel.textContent="Annuler";
+    bCancel.style.cssText="flex:1;padding:10px;border:2px solid #e0e0e0;border-radius:8px;background:#fff;font-size:15px;cursor:pointer;";
+    bCancel.onclick=function(){ ov.remove(); };
+    var bOk=document.createElement("button"); bOk.textContent="✅ Connexion";
+    bOk.style.cssText="flex:2;padding:10px;border:none;border-radius:8px;background:#2e7d32;color:#fff;font-size:15px;cursor:pointer;font-weight:700;";
+    bOk.onclick=function(){
+      var pin = inp.value.trim();
+      if(!_PIN_REGEX.test(pin)){ err.textContent="PIN invalide (4-8 chiffres)"; return; }
+      bOk.disabled = true; bOk.textContent = "…";
+      _loginWithPin(pin).then(function(r){
+        bOk.disabled = false; bOk.textContent = "✅ Connexion";
+        if(r.ok){ ov.remove(); _toast("👤 Bonjour "+r.actor.name); _refreshActorBadge(); }
+        else { err.textContent = "PIN incorrect"; inp.value=""; inp.focus(); }
+      });
+    };
+    br.appendChild(bCancel); br.appendChild(bOk); card.appendChild(br);
+    ov.appendChild(card); ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
+    document.body.appendChild(ov);
+    setTimeout(function(){ inp.focus(); }, 100);
+  }
+
+  function _refreshActorBadge(){
+    var badge = document.getElementById("acim-actor-badge");
+    if(!badge) return;
+    _getCurrentActorAsync().then(function(actor){
+      badge.innerHTML = "";  // always wipe first — avoid button accumulation across refreshes
+      if(!actor){
+        var span=document.createElement("span");
+        span.style.cssText="color:#888;font-weight:500;";
+        span.textContent="👤 ops?";
+        badge.appendChild(span);
+        var b=document.createElement("button"); b.textContent="Connexion";
+        b.style.cssText="margin-left:8px;padding:4px 10px;border:1px solid #e0e0e0;border-radius:6px;background:#fff;font-size:13px;cursor:pointer;";
+        b.onclick=function(){ _showLogin(); };
+        badge.appendChild(b);
+      } else {
+        var btnLogin=document.createElement("button");
+        btnLogin.innerHTML='👤 <b>'+esc(actor.name)+'</b> <span style="font-size:11px;color:#888;">('+esc(actor.role)+')</span> <span style="color:#c62828;">⏻</span>';
+        btnLogin.style.cssText="padding:4px 10px;border:1px solid #e0e0e0;border-radius:6px;background:#fff;font-size:13px;cursor:pointer;";
+        btnLogin.onclick=function(){ if(confirm("Déconnexion opérateur ?")){ _logout().then(function(){ _toast("Déconnecté"); _refreshActorBadge(); }); } };
+        badge.appendChild(btnLogin);
+      }
+    });
+  }
+
+  // ─── END PR C ─────────────────────────────────────────
 
   // ─── RECEIPT ─────────────────────────────────────────
   function _showReceipt(ticketNum,items,total,discountCents,payments){
@@ -4274,6 +4620,10 @@
       return _maybeMigrateLegacy();
     }).then(function(migRes){
       if(migRes) _log("Migration: "+(migRes.ok?(migRes.alreadyMigrated?"already migrated":"done: "+JSON.stringify(migRes.copied)):("FAILED: "+migRes.error)));
+      // PR C — Restoring operator session if any (offline-first trust local meta).
+      return _restoreSessionIfAny();
+    }).then(function(actor){
+      if(actor) _log("Operator session restored: "+actor.id+" ("+actor.name+")");
       return Promise.all([_loadBcSeq(),_loadTicketSeq(),_loadSettings()]);
     }).then(function(){
       _log("v1.3.0#40 — transactional stock + kg weight fix + version unification");
@@ -4299,11 +4649,13 @@
         _log("Produits chargés: "+_allProducts.length);
         _createPOS();
         _renderPOS();
+        _refreshActorBadge();
       }).catch(function(e){
         _err("Init error:",e);
         _allProducts=[];
         _createPOS();
         _renderPOS();
+        _refreshActorBadge();
       });
     }).catch(function(e){
       _err("DB migration init failed:",e);
@@ -4386,9 +4738,30 @@
     persistSale:_persistSale,
     undoLastSale:_undoLastSale,
     executeUndoSaleAtomic:_executeUndoSaleAtomic,
+    // PR C — operator identity + manual stock adjust (test surface)
+    adjustStock:_adjustStock,
+    createUser:_createUser,
+    listUsers:_listUsers,
+    loginWithPin:_loginWithPin,
+    logout:_logout,
+    getCurrentActor:_getCurrentActor,
+    getCurrentActorAsync:_getCurrentActorAsync,
+    restoreSessionIfAny:_restoreSessionIfAny,
+    hashPin:_hashPin,
+    verifyPin:_verifyPin,
+    bytesToBase64:_bytesToBase64,
+    STOCK_ADJUST_REASON:STOCK_ADJUST_REASON,
+    USER_META_KEY:_USER_META_KEY,
     clearCart:function(){_myCart=[];_realBcMap={};_cartDiscountCents=0;_renderPOS();},
     getCart:function(){return _myCart.slice();},
     formatWeight:_formatWeight,
     formatPricePerUnit:_formatPricePerUnit
   };
+  // PR C — UI public surface
+  window._acimAdjustStock=_adjustStock;
+  window._acimShowLogin=_showLogin;
+  window._acimLogout=_logout;
+  window._acimGetCurrentActor=_getCurrentActor;
+  window._acimGetCurrentActorAsync=_getCurrentActorAsync;
+  window._acimRefreshActorBadge=_refreshActorBadge;
 })();

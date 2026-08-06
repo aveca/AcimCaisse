@@ -16,7 +16,7 @@ async function ok(name, cond, detail){ if(cond){R.pass++; log('  PASS: '+name);}
 async function clearAudit(p){
   return await p.evaluate(async () => {
     return await new Promise(res => {
-      const r = indexedDB.open("acim", 2);
+      const r = indexedDB.open("acim", 3);
       r.onsuccess = (e) => {
         const d = e.target.result;
         const tx = d.transaction("audit_events","readwrite");
