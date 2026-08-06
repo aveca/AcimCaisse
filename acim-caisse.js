@@ -2010,19 +2010,36 @@
   function _seedDefaultUser(){
     return _openUnifiedDB().then(function(db){
       if(!db) return;
-      return new Promise(function(resolve){
-        var tx = db.transaction("users", "readonly");
-        var req = tx.objectStore("users").getAll();
-        req.onsuccess = function(){
-          if(req.result && req.result.length > 0){ resolve(); return; }
-          _createUser("u-admin", "1234", "Administrateur", "manager").then(function(){
-            _log("✅ Utilisateur admin par défaut créé (PIN: 1234)");
-            resolve();
-          });
-        };
-        req.onerror = function(){ resolve(); };
+      return _hashPin("1234").then(function(h){
+        return new Promise(function(resolve){
+          var tx = db.transaction("users", "readwrite");
+          var s = tx.objectStore("users");
+          var getReq = s.get("u-admin");
+          getReq.onsuccess = function(){
+            if(getReq.result){
+              // Update existing admin with PIN 1234 (in case it was created with different PIN)
+              s.put({id:"u-admin", salt:h.salt, pinHash:h.pinHash, name:"Administrateur", role:"manager", active:true, createdAt:getReq.result.createdAt||Date.now()});
+              _log("✅ Utilisateur admin mis à jour (PIN: 1234)");
+            } else {
+              // Check if any users exist
+              var allReq = s.getAll();
+              allReq.onsuccess = function(){
+                if(allReq.result && allReq.result.length > 0){
+                  _log("Users exist but no u-admin, skipping seed");
+                  resolve();
+                  return;
+                }
+                s.put({id:"u-admin", salt:h.salt, pinHash:h.pinHash, name:"Administrateur", role:"manager", active:true, createdAt:Date.now()});
+                _log("✅ Utilisateur admin par défaut créé (PIN: 1234)");
+              };
+            }
+          };
+          tx.oncomplete = function(){ resolve(); };
+          tx.onerror = function(){ resolve(); };
+          tx.onabort = function(){ resolve(); };
+        });
       });
-    });
+    }).catch(function(e){ _err("Seed user error:", e); });
   }
 
   // Login via PIN. Resolve {ok, actor?} où actor = {id, name, role}.
