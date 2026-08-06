@@ -4987,7 +4987,13 @@
     "yaourts nature":"https://images.openfoodfacts.org/images/products/611/103/200/2925/front_fr.44.400.jpg",
     // Boissons (verified working)
     "eau minerale":"https://images.openfoodfacts.org/images/products/370/012/330/0014/front_fr.108.400.jpg",
-    "eau":"https://images.openfoodfacts.org/images/products/370/012/330/0014/front_fr.108.400.jpg"
+    "eau":"https://images.openfoodfacts.org/images/products/370/012/330/0014/front_fr.108.400.jpg",
+    "coca":"https://images.openfoodfacts.org/images/products/544/900/000/0996/front_en.1107.400.jpg",
+    "coca cola":"https://images.openfoodfacts.org/images/products/544/900/000/0996/front_en.1107.400.jpg",
+    "orangina":"https://images.openfoodfacts.org/images/products/322/885/700/0166/front_fr.1869.400.jpg",
+    "pain complet":"https://images.openfoodfacts.org/images/products/322/885/700/0166/front_fr.1869.400.jpg",
+    "prince chocolat":"https://images.openfoodfacts.org/images/products/762/221/044/9283/front_en.605.400.jpg",
+    "prince":"https://images.openfoodfacts.org/images/products/762/221/044/9283/front_en.605.400.jpg"
   };
 
   function _searchImageByName(name){
