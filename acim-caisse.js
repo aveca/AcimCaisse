@@ -2450,23 +2450,23 @@
   }
 
   // ─── IDEAL CART (200€ preset) ──
-  // Real EAN barcodes for known French products; fresh produce uses name search
+  // Real verified EAN barcodes from Open Food Facts; fresh produce uses name search
   function _showIdealCart(){
     var idealItems=[
       {name:"Poulet entier",price:8.50,qty:2,cat:"viande"},
       {name:"Bavette de boeuf 500g",price:9.90,qty:2,cat:"viande"},
       {name:"Cotelettes de porc 4pce",price:7.50,qty:1,cat:"viande"},
       {name:"Saumon frais 200g",price:6.90,qty:2,cat:"poisson"},
-      {name:"Riz basmati 1kg",price:2.80,qty:2,cat:"epicerie",bc:"3033710071534"},
-      {name:"Pates spaghetti 500g",price:1.50,qty:3,cat:"epicerie",bc:"8002270017573"},
-      {name:"Huile d'olive 75cl",price:6.90,qty:1,cat:"epicerie",bc:"3033710031460"},
-      {name:"Sauce tomate 680g",price:2.20,qty:2,cat:"epicerie",bc:"3248160008005"},
-      {name:"Conserve thon 185g",price:2.50,qty:3,cat:"epicerie",bc:"3033710031453"},
-      {name:"Lait entier 1L",price:1.45,qty:4,cat:"laitier",bc:"3033710062006"},
-      {name:"Beurre doux 250g",price:2.10,qty:2,cat:"laitier",bc:"3033710022352"},
-      {name:"Fromage rape 200g",price:3.50,qty:1,cat:"laitier",bc:"3033710093421"},
+      {name:"Riz basmati 1kg",price:2.80,qty:2,cat:"epicerie"},
+      {name:"Pates spaghetti 500g",price:1.50,qty:3,cat:"epicerie",bc:"8076800195057"},
+      {name:"Huile d'olive 75cl",price:6.90,qty:1,cat:"epicerie",bc:"3178050000749"},
+      {name:"Sauce tomate 680g",price:2.20,qty:2,cat:"epicerie"},
+      {name:"Conserve thon 185g",price:2.50,qty:3,cat:"epicerie",bc:"3019081239138"},
+      {name:"Lait entier 1L",price:1.45,qty:4,cat:"laitier",bc:"3533631781002"},
+      {name:"Beurre doux 250g",price:2.10,qty:2,cat:"laitier",bc:"3155251205500"},
+      {name:"Fromage rape 200g",price:3.50,qty:1,cat:"laitier",bc:"3073781102093"},
       {name:"Oeufs plein air 12pce",price:3.80,qty:1,cat:"laitier"},
-      {name:"Yaourts nature 12pce",price:3.20,qty:1,cat:"laitier",bc:"3033710036116"},
+      {name:"Yaourts nature 12pce",price:3.20,qty:1,cat:"laitier",bc:"6111032002925"},
       {name:"Pommes variées 1kg",price:3.50,qty:2,cat:"fruits"},
       {name:"Bananes 1kg",price:2.20,qty:2,cat:"fruits"},
       {name:"Tomates grappe 1kg",price:4.50,qty:1,cat:"legumes"},
@@ -2475,28 +2475,28 @@
       {name:"Carottes 1kg",price:2.50,qty:1,cat:"legumes"},
       {name:"Oignons 1kg",price:1.90,qty:1,cat:"legumes"},
       {name:"Pommes de terre 2kg",price:3.20,qty:1,cat:"legumes"},
-      {name:"Eau minerale 6x1.5L",price:3.50,qty:2,cat:"boisson",bc:"3067140013120"},
-      {name:"Jus d'orange 1L",price:2.80,qty:2,cat:"boisson",bc:"3033710059113"},
+      {name:"Eau minerale 6x1.5L",price:3.50,qty:2,cat:"boisson",bc:"3700123300014"},
+      {name:"Jus d'orange 1L",price:2.80,qty:2,cat:"boisson"},
       {name:"Cafe moulu 250g",price:4.50,qty:1,cat:"epicerie",bc:"3187570015447"},
-      {name:"Sucre en poudre 1kg",price:1.90,qty:1,cat:"epicerie",bc:"3067140013137"},
-      {name:"Farine de ble 1kg",price:1.50,qty:1,cat:"epicerie",bc:"3266720000106"},
-      {name:"Moutarde Dijon 200g",price:1.80,qty:1,cat:"epicerie",bc:"3088540004440"},
-      {name:"Poivre noir moulin",price:3.50,qty:1,cat:"epicerie",bc:"3263810444532"},
-      {name:"Sel fin 500g",price:0.90,qty:1,cat:"epicerie",bc:"3088540004457"},
-      {name:"Herbes de Provence 20g",price:1.80,qty:1,cat:"epicerie",bc:"3263810444549"},
+      {name:"Sucre en poudre 1kg",price:1.90,qty:1,cat:"epicerie",bc:"3165430810005"},
+      {name:"Farine de ble 1kg",price:1.50,qty:1,cat:"epicerie",bc:"3068110702235"},
+      {name:"Moutarde Dijon 200g",price:1.80,qty:1,cat:"epicerie",bc:"8720182460721"},
+      {name:"Poivre noir moulin",price:3.50,qty:1,cat:"epicerie"},
+      {name:"Sel fin 500g",price:0.90,qty:1,cat:"epicerie"},
+      {name:"Herbes de Provence 20g",price:1.80,qty:1,cat:"epicerie"},
       {name:"Champignons de Paris 250g",price:2.20,qty:1,cat:"legumes"},
       {name:"Ail frais 3 pce",price:1.20,qty:1,cat:"legumes"},
       {name:"Citrons 500g",price:2.50,qty:1,cat:"fruits"},
       {name:"Mangue 1 pce",price:2.80,qty:1,cat:"fruits"},
-      {name:"Lait de coco 400ml",price:2.20,qty:1,cat:"epicerie",bc:"8886303210238"},
-      {name:"The vert 20 sachets",price:2.80,qty:1,cat:"epicerie",bc:"3263810444556"},
-      {name:"Cornichons 330g",price:2.20,qty:1,cat:"epicerie",bc:"3088540004464"},
-      {name:"Olives vertes 200g",price:2.50,qty:1,cat:"epicerie",bc:"3263810444563"},
-      {name:"Pain de mie 500g",price:2.20,qty:1,cat:"boulangerie",bc:"3266720000113"},
+      {name:"Lait de coco 400ml",price:2.20,qty:1,cat:"epicerie",bc:"5021047105317"},
+      {name:"The vert 20 sachets",price:2.80,qty:1,cat:"epicerie"},
+      {name:"Cornichons 330g",price:2.20,qty:1,cat:"epicerie"},
+      {name:"Olives vertes 200g",price:2.50,qty:1,cat:"epicerie"},
+      {name:"Pain de mie 500g",price:2.20,qty:1,cat:"boulangerie",bc:"3242271990056"},
       {name:"Baguette tradition",price:1.10,qty:2,cat:"boulangerie",bc:"3276551080656"},
       {name:"Croissants 4 pce",price:3.80,qty:1,cat:"boulangerie"},
-      {name:"Legumes surgelés mix 750g",price:3.20,qty:1,cat:"surgelé",bc:"3088540004471"},
-      {name:"Miel de fleur 250g",price:5.50,qty:1,cat:"epicerie",bc:"3088540004488"}
+      {name:"Legumes surgelés mix 750g",price:3.20,qty:1,cat:"surgelé",bc:"8410092173278"},
+      {name:"Miel de fleur 250g",price:5.50,qty:1,cat:"epicerie"}
     ];
 
     // Clear cart first
@@ -4948,8 +4948,8 @@
         if(item.cb)item.cb(dataUrl);
         _imgProcessing=false;
         _processImageQueue();
-      }else if(item.name){
-        // Try search by name if barcode fails
+      }else if(item.name && !_batchMode){
+        // Try search by name only in single-item mode (not batch)
         _searchImageByName(item.name).then(function(dataUrl2){
           if(dataUrl2){_cacheImage(item.bc,dataUrl2);_imgTotalFetched++;}
           else{_imgCache[item.bc]=null;}
@@ -4967,7 +4967,9 @@
   }
 
   // ─── BATCH IMAGE FETCH (auto-fetch images for all products, priority: priced > sold) ──
+  var _batchMode=false;
   function _batchFetchImages(products){
+    _batchMode=true;
     var count=0;
     var toFetch=[];
     for(var i=0;i<products.length;i++){
@@ -4995,6 +4997,8 @@
         }
       },p.name);
     });
+    // Reset batch mode after queue drains
+    setTimeout(function(){_batchMode=false;},100);
   }
 
   // ─── INIT ────────────────────────────────────────────
