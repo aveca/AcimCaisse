@@ -1282,12 +1282,12 @@
       card.appendChild(camBtn);
 
       // Load cached image
-      (function(bc,img,ph){
+      (function(bc,img,ph,pname){
         _getCachedImage(bc).then(function(url){
           if(url){img.src=url;img.style.display="block";ph.style.display="none";}
-          else _enqueueImage(bc,function(url){if(url){img.src=url;img.style.display="block";ph.style.display="none";}});
+          else _enqueueImage(bc,function(url){if(url){img.src=url;img.style.display="block";ph.style.display="none";}},pname);
         });
-      })(p.barcode,icImg,icPh);
+      })(p.barcode,icImg,icPh,p.name);
       card.appendChild(icImg);
 
       // Product info
@@ -1398,10 +1398,15 @@
         var svgUrl=_generateProductSVG(it.name,it.cat,it.price);
         imgEl.src=svgUrl;
         icon.appendChild(imgEl);
-        // Try to load real image from cache
+        // Try to load real image from cache or fetch by name
         if(it.bc){
           _getCachedImage(it.bc).then(function(url){
-            if(url)imgEl.src=url;
+            if(url){imgEl.src=url;}
+            else{
+              _enqueueImage(it.bc,function(url2){
+                if(url2)imgEl.src=url2;
+              },it.name);
+            }
           });
         }
         row.appendChild(icon);
@@ -4900,9 +4905,41 @@
     }
     return tryApi(0);
   }
-  function _enqueueImage(bc,cb){
+  // Search Open Food Facts by product name (throttled)
+  var _lastSearchTime=0;
+  function _searchImageByName(name){
+    if(!name)return Promise.resolve(null);
+    var now=Date.now();
+    var delay=Math.max(0,500-(now-_lastSearchTime));
+    _lastSearchTime=now+delay;
+    return new Promise(function(resolve){
+      setTimeout(function(){
+        var q=encodeURIComponent(name);
+        var url="https://world.openfoodfacts.org/cgi/search.pl?search_terms="+q+"&search_simple=1&action=process&json=1&page_size=1&fields=image_front_small_url";
+        fetch(url,{headers:{"User-Agent":"AcimCaisse/1.0"}}).then(function(r){
+          if(!r.ok)return resolve(null);
+          return r.json();
+        }).then(function(d){
+          if(!d||!d.products||!d.products.length)return resolve(null);
+          var u=d.products[0].image_front_small_url;
+          if(!u)return resolve(null);
+          return fetch(u).then(function(ir){
+            if(!ir.ok)return resolve(null);
+            return ir.blob();
+          }).then(function(b){
+            if(!b)return resolve(null);
+            var rd=new FileReader();
+            rd.onload=function(){resolve(rd.result);};
+            rd.onerror=function(){resolve(null);};
+            rd.readAsDataURL(b);
+          });
+        }).catch(function(){resolve(null);});
+      },delay);
+    });
+  }
+  function _enqueueImage(bc,cb,name){
     if(!bc||_imgCache[bc]!==undefined)return;
-    _imgQueue.push({bc:bc,cb:cb});
+    _imgQueue.push({bc:bc,cb:cb,name:name||""});
     _processImageQueue();
   }
   function _processImageQueue(){
@@ -4910,10 +4947,26 @@
     _imgProcessing=true;
     var item=_imgQueue.shift();
     _fetchImageFromApi(item.bc).then(function(dataUrl){
-      if(dataUrl){_cacheImage(item.bc,dataUrl);_imgTotalFetched++;}else{_imgCache[item.bc]=null;}
-      if(item.cb)item.cb(dataUrl);
-      _imgProcessing=false;
-      _processImageQueue();
+      if(dataUrl){
+        _cacheImage(item.bc,dataUrl);_imgTotalFetched++;
+        if(item.cb)item.cb(dataUrl);
+        _imgProcessing=false;
+        _processImageQueue();
+      }else if(item.name){
+        // Try search by name if barcode fails
+        _searchImageByName(item.name).then(function(dataUrl2){
+          if(dataUrl2){_cacheImage(item.bc,dataUrl2);_imgTotalFetched++;}
+          else{_imgCache[item.bc]=null;}
+          if(item.cb)item.cb(dataUrl2);
+          _imgProcessing=false;
+          _processImageQueue();
+        }).catch(function(){_imgCache[item.bc]=null;_imgProcessing=false;_processImageQueue();});
+      }else{
+        _imgCache[item.bc]=null;
+        if(item.cb)item.cb(null);
+        _imgProcessing=false;
+        _processImageQueue();
+      }
     }).catch(function(){_imgProcessing=false;_processImageQueue();});
   }
 
@@ -4925,6 +4978,7 @@
       var p=products[i];
       if(!p.barcode)continue;
       if(_imgCache[p.barcode]!==undefined)continue;
+      // Don't skip IDEAL- barcodes anymore - we want to fetch by name
       if(/^(ACIM-|INV-|TEST-|test-)/.test(p.barcode))continue;
       toFetch.push(p);
     }
@@ -4937,7 +4991,7 @@
           if(count%10===0)_log("Images t\u00E9l\u00E9charg\u00E9es: "+count);
           _renderGrid();
         }
-      });
+      },p.name);
     });
   }
 
