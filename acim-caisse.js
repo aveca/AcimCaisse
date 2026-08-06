@@ -2267,6 +2267,12 @@
     });
   }
 
+  // ─── ROLE-BASED ACCESS ──────────────────────────────
+  function _isManager(){
+    var actor = _getCurrentActor();
+    return actor && actor.role === "manager";
+  }
+
   // ─── END PR C ─────────────────────────────────────────
 
   // ─── RECEIPT ─────────────────────────────────────────
@@ -2594,19 +2600,21 @@
       {label:"📋 Historique des ventes",fn:function(){ov.remove();_showHistory();}},
       {label:"📊 Rapport de fin de journée",fn:function(){ov.remove();_showDayReport();}},
       {label:"↩️ Annuler la dernière vente",fn:function(){ov.remove();_undoLastSale();}},
-      {label:"🔍 Vérifier / Nettoyer le catalogue",fn:function(){ov.remove();_showProductAudit();}},
-      {label:"📄 Importer facture fournisseur",fn:function(){ov.remove();_showInvoiceImport();}},
+      {label:"🔍 Vérifier / Nettoyer le catalogue",fn:function(){ov.remove();_showProductAudit();},managerOnly:true},
+      {label:"📄 Importer facture fournisseur",fn:function(){ov.remove();_showInvoiceImport();},managerOnly:true},
       {label:"📒 Catalogue fournisseur",fn:function(){ov.remove();_showSupplierCatalog();}},
       {label:"🏷️ Imprimer codes-barres",fn:function(){window.open("barcode.html","_blank");}},
-      {label:"📤 Exporter mes données",fn:function(){ov.remove();_showExportDialog();}},
-      {label:"📦 Réinitialiser depuis un JSON maître",fn:function(){ov.remove();_showResetFromJson();}},
-      {label:"📥 Importer des données (JSON)",fn:function(){ov.remove();_showImportDialog();}},
+      {label:"📤 Exporter mes données",fn:function(){ov.remove();_showExportDialog();},managerOnly:true},
+      {label:"📦 Réinitialiser depuis un JSON maître",fn:function(){ov.remove();_showResetFromJson();},managerOnly:true},
+      {label:"📥 Importer des données (JSON)",fn:function(){ov.remove();_showImportDialog();},managerOnly:true},
       {label:"🖥️ Écran client (2e écran)",fn:function(){window.open("customer-display.html","_blank");}},
       {label:"⬇️ Télécharger la version bureau (.exe)",fn:function(){window.open("https://github.com/aveca/AcimCaisse/releases/latest","_blank");}},
       {label:"🔄 Migrer depuis l'ancienne version",fn:function(){window.open("migration.html","_blank");}},
-      {label:"⚙️ Paramètres",fn:function(){ov.remove();_showSettings();}},
+      {label:"⚙️ Paramètres",fn:function(){ov.remove();_showSettings();},managerOnly:true},
     ];
+    var isMgr=_isManager();
     btns.forEach(function(b){
+      if(b.managerOnly && !isMgr)return; // skip manager-only items for cashiers
       var btn=document.createElement("button");btn.textContent=b.label;
       btn.style.cssText="width:100%;padding:14px;border:2px solid #e0e0e0;border-radius:8px;background:#fff;font-size:17px;cursor:pointer;text-align:left;margin-bottom:8px;";
       btn.onmouseenter=function(){this.style.borderColor="#e65100";this.style.background="#fff3e0";};
