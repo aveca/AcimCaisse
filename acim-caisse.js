@@ -1514,6 +1514,8 @@
   document.addEventListener("keydown",function(e){
     // Scan toujours prioritaire, quel que soit le focus
     if(/^[0-9]$/.test(e.key)){
+      // Don't interfere with input fields (typing in search bar etc.)
+      if(document.activeElement===_posSearch)return;
       _scanning=true;
       _scanBuf+=e.key;
       if(_pos&&_pos.style.display!=="none"&&_posSearch){
@@ -1532,11 +1534,14 @@
     }
     if(/^[a-zA-ZÀ-ÿ]$/.test(e.key)){
       if(e.ctrlKey||e.metaKey||e.altKey)return;
-      if(!_pos||_pos.style.display==="none")_togglePOS(true);
-      if(_posSearch){
-        _posSearch.value+=e.key;
-        _posSearch.focus();
-        _filterProducts();
+      // Only append if search bar is NOT already focused (avoids letter duplication)
+      if(document.activeElement!==_posSearch){
+        if(!_pos||_pos.style.display==="none")_togglePOS(true);
+        if(_posSearch){
+          _posSearch.value+=e.key;
+          _posSearch.focus();
+          _filterProducts();
+        }
       }
     }
     if(e.key==="Backspace"&&_posSearch&&_posSearch.value.length>0){
