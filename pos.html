@@ -9,13 +9,14 @@
   <meta name="description" content="AcimCaisse v1.3.0 — POS offline pour epicerie/boucherie">
   <title>AcimCaisse — POS</title>
   <link rel="stylesheet" href="acimcaisse-ux-fix.css">
+  <link rel="stylesheet" href="acim-uber-eats.css">
   <link rel="icon" type="image/png" href="favicon.png"/>
   <style>
     /* Loading splash — hidden once acim-caisse.js (init) renders #acim-pos */
-    #acim-splash{position:fixed;inset:0;background:#1a1a2e;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:'Segoe UI',Arial,sans-serif;z-index:9999999;}
-    #acim-splash h1{color:#e65100;font-size:28px;margin:0 0 8px 0;}
-    #acim-splash p{color:#888;font-size:14px;margin:0;}
-    #acim-splash .spin{margin-top:20px;width:32px;height:32px;border:3px solid #e65100;border-top-color:transparent;border-radius:50%;animation:acimspin 0.8s linear infinite;}
+    #acim-splash{position:fixed;inset:0;background:#06C167;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;z-index:9999999;}
+    #acim-splash h1{color:#fff;font-size:32px;margin:0 0 8px 0;}
+    #acim-splash p{color:rgba(255,255,255,0.8);font-size:16px;margin:0;}
+    #acim-splash .spin{margin-top:24px;width:36px;height:36px;border:3px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:acimspin 0.8s linear infinite;}
     @keyframes acimspin{to{transform:rotate(360deg);}}
     /* Hide splash once #acim-pos exists in DOM */
     #acim-pos ~ #acim-splash,#acim-pos:has(+ #acim-splash){display:none;}
@@ -23,8 +24,8 @@
 </head>
 <body>
   <div id="acim-splash">
-    <h1>🏪 AcimCaisse</h1>
-    <p>Chargement de la caisse…</p>
+    <h1>\uD83C\uDFEA AcimCaisse</h1>
+    <p>Chargement de la caisse\u2026</p>
     <div class="spin"></div>
   </div>
   <!-- Sprint 4.1 PR A — Audit Core (must load before caisse engine) -->

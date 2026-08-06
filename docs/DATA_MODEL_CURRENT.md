@@ -1,8 +1,8 @@
 # AcimCaisse — Data Model Current State
 
-> Sprint 4.1 Gate 0 — baseline storage cartography.
-> Captured from `acim-caisse.js` (lines 28-330) and `acim-voice-flash.js`.
-> Aucune dépendance à SQLite/Drizzle/Supabase à ce stade : **100% IndexedDB navigateur**.
+> Mise à jour post-Sprint 4.1 (2026-08-06).
+> Capture depuis `acim-caisse.js` + `acim-audit.js`.
+> **100% IndexedDB navigateur** (offline-first, mono-poste). Pas de SQLite/Drift/Supabase à ce stade.
 
 ## Glossaire
 
@@ -13,24 +13,46 @@
 
 ## Enumération des bases IndexedDB
 
-| DB | Version | Stores | Rôle | Mécanisme de migration |
-|---|---|---|---|---|
-| `acim-meta` | 1 | `meta` (keyPath: `key`) | Clés/valeurs système (seq, flags) | Manuelle via `_migrations` (appliquée sur `products`, pas sur `meta`) |
-| `acim-catalog` | 1 | `products` (keyPath: `barcode`) | Catalogue produits + stock | Manuelle via `_migrateSchema()` |
-| `acim-sales` | 1 | `sales` (keyPath: `id`, autoIncrement) | Historique des ventes validées | Aucune |
+### Base courante — `acim` (v3, unifiée)
 
-### Détail `acim-meta.meta`
+Depuis PR A (Sprint 4.1), une **base unifiée `acim`** (version 3) regroupe tous les stores applicatifs. La migration in-place au boot lit les anciennes bases legacy (`acim-meta`, `acim-catalog`, `acim-sales`) puis les supprime une fois la copie terminée (idempotente via le flag meta `acim-migrated-v2`).
 
-Stocke paires `{key, value}`. Clés connues :
-
-| key | type | Rôle | Code source |
+| Store | keyPath | Indexes | Rôle |
 |---|---|---|---|
-| `acim-bc-seq` | number | Prochain numéro de code-barres interne (`ACIM-XXXX`) | `acim-caisse.js:29-43` |
-| `acim-ticket-seq` | number | Prochain numéro de ticket | `acim-caisse.js:51-65` |
-| `acim-backup-imported-v1` | boolean | Empêche la réimport du backup embarqué | `acim-caisse.js:332,359,404` |
-| `schema-version` | number | Version du schéma produits courant (actuellement `4`) | `acim-caisse.js:117-182` |
+| `products` | `barcode` | — | Catalogue produits + stock |
+| `sales` | `id` (autoIncrement) | — | Historique des ventes validées |
+| `meta` | `key` | — | Clés/valeurs système (seq, flags, session) |
+| `audit_events` | `id` (UUID) | `by_timestamp`, `by_type`, `by_actorId`, `by_sessionId`, `by_entityType`, `by_entityId` | Journal d'audit append-only strict |
+| `users` | `id` (string) | `by_active` | Employés enregistrés (login PIN salé) — ajouté en v3 (PR C) |
 
-### Détail `acim-catalog.products`
+### Bases legacy (pré-Sprint 4.1, supprimées après migration)
+
+| DB | Version | Store | Devenu |
+|---|---|---|---|
+| `acim-meta` | 1 | `meta` | → `acim.meta` |
+| `acim-catalog` | 1 | `products` | → `acim.products` |
+| `acim-sales` | 1 | `sales` (autoIncrement) | → `acim.sales` (autoIncrement reset à max+1) |
+
+La migration est **idempotente** : un flag `acim-migrated-v2` dans `acim.meta` empêche la recopie. Un probe non-mutateur via `indexedDB.databases()` détecte l'absence des legacy DB sans les recréer.
+
+### Détail `acim.meta`
+
+Paires `{key, value, ...}`. Clés connues :
+
+| key | type | Rôle | Origine |
+|---|---|---|---|
+| `acim-bc-seq` | number | Prochain numéro de code-barres interne (`ACIM-XXXX`) | Hérité de `acim-meta` |
+| `acim-ticket-seq` | number | Prochain numéro de ticket | Hérité de `acim-meta` |
+| `acim-backup-imported-v1` | boolean | Empêche la réimport du backup embarqué | Hérité de `acim-meta` |
+| `schema-version` | number | Version du schéma produits courant (actuellement `4`) | Hérité de `acim-catalog` |
+| `acim-migrated-v2` | boolean | Flag de idempotence migration legacy→unifiée | PR A |
+| `acim-audit-session-id` | string (UUID) | `sessionId` courant (généré au boot, persisté pour corrélation cross-boots) | PR A — `acim-audit.js:60` |
+| `acim-audit-actor-id` | string\|null | Cache interne de `_actorId` pour le service audit (persisté par `setActor()` mais source de vérité = `acim-current-actor-id` ci-dessous) | PR A — `acim-audit.js:61` |
+| `acim-current-actor-id` | string | **Session opérateur courante** — id du user loggé. Login l'écrit (avec `loginAt`), logout le supprime, boot le lit pour `_restoreSessionIfAny()` | PR C — `acim-caisse.js:1859` |
+
+> Note : deux clés audit/actor coexistent. `acim-audit-actor-id` est un cache interne au module audit (PR A, pouvait être null en v1). `acim-current-actor-id` est la clé de session applicative (PR C, alimentée par `_loginWithPin`). En pratique depuis PR C, `_loginWithPin` écrit `acim-current-actor-id` et appelle `_acimAudit.setActor(u.id)` qui met à jour `_actorId` en mémoire (le cache `acim-audit-actor-id` est secondaire).
+
+### Détail `acim.products`
 
 Chaque document = un produit. **keyPath: `barcode`** (string).
 
@@ -57,9 +79,9 @@ Schéma observé (champs effectivement écrits par le code) :
 - v2 → v3: ajoute `low_stock_threshold`, `expiry_date`, `source`
 - v3 → v4: ajoute `last_updated`, sanitize `stockQty`
 
-### Détail `acim-sales.sales`
+### Détail `acim.sales`
 
-Document écrit par `_persistSale()` (`acim-caisse.js:238-258`) :
+Document écrit par `_finalizeSale()` (depuis PR B, dans la même TX atomique que les decrements stock et l'event `SALE_COMPLETED`) :
 
 ```js
 {
@@ -93,88 +115,196 @@ Document écrit par `_persistSale()` (`acim-caisse.js:238-258`) :
 
 **Clé : `id` autoIncrement.** Aucun index secondaire. Pas de relation au ticket stocké ailleurs.
 
-## Flux mutation stock actuel
+### Détail `acim.audit_events` (PR A)
 
-### `_decrementStock(barcode, qtyOrWeight)` — `acim-caisse.js:273-305`
+**Append-only strict** : aucune API publique d'update/delete/clear n'est exposée en v1. L'écriture utilise `add()` (pas `put()`) — échec si la clé existe déjà (immutabilité garantie par IDB lui-même).
 
-Transaction **single-store** `products` en `readwrite` :
-1. `get(barcode)` → lit stock courant
-2. Si stock futur < 0 → `tx.abort()` + return `{ok:false, reason:"stock:N"}`
-3. Sinon → `put(p)` avec `stockQty -= amount` + `last_updated = Date.now()`
-4. `tx.oncomplete` → resolve `{ok:true, newStock, reason:"ok"}`
+Schema de l'enveloppe commune (build par `_buildEvent()`, `acim-audit.js:144-161`) :
 
-**Atomique par produit** — c'est ce que Sprint 4.0 TEST 4 a validé (5 concurrents → 2 OK / 3 KO). ✅
-
-### `_restoreStock(barcode, qtyOrWeight)` — `acim-caisse.js:307-329`
-
-Symétrique du décrément. Utilisé pour annulations / void ticket. Pas de garde "stock max" — peut dépasser la valeur initiale.
-
-### `_persistSale(...)` — `acim-caisse.js:238-258`
-
-TX `sales.readwrite` : un seul `put(sale)`. **Indépendant** du décrément stock.
-
-## Chaîne checkout actuelle (le point critique pour Sprint 4.1)
-
-`_finalizeSale(payments)` à `acim-caisse.js:1369-1404` :
-
-```
-1. _cartTotal()
-2. _nextTicket()  ── incrémente seq en mémoire (pas de TX meta)
-3. _saveTicketSeq()  ── persiste la nouvelle valeur de seq dans acim-meta (TX séparée)
-4. _persistSale(ticketNum, items, total, ...)  TX acim-sales (1)
-   on success:
-   5. decPromises.push(_decrementStock(bc, amount))  ── TX acim-catalog (1 par ligne)  (2)
-      Promise.all(decPromises)  ── n'est pas attendu (fire-and-forget)
-   6. _showReceipt(...)
-   7. _broadcastClear()  ── BroadcastChannel "acim-customer-display"
-   8. _myCart = []; _renderPOS();
+```js
+{
+  id:            string (UUID),           // clé primaire — immuable
+  schemaVersion: number,                  // actuellement 1
+  timestamp:     number (ms),             // Date.now()
+  type:          EventType,               // voir enum ci-dessous
+  actorId:       string | null,           // users.id immuable ; null si pas de login
+  sessionId:     string (UUID),           // généré au boot, persisté dans meta
+  entityType:    EntityType,               // "sale" | "product" | "stock" | "session" | "system"
+  entityId:      string | null,           // ex: ticketNumber, barcode, userId
+  action:        Action,                   // "create" | "complete" | "cancel" | ...
+  payload:       object,                   // détails spécifiques à l'event, libre
+  previousState: object | null,           // snapshot avant mutation
+  newState:      object | null,           // snapshot après mutation
+  status:        "COMMITTED" | "ROLLED_BACK"
+}
 ```
 
-**Trous de cohérence identifiés** (à combler en Sprint 4.1 PR A/B) :
+**Event types v1** (`acim-audit.js:18-29`) :
 
-| # | Trou | Conséquence |
-|---|---|---|
-| H1 | `_persistSale` et les `_decrementStock` sont dans **des transactions IDB séparées** | Une vente peut être persistée sans que le stock soit décrémenté si la page est fermée entre les deux |
-| H2 | `decPromises` est fire-and-forget (pas `await`) | Le toast `⚠️ Stock insuffisant` peut s'afficher mais la vente reste validée → stock négatif masqué |
-| H3 | `_saveTicketSeq` est en TX séparée | Si crash entre `_nextTicket()` et `_saveTicketSeq()`, deux ventes peuvent partager le même numéro |
-| H4 | Pas d'audit | Aucune trace de qui a validé, quand, de quelle valeur stockelle venait |
+| Type | Émis par | entityId typique | payload typique |
+|---|---|---|---|
+| `SALE_CREATED` | (réservé — pas émis en v1, future PR) | `String(ticketNumber)` | ticket draft |
+| `SALE_COMPLETED` | `_finalizeSale` (PR B) | `String(ticketNumber)` | `{ticket, itemCount, totalCents, discountCents, paymentMethods}` |
+| `SALE_CANCELLED` | `_undoLastSale` (PR B) | `String(saleId)` | `{originalTicket, items}` |
+| `STOCK_DECREMENT` | `_finalizeSale` (PR B, une fois par item) | `barcode` | `{amount, weight, unitType}` + `previousState/newState {stockQty}` |
+| `STOCK_INCREMENT` | `_undoLastSale` (PR B, une fois par item) | `barcode` | `{amount, weight, unitType}` + `previousState/newState {stockQty}` |
+| `STOCK_ADJUSTED` | `_adjustStock` (PR C) | `barcode` | `{delta, reason}` + `previousState/newState {stockQty}` |
+| `SESSION_START` | (réservé — pas émis en v1) | `sessionId` | `{bootTime}` |
+| `SESSION_END` | (réservé — pas émis en v1) | `sessionId` | `{endTime}` |
+| `SYSTEM_ERROR` | (réservé — pas émis en v1) | `null` | `{error}` |
+| `MIGRATION_COMPLETED` | `_maybeMigrateLegacy` (PR A) | `"acim-v2"` | `{copied, legacyDBsRemoved}` |
 
-Sprint 4.0 a validé l'atomicité **par produit** (TEST 4) mais pas l'atomicité **de l'ensemble du checkout**. C'est exactement ce que Sprint 4.1 doit couvrir.
+**Indexes secondaires** (6) :
+- `by_timestamp` — range queries chronologiques
+- `by_type` — `getByType(type)`
+- `by_actorId` — `getByActor(actorId)` (filtre par opérateur)
+- `by_sessionId` — `getBySession(sId)` (corrélation cross-boots)
+- `by_entityType` — utilisé par `getByEntity(entityType, entityId)` (combiné avec `by_entityId`)
+- `by_entityId` — voir ci-dessus
 
-## Canaux de sync cross-tab / cross-window existants
+**API publique** (`window._acimAudit`) :
+- `log(partial)` — écriture standalone (hors TX métier)
+- `logInTx(tx, partial)` — écriture co-transactionnelle (utilisée par `_finalizeSale`, `_undoLastSale`, `_adjustStock`)
+- `getByEntity`, `getByType`, `getByActor`, `getBySession`, `getByTimeRange`, `count`, `first`, `last`
+- `setActor(actorId)` — met à jour l'actorId courant (_in-memory + meta_)
+- `getActorId()` — getter sync
+
+### Détail `acim.users` (PR C)
+
+Stocké dans la DB unifiée `acim` v3. **Append-friendly** : on peut `put` un user (idempotent par `id`), mais il n'y a pas d'API de `delete` exposée en v1 (soft-delete via `active=false`).
+
+**Schema** :
+
+```js
+{
+  id:        string,        // ex: "u001" — IMMUABLE. Jamais réassigné.
+                           // Utilisé comme actorId dans audit_events.
+  salt:      string,        // base64 de 16 octets aléatoires (crypto.getRandomValues).
+                           // Unique par utilisateur. Empêche le bruteforce par rainbow table.
+  pinHash:   string,        // base64 de SHA-256(saltBytes || utf8(pin)).
+                           // Jamais comparé directement sans sel.
+  name:      string,        // "Alice" — modifiable. N'est JAMAIS utilisé comme
+                           // identifiant dans audit_events (uniquement actorId = id).
+  role:      "cashier" | "manager",   // v1: seulement pour futur manager approval
+  active:    boolean,       // soft-delete sans perte historique audit
+  createdAt: number
+}
+```
+
+**Index secondaire** : `by_active` (unique: false) — permet `users.where(active=true)`.
+
+**Invariant d'identité** (verrouillé) :
+- `audit_events.actorId` = `users.id`, immuable.
+- `users.name` modifiable librement ; les événements déjà émis ne sont **jamais** rétro-mis-à-jour (append-only).
+- Aucun event audit ne contient `name` comme identifiant. Seul `actorId` est persisté dans `audit_events.actorId`.
+
+## Modèle de session opérateur (PR C)
+
+### Cycle login → opération → logout
+
+```
+boot → _restoreSessionIfAny()
+        └─ lit meta.acim-current-actor-id
+        └─ si présent + user toujours active:
+           _acimAudit.setActor(userId)
+           actor disponible pour tous les prochains events
+        └─ sinon: actorId null (mode "open")
+
+login  → _loginWithPin(pin)
+         └─ parcours users actifs, _verifyPin(pin, u.salt, u.pinHash)
+         └─ sur match:
+            _acimAudit.setActor(u.id)
+            meta.put({key:"acim-current-actor-id", value:u.id, loginAt:Date.now()})
+         └─ sur no-match: pas d'écriture meta, acteur reste null
+
+logout → _logout()
+         └─ _acimAudit.setActor(null)
+         └─ meta.delete("acim-current-actor-id")
+```
+
+### Politique de sécurité PIN (v1)
+
+- **Algorithme** : SHA-256 via `crypto.subtle.digest` (natif navigateur, pas de dépendance).
+- **Sel** : 16 octets aléatoires par utilisateur via `crypto.getRandomValues(new Uint8Array(16))`, stocké base64 dans `users.salt`.
+- **Taille PIN** : 4 à 8 chiffres. Validation regex `/^\d{4,8}$/`.
+- **Pas de lockout / rate-limit** en v1 (offline-first, mono-poste). Le sel rend les attaques par rainbow table impossibles ; seule l'attaque exhaustive par utilisateur reste possible, ce qui est acceptable sur poste isolé.
+- **Pas de recovery PIN oublié** en v1. Une future PR implémentera "reset PIN si manager-approved".
+- **Pas de re-auth au boot** : si `meta.acim-current-actor-id` existe, l'utilisateur est restauré sans redemander le PIN (trust local, offline-first).
+- **Prérequis crypto.subtle** : HTTPS ou localhost requis. `tests/serve.js` tourne sur http://localhost — OK. Prod via https://*.netlify.app — OK.
+
+## Flux mutation stock actuel (Sprint 4.1)
+
+### `_finalizeSale(payments)` — `acim-caisse.js` (PR B)
+
+**TX unique `readwrite` sur `[sales, products, meta, audit_events]`**. Tous les decrements, le `SALE_COMPLETED` et les `STOCK_DECREMENT` par item sont co-commités synchro dans le corps de la TX (pas d'`await`, pas de fire-and-forget).
+
+Sequence :
+1. `put(ticketSeq)` dans `meta`
+2. `put(sale)` dans `sales` (autoIncrement id)
+3. Pour chaque item du panier : `get(product)` → si stock futur < 0, `tx.abort()`. Sinon `put(product)` avec `stockQty -= amount` + `logInTx(tx, STOCK_DECREMENT, ...)`.
+4. `logInTx(tx, SALE_COMPLETED, ...)` avec entityId = `String(ticketNumber)`
+5. `tx.oncomplete` → showReceipt + `_broadcastClear` + `_myCart = []`
+6. En cas d'échec audit : `tx.onabort` → décrémente `_ticketSeq` en mémoire + renvoie `{ok:false, reason:"audit-error"}`
+
+**Invariant P0 tenu** : si l'audit échoue, la TX entière aborte (vente + stock + audit). Aucune mutation partielle.
+
+### `_undoLastSale(...)` — `acim-caisse.js` (PR B)
+
+Refactor en 3 étapes pour éviter le piège cursor IDB (TX morte à la fin du read) :
+
+1. **TX read-only sur `sales`** → snapshot dernière vente (par `id` store)
+2. **Modal UI de confirmation** (multi-secondes, hors TX)
+3. **TX readwrite fraîche sur `[sales, products, audit_events]`** :
+   - `sales.get(saleId)` (re-fetch by id — ne pas compter sur le snapshot)
+   - pour chaque item : `products.get(barcode)` → `put(stock += amount)` + `logInTx(STOCK_INCREMENT, ...)`
+   - `logInTx(SALE_CANCELLED, ...)`
+   - `sales.delete(saleId)`
+   - `tx.oncomplete` → resolve
+
+### `_adjustStock(barcode, delta, reason)` — `acim-caisse.js` (PR C)
+
+Point d'entrée unique pour ajustement manuel (hors checkout/undo).
+
+- **TX atomique sur `[products, audit_events]`** en `readwrite`.
+- Garde : `newStock = currentStock + delta` ; si `newStock < 0` → `tx.abort()` + return `{ok:false, reason:"stock:N" ou "stock-kg:N"}`.
+- Sinon : `products.put({…, stockQty: newStock, last_updated: Date.now()})` + `logInTx(STOCK_ADJUSTED, ...)`.
+- `reason` obligatoire, enum frozen `STOCK_ADJUST_REASON = { RESTOCK, INVENTORY, LOSS, CORRECTION, MANUAL }`.
+- `previousState.stockQty` + `newState.stockQty` toujours présents (jamais null pour cet event).
+- Si `logInTx` throw → TX aborte (atomicité garantie, même pattern que PR B).
+
+**Invariant P0 tenu** : aucune mutation de stock sans event audit atomique.
+
+## Canaux de sync cross-tab / cross-window
 
 | Canal | Type | Usage | Code |
 |---|---|---|---|
 | `acim-customer-display` | BroadcastChannel | Sync panier → onglet "customer display" séparé | `acim-caisse.js:676`, `acim-voice-flash.js:263-266` |
 
-**Pas de canal de sync audit**. À ajouter en Sprint 4.1 si on veut qu'un autre onglet réagisse aux events.
+**Pas de canal de sync audit** en v1. Si on veut qu'un autre onglet réagisse aux events, à ajouter en Sprint 5.x (EventSource ou listeurs sur `audit_events` via BroadcastChannel).
+
+## Ce qui existe désormais (Sprint 4.1 livré)
+
+- ✅ Système d'identité opérateur : store `users` v3 avec PIN salé SHA-256.
+- ✅ Journal d'audit immuable : `audit_events` append-only strict, 6 indexes secondaires, 10 event types v1.
+- ✅ Session opérateur persistée : login/logout + restauration au boot depuis `meta`.
+- ✅ Invariant P0 : toute mutation métier (`_finalizeSale`, `_undoLastSale`, `_adjustStock`) est co-transactionnelle avec son event audit.
+- ✅ Atomicité multi-store : une seule TX IDB par opération métier (checkout, undo, adjust).
+- ✅ Migration legacy → unifiée idempotente (`acim-migrated-v2`).
 
 ## Ce qui n'existe PAS (encore)
 
-- Aucun système d'identité (pas de `user_id`, `device_id`, `session_id`).
-- Aucun journal d'audit.
-- Aucune file d'attente sync (pas de `sync_queue`).
-- Aucune notion d'opérateur/caissier ni de PIN.
-- Aucune notion de Manager approval.
-- Aucune transaction multi-store cross-database (IDB ne supporte pas nativement les transactions cross-DB ; il faudrait soit une seule DB agrégée, soit un WAL applicatif).
-- Aucune hash chain.
-- Aucune connexion Supabase.
+- ❌ File d'attente sync (pas de `sync_queue`) — prévu PR D (Sprint 4.2).
+- ❌ Connexion Supabase — prévue PR D (Sprint 4.2).
+- ❌ Backup/restauration testable — prévu PR E (Sprint 4.2).
+- ❌ UI audit timeline / export CSV-JSON — prévu Sprint 5.x.
+- ❌ UI admin users complète (liste, edit, soft-delete) — prévu Sprint 5.x (v1 a seulement badge opérateur + modal login + mini-mode setup).
+- ❌ Roles / permissions / Manager approval flow — prévu Sprint 5.x.
+- ❌ Recovery PIN oublié (manager-approved reset) — prévu Sprint 5.x.
+- ❌ Lockout / rate-limit login — prévu Sprint 5.x.
+- ❌ Hash chain (tamper-evidence au-delà d'IDB) — prévu Sprint 5.x.
+- ❌ Multi-postes auth centralisée — prévu Sprint 5.x.
 
-## Décision Sprint 4.1 — conséquences techniques
+## Prochaines étapes (Sprint 4.2)
 
-Pour respecter l'invariant P0 "toute action métier a un event audit + mutation atomique", et vu que **IDB ne supporte pas les transactions cross-database** :
-
-- **Option retenue** : créer une nouvelle DB `acim-audit` (version 1) avec stores `audit_events` + `sync_queue`. Audit **extérieur** à la transaction métier — pas atomique au sens DB, mais **compensé par ordre d'écriture** :
-  1. `audit_events.put(event)` — buter le BEFORE en premier
-  2. `_decrementStock(...)` — si cette TX échoue, on écrit un event `STOCK_ROLLBACK` qui annule l'event BEFORE
-
-- **Alternative écartée** : migrer `products` + `audit_events` dans une seule DB agrégée. Trop risqué en Sprint 4.1 (touche l'existant, risque de régression sur les invariants Sprint 4.0).
-
-- **Hash chain** : optionnelle en PR A, activée en PR C (tests). `hash_current = SHA256(prev_hash + JSON.stable(event))`. Pas de crypto navigateur à part `crypto.subtle` — suffisant.
-
-## Prochaines étapes
-
-- Gate 0 ✅ (ce document)
-- PR A : schema `acim-audit` (audit_events + sync_queue) + Audited IDs (device_id init) — ne touche pas au code métier
-- PR B : AuditService + emission des 4 events P0 + transaction orchestration
-- PR C : tests robust4.1 (audit vente + crash recovery + immutabilité)
+- PR D : sync queue + push Supabase (offline-first, idempotence via UUID, RLS par `actorId` + `storeId`)
+- PR E : backup/restauration JSON avec validation de schéma + E2E export → wipe → reimport

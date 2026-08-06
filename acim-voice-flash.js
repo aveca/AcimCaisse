@@ -220,8 +220,9 @@
   function buildMicBtn(){
     if(micBtn)return;
     micBtn=document.createElement("button");
-    micBtn.style.cssText="position:fixed;bottom:18px;left:18px;width:64px;height:64px;border:none;border-radius:50%;background:"+(S.voiceOn?"#4caf50":"#1a1a2e")+" color:#fff;font-size:30px;cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,0.4);z-index:10000008;transition:all .15s;";
-    micBtn.textContent="🎤";
+    micBtn.id="acim-mic-btn";
+    micBtn.style.cssText="position:fixed;bottom:80px;left:18px;width:52px;height:52px;border:none;border-radius:50%;background:"+(S.voiceOn?"#4caf50":"#1a1a2e")+";color:#fff;font-size:24px;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,0.3);z-index:10000005;transition:all .15s;";
+    micBtn.textContent="\uD83C\uDF99";
     micBtn.title="Activer la reconnaissance vocale";
     micBtn.onclick=function(){
       S.voiceOn=!S.voiceOn;

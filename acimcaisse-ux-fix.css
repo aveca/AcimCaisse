@@ -90,8 +90,8 @@ flutter-view {
   #acim-pos {
     flex-direction: column !important;
   }
-  #acim-pos > div:last-child {
-    flex-direction: column !important;
+  .acim-desktop-cart {
+    display: none !important;
   }
 }
 

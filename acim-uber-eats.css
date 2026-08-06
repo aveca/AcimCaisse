@@ -1,0 +1,753 @@
+/**
+ * AcimCaisse — Uber Eats Mobile UI
+ * Green header + category icons + bottom nav + bottom sheet cart
+ */
+
+/* ── Reset & Base ── */
+:root {
+  --acim-green: #06C167;
+  --acim-green-dark: #059c54;
+  --acim-orange: #e65100;
+  --acim-bg: #f5f5f5;
+  --acim-card: #ffffff;
+  --acim-text: #1a1a2e;
+  --acim-text-secondary: #666666;
+  --acim-border: #e8e8e8;
+  --acim-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  --acim-radius: 12px;
+  --acim-nav-height: 60px;
+  --acim-header-height: 120px;
+}
+
+/* ── POS Container ── */
+#acim-pos {
+  position: fixed;
+  inset: 0;
+  z-index: 999999;
+  display: flex;
+  flex-direction: column;
+  background: var(--acim-bg);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  animation: acimFadeIn 0.2s ease-out;
+}
+
+/* ── Green Header ── */
+.acim-header {
+  background: var(--acim-green);
+  padding: 16px;
+  padding-top: max(16px, env(safe-area-inset-top));
+  flex-shrink: 0;
+  position: relative;
+}
+
+.acim-header-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.acim-header-title {
+  color: #fff;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.acim-header-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.acim-header-btn {
+  background: rgba(255,255,255,0.2);
+  border: none;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 18px;
+  transition: background 0.15s;
+}
+
+.acim-header-btn:hover {
+  background: rgba(255,255,255,0.3);
+}
+
+/* ── Actor Badge (inside search bar) ── */
+#acim-actor-badge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  margin-left: 4px;
+}
+
+#acim-actor-badge span {
+  font-size: 11px;
+  color: var(--acim-text-secondary);
+  white-space: nowrap;
+}
+
+#acim-actor-badge button {
+  padding: 4px 8px;
+  border: 1px solid var(--acim-border);
+  border-radius: 6px;
+  background: #fff;
+  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+@media (max-width: 400px) {
+  #acim-actor-badge span {
+    display: none;
+  }
+}
+
+/* ── Search Bar ── */
+.acim-search {
+  background: var(--acim-card);
+  border-radius: var(--acim-radius);
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-shadow: var(--acim-shadow);
+}
+
+.acim-search-icon {
+  font-size: 18px;
+  color: var(--acim-text-secondary);
+}
+
+.acim-search-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-size: 16px;
+  color: var(--acim-text);
+  outline: none;
+}
+
+.acim-search-input::placeholder {
+  color: #999;
+}
+
+/* ── Categories Scroll ── */
+.acim-categories {
+  background: var(--acim-card);
+  padding: 12px 0;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--acim-border);
+}
+
+.acim-categories-scroll {
+  display: flex;
+  gap: 16px;
+  overflow-x: auto;
+  padding: 0 16px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.acim-categories-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.acim-category-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  min-width: 64px;
+  transition: transform 0.15s;
+}
+
+.acim-category-item:active {
+  transform: scale(0.95);
+}
+
+.acim-category-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--acim-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  transition: all 0.15s;
+}
+
+.acim-category-item.active .acim-category-icon {
+  background: var(--acim-green);
+  box-shadow: 0 4px 12px rgba(6, 193, 103, 0.3);
+}
+
+.acim-category-label {
+  font-size: 12px;
+  color: var(--acim-text-secondary);
+  text-align: center;
+  font-weight: 500;
+}
+
+.acim-category-item.active .acim-category-label {
+  color: var(--acim-green);
+  font-weight: 600;
+}
+
+/* ── Product Grid ── */
+.acim-products {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  padding-bottom: calc(var(--acim-nav-height) + 16px);
+}
+
+.acim-products-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.acim-product-card {
+  background: var(--acim-card);
+  border-radius: var(--acim-radius);
+  overflow: hidden;
+  box-shadow: var(--acim-shadow);
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+  position: relative;
+}
+
+.acim-product-card:active {
+  transform: scale(0.97);
+}
+
+.acim-product-image {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  background: var(--acim-bg);
+}
+
+.acim-product-placeholder {
+  width: 100%;
+  aspect-ratio: 1;
+  background: var(--acim-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 48px;
+}
+
+.acim-product-info {
+  padding: 10px;
+}
+
+.acim-product-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--acim-text);
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-height: 36px;
+}
+
+.acim-product-price {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--acim-orange);
+  margin-top: 6px;
+}
+
+.acim-product-stock {
+  font-size: 11px;
+  color: var(--acim-text-secondary);
+  margin-top: 4px;
+}
+
+.acim-product-stock.low {
+  color: var(--acim-orange);
+  font-weight: 600;
+}
+
+.acim-product-stock.expired {
+  color: #c62828;
+  font-weight: 600;
+}
+
+.acim-product-delete {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.95);
+  border: 1px solid #ffcdd2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  color: #c62828;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+  z-index: 5;
+}
+
+.acim-product-camera {
+  position: absolute;
+  bottom: 6px;
+  right: 6px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.5);
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  color: #fff;
+  cursor: pointer;
+  z-index: 5;
+}
+
+/* ── Bottom Navigation ── */
+.acim-bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: var(--acim-nav-height);
+  background: var(--acim-card);
+  border-top: 1px solid var(--acim-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  padding-bottom: env(safe-area-inset-bottom);
+  z-index: 10000010;
+}
+
+.acim-nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  padding: 8px 16px;
+  border-radius: 8px;
+  transition: all 0.15s;
+  background: none;
+  border: none;
+  font-family: inherit;
+}
+
+.acim-nav-item:active {
+  background: var(--acim-bg);
+}
+
+.acim-nav-icon {
+  font-size: 22px;
+  color: var(--acim-text-secondary);
+  opacity: 0.7;
+}
+
+.acim-nav-label {
+  font-size: 11px;
+  color: var(--acim-text-secondary);
+  font-weight: 500;
+  opacity: 0.7;
+}
+
+.acim-nav-item.active .acim-nav-icon {
+  color: var(--acim-green);
+  opacity: 1;
+}
+
+.acim-nav-item.active .acim-nav-label {
+  color: var(--acim-green);
+  font-weight: 600;
+  opacity: 1;
+}
+
+/* ── Cart FAB (Floating Action Button) ── */
+.acim-cart-fab {
+  position: fixed;
+  bottom: calc(var(--acim-nav-height) + 16px);
+  right: 16px;
+  background: var(--acim-green);
+  color: #fff;
+  border: none;
+  border-radius: 16px;
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(6, 193, 103, 0.4);
+  z-index: 10000009;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.acim-cart-fab:active {
+  transform: scale(0.95);
+}
+
+.acim-cart-fab.hidden {
+  display: none;
+}
+
+.acim-cart-badge {
+  background: #fff;
+  color: var(--acim-green);
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/* ── Bottom Sheet Cart ── */
+.acim-sheet-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 2000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s;
+}
+
+.acim-sheet-overlay.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.acim-sheet {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  max-height: 85vh;
+  background: var(--acim-card);
+  border-radius: 20px 20px 0 0;
+  z-index: 2001;
+  transform: translateY(100%);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+}
+
+.acim-sheet.open {
+  transform: translateY(0);
+}
+
+.acim-sheet-handle {
+  width: 40px;
+  height: 4px;
+  background: #ddd;
+  border-radius: 2px;
+  margin: 10px auto;
+  flex-shrink: 0;
+}
+
+.acim-sheet-header {
+  padding: 0 16px 12px;
+  border-bottom: 1px solid var(--acim-border);
+  flex-shrink: 0;
+}
+
+.acim-sheet-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--acim-text);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.acim-sheet-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  color: var(--acim-text-secondary);
+  cursor: pointer;
+  padding: 4px;
+}
+
+.acim-sheet-items {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 0;
+}
+
+.acim-sheet-empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--acim-text-secondary);
+  font-size: 15px;
+}
+
+.acim-sheet-item {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--acim-border);
+  gap: 12px;
+}
+
+.acim-sheet-item-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.acim-sheet-item-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.acim-sheet-item-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--acim-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.acim-sheet-item-weight {
+  font-size: 13px;
+  color: var(--acim-text-secondary);
+}
+
+.acim-sheet-item-price {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--acim-orange);
+}
+
+.acim-sheet-item-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.acim-sheet-item-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--acim-border);
+  background: var(--acim-card);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 16px;
+  transition: all 0.15s;
+}
+
+.acim-sheet-item-btn:hover {
+  background: var(--acim-bg);
+}
+
+.acim-sheet-item-btn.danger {
+  color: #c62828;
+  border-color: #ffcdd2;
+}
+
+/* ── Sheet Footer (Totals + Checkout) ── */
+.acim-sheet-footer {
+  border-top: 2px solid var(--acim-green);
+  padding: 16px;
+  flex-shrink: 0;
+  background: var(--acim-card);
+}
+
+.acim-sheet-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.acim-sheet-row-label {
+  font-size: 15px;
+  color: var(--acim-text-secondary);
+}
+
+.acim-sheet-row-value {
+  font-size: 15px;
+  color: var(--acim-text);
+}
+
+.acim-sheet-row.discount .acim-sheet-row-label,
+.acim-sheet-row.discount .acim-sheet-row-value {
+  color: #2e7d32;
+}
+
+.acim-sheet-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 12px 0 16px;
+  padding-top: 10px;
+  border-top: 1px solid var(--acim-border);
+}
+
+.acim-sheet-total-label {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--acim-text);
+}
+
+.acim-sheet-total-value {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--acim-orange);
+}
+
+.acim-sheet-checkout {
+  width: 100%;
+  padding: 16px;
+  border: none;
+  border-radius: var(--acim-radius);
+  background: var(--acim-green);
+  color: #fff;
+  font-size: 18px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.acim-sheet-checkout:hover {
+  background: var(--acim-green-dark);
+}
+
+.acim-sheet-checkout:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+/* ── Desktop: show cart panel ── */
+@media (min-width: 769px) {
+  .acim-cart-fab {
+    display: none;
+  }
+
+  .acim-bottom-nav {
+    display: none;
+  }
+
+  .acim-products {
+    padding-bottom: 16px;
+  }
+
+  .acim-desktop-cart {
+    width: 360px;
+    background: var(--acim-card);
+    border-left: 1px solid var(--acim-border);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+  }
+
+  .acim-desktop-cart-header {
+    padding: 16px;
+    background: var(--acim-green);
+    color: #fff;
+    font-size: 18px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .acim-desktop-cart-items {
+    flex: 1;
+    overflow-y: auto;
+  }
+
+  .acim-desktop-cart-footer {
+    border-top: 2px solid var(--acim-green);
+    padding: 16px;
+    background: var(--acim-card);
+  }
+}
+
+/* ── Empty state ── */
+.acim-empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--acim-text-secondary);
+}
+
+.acim-empty-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+}
+
+.acim-empty-text {
+  font-size: 16px;
+}
+
+/* ── Animations ── */
+@keyframes acimFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes acimSlideUp {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.acim-product-card {
+  animation: acimSlideUp 0.2s ease-out backwards;
+}
+
+.acim-product-card:nth-child(1) { animation-delay: 0ms; }
+.acim-product-card:nth-child(2) { animation-delay: 30ms; }
+.acim-product-card:nth-child(3) { animation-delay: 60ms; }
+.acim-product-card:nth-child(4) { animation-delay: 90ms; }
+.acim-product-card:nth-child(5) { animation-delay: 120ms; }
+.acim-product-card:nth-child(6) { animation-delay: 150ms; }
+
+/* ── Responsive grid ── */
+@media (max-width: 400px) {
+  .acim-products-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+}
+
+@media (min-width: 401px) and (max-width: 768px) {
+  .acim-products-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+  }
+}
+
+/* ── Print ── */
+@media print {
+  .acim-header, .acim-categories, .acim-bottom-nav, .acim-cart-fab, .acim-sheet-overlay, .acim-sheet {
+    display: none !important;
+  }
+  .acim-products {
+    padding: 0;
+  }
+}
