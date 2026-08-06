@@ -20,42 +20,42 @@
     if(!S.flashOn)return;
     if(flashEl)flashEl.remove();
     if(flashTimer)clearTimeout(flashTimer);
+    var isMobile=window.innerWidth<=768;
     var ov=document.createElement("div");
-    ov.style.cssText="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.55);z-index:10000006;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:Segoe UI,Arial,sans-serif;animation:acimFlashIn .18s ease-out;pointer-events:none;";
+    ov.style.cssText="position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:10000006;display:flex;flex-direction:column;align-items:center;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;animation:acimFlashIn .15s ease-out;pointer-events:none;";
     var name=document.createElement("div");
-    name.style.cssText="color:#fff;font-size:32px;font-weight:700;margin-bottom:14px;text-shadow:0 2px 8px rgba(0,0,0,0.7);max-width:80vw;text-align:center;";
+    name.style.cssText="color:#fff;font-size:"+(isMobile?"14px":"16px")+";font-weight:600;margin-bottom:"+(isMobile?"4px":"6px") +";text-shadow:0 1px 4px rgba(0,0,0,0.5);max-width:80vw;text-align:center;";
     name.textContent=opts.name||" Produit";
     ov.appendChild(name);
     var big=document.createElement("div");
     var bgColor=opts.error?"#c62828":(opts.subtitle?"#1976d2":"#e65100");
-    big.style.cssText="font-size:160px;font-weight:900;color:#fff;background:"+bgColor+";padding:24px 60px;border-radius:24px;box-shadow:0 12px 40px "+bgColor+"AA;text-shadow:0 4px 12px rgba(0,0,0,0.5);line-height:1;";
+    big.style.cssText="font-size:"+(isMobile?"36px":"48px")+";font-weight:900;color:#fff;background:"+bgColor+";padding:"+(isMobile?"8px 20px":"10px 28px")+";border-radius:"+(isMobile?"12px":"16px")+";box-shadow:0 8px 24px "+bgColor+"88;text-shadow:0 2px 8px rgba(0,0,0,0.4);line-height:1;";
     big.textContent=fmtEuros(opts.priceCents||0)+" €";
     ov.appendChild(big);
     if(opts.subtitle){
       var sub=document.createElement("div");
-      sub.style.cssText="color:#fff;font-size:28px;margin-top:14px;opacity:0.85;";
+      sub.style.cssText="color:#fff;font-size:"+(isMobile?"12px":"14px")+";margin-top:6px;opacity:0.85;";
       sub.textContent=opts.subtitle;
       ov.appendChild(sub);
     }
     if(opts.warn){
       var warn=document.createElement("div");
-      warn.style.cssText="color:#ffcdd2;font-size:20px;margin-top:10px;opacity:0.9;";
+      warn.style.cssText="color:#ffcdd2;font-size:"+(isMobile?"11px":"13px")+";margin-top:4px;opacity:0.9;";
       warn.textContent=opts.warn;
       ov.appendChild(warn);
     }
-    // Inject animation CSS once
     if(!document.getElementById("acim-s3-style")){
       var st=document.createElement("style");
       st.id="acim-s3-style";
-      st.textContent="@keyframes acimFlashIn{from{opacity:0;transform:scale(0.86)}to{opacity:1;transform:scale(1)}}@keyframes acimFlashOut{from{opacity:1;transform:scale(1)}to{opacity:0;transform:scale(0.92)}}.acim-flash-out{animation:acimFlashOut .25s ease-in forwards;}";
+      st.textContent="@keyframes acimFlashIn{from{opacity:0;transform:translateX(-50%) translateY(-20px) scale(0.9)}to{opacity:1;transform:translateX(-50%) translateY(0) scale(1)}}@keyframes acimFlashOut{from{opacity:1;transform:translateX(-50%) translateY(0) scale(1)}to{opacity:0;transform:translateX(-50%) translateY(-10px) scale(0.95)}}.acim-flash-out{animation:acimFlashOut .2s ease-in forwards;}";
       document.head.appendChild(st);
     }
     document.body.appendChild(ov);
     flashEl=ov;
     flashTimer=setTimeout(function(){
       ov.classList.add("acim-flash-out");
-      setTimeout(function(){if(ov.parentNode)ov.remove();flashEl=null;},260);
-    },opts.duration||1500);
+      setTimeout(function(){if(ov.parentNode)ov.remove();flashEl=null;},210);
+    },isMobile?500:(opts.duration||1000));
   }
 
   // ── Voice: speech synthesis ──

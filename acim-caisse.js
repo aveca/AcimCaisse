@@ -1,4 +1,4 @@
-// ─── AcimCaisse v1.3.0#40 — Transactional stock + kg weight fix + version unification ──
+﻿// ─── AcimCaisse v1.3.0#40 — Transactional stock + kg weight fix + version unification ──
 ;(function(){
   "use strict";
   var _log=function(m){console.log("[Acim] "+m);};
@@ -300,16 +300,16 @@
 
   // ─── CATEGORIES ──────────────────────────────────────
   var CATS=[
-    {id:"viande",ic:"🥩"}, {id:"volaille",ic:"🐔"}, {id:"laitier",ic:"🧀"}, {id:"epicerie",ic:"🏪"},
+    {id:"viande",ic:"🥩"}, {id:"volaille",ic:"🐔"}, {id:"poisson",ic:"🐟"}, {id:"laitier",ic:"🧀"}, {id:"epicerie",ic:"🏪"},
     {id:"boulangerie",ic:"🍞"}, {id:"boisson",ic:"🥤"}, {id:"surgelé",ic:"🧊"},
     {id:"snack",ic:"🍪"}, {id:"condiment",ic:"🧂"}, {id:"menager",ic:"🧴"},
-    {id:"vin",ic:"🍷"}, {id:"autre",ic:"📦"}
+    {id:"fruits",ic:"🍎"}, {id:"legumes",ic:"🥬"}, {id:"vin",ic:"🍷"}, {id:"autre",ic:"📦"}
   ];
   function _catIcon(id){
     for(var i=0;i<CATS.length;i++)if(CATS[i].id===id)return CATS[i].ic;
     return "📦";
   }
-  var _catBg={viande:"#fce4e4",volaille:"#fef0db",laitier:"#dbeafe",epicerie:"#dcfce7",boulangerie:"#fef9c3",boisson:"#ccfbf1",snack:"#fef3c7",condiment:"#f3f4f6",menager:"#ede9fe",surgelé:"#cffafe",vin:"#fce7f3",autre:"#f5f5f5"};
+  var _catBg={viande:"#fce4e4",volaille:"#fef0db",poisson:"#e0f2fe",laitier:"#dbeafe",epicerie:"#dcfce7",boulangerie:"#fef9c3",boisson:"#ccfbf1",snack:"#fef3c7",condiment:"#f3f4f6",menager:"#ede9fe",surgelé:"#cffafe",fruits:"#fef9c3",legumes:"#dcfce7",vin:"#fce7f3",autre:"#f5f5f5"};
 
 
   // ─── CATALOGUE IndexedDB ─────────────────────────────────
@@ -983,12 +983,13 @@
 
     var navItems=[
       {icon:"\uD83C\uDFE0",label:"Accueil",active:true},
+      {icon:"\uD83D\uDED2",label:"Panier 200\u20AC",cart:true,fn:function(){_showIdealCart();}},
       {icon:"\uD83D\uDCCB",label:"Historique",fn:function(){_showHistory();}},
       {icon:"\u2699\uFE0F",label:"Menu",fn:function(){_showMainMenu();}}
     ];
     navItems.forEach(function(item){
       var btn=document.createElement("button");
-      btn.className="acim-nav-item"+(item.active?" active":"");
+      btn.className="acim-nav-item"+(item.active?" active":"")+(item.cart?" acim-nav-cart":"");
       btn.innerHTML='<span class="acim-nav-icon">'+item.icon+'</span><span class="acim-nav-label">'+item.label+'</span>';
       if(item.fn)btn.onclick=item.fn;
       nav.appendChild(btn);
@@ -1150,7 +1151,14 @@
     var overlay=document.getElementById("acim-sheet-overlay");
     var sheet=document.getElementById("acim-sheet");
     if(overlay)overlay.classList.add("open");
-    if(sheet)sheet.classList.add("open");
+    if(sheet){
+      sheet.classList.add("open");
+      sheet.onclick=function(e){
+        if(e.target===sheet||e.target.classList.contains("acim-sheet-handle")){
+          _closeCartSheet();
+        }
+      };
+    }
     _renderCart();
   }
   function _closeCartSheet(){
@@ -1228,8 +1236,10 @@
 
       var icPh=document.createElement("div");
       icPh.className="acim-product-placeholder";
-      icPh.style.background=bg;
-      icPh.innerHTML='<span style="font-size:48px">'+_catIcon(cat)+'</span>';
+      icPh.style.background="linear-gradient(135deg,"+bg+" 0%,#e8e8e8 100%)";
+      // Generate nice initial-based placeholder
+      var initials=(p.name||"?").split(" ").slice(0,2).map(function(w){return w.charAt(0).toUpperCase();}).join("");
+      icPh.innerHTML='<span style="font-size:28px;font-weight:800;color:rgba(0,0,0,0.12);letter-spacing:1px">'+initials+'</span>';
       card.appendChild(icPh);
 
       // Camera button for adding/changing photo
@@ -2403,6 +2413,97 @@
     ov.onclick=function(e){if(e.target===ov)ov.remove();};
     document.body.appendChild(ov);
     setTimeout(function(){valInput.focus();},100);
+  }
+
+  // ─── IDEAL CART (200€ preset) ──
+  function _showIdealCart(){
+    var idealItems=[
+      {name:"Poulet entier",price:8.50,qty:2,cat:"viande"},
+      {name:"Bavette de boeuf 500g",price:9.90,qty:2,cat:"viande"},
+      {name:"Cotelettes de porc 4pce",price:7.50,qty:1,cat:"viande"},
+      {name:"Saumon frais 200g",price:6.90,qty:2,cat:"poisson"},
+      {name:"Riz basmati 1kg",price:2.80,qty:2,cat:"epicerie"},
+      {name:"Pates spaghetti 500g",price:1.50,qty:3,cat:"epicerie"},
+      {name:"Huile d'olive 75cl",price:6.90,qty:1,cat:"epicerie"},
+      {name:"Sauce tomate 680g",price:2.20,qty:2,cat:"epicerie"},
+      {name:"Conserve thon 185g",price:2.50,qty:3,cat:"epicerie"},
+      {name:"Lait entier 1L",price:1.45,qty:4,cat:"laitier"},
+      {name:"Beurre doux 250g",price:2.10,qty:2,cat:"laitier"},
+      {name:"Fromage rape 200g",price:3.50,qty:1,cat:"laitier"},
+      {name:"Oeufs plein air 12pce",price:3.80,qty:1,cat:"laitier"},
+      {name:"Yaourts nature 12pce",price:3.20,qty:1,cat:"laitier"},
+      {name:"Pommes variées 1kg",price:3.50,qty:2,cat:"fruits"},
+      {name:"Bananes 1kg",price:2.20,qty:2,cat:"fruits"},
+      {name:"Tomates grappe 1kg",price:4.50,qty:1,cat:"legumes"},
+      {name:"Courgettes 1kg",price:3.80,qty:1,cat:"legumes"},
+      {name:"Salade verte 200g",price:1.80,qty:2,cat:"legumes"},
+      {name:"Carottes 1kg",price:2.50,qty:1,cat:"legumes"},
+      {name:"Oignons 1kg",price:1.90,qty:1,cat:"legumes"},
+      {name:"Pommes de terre 2kg",price:3.20,qty:1,cat:"legumes"},
+      {name:"Eau minerale 6x1.5L",price:3.50,qty:2,cat:"boisson"},
+      {name:"Jus d'orange 1L",price:2.80,qty:2,cat:"boisson"},
+      {name:"Cafe moulu 250g",price:4.50,qty:1,cat:"epicerie"},
+      {name:"Sucre en poudre 1kg",price:1.90,qty:1,cat:"epicerie"},
+      {name:"Farine de ble 1kg",price:1.50,qty:1,cat:"epicerie"},
+      {name:"Moutarde Dijon 200g",price:1.80,qty:1,cat:"epicerie"},
+      {name:"Poivre noir moulin",price:3.50,qty:1,cat:"epicerie"},
+      {name:"Sel fin 500g",price:0.90,qty:1,cat:"epicerie"},
+      {name:"Herbes de Provence 20g",price:1.80,qty:1,cat:"epicerie"},
+      {name:"Champignons de Paris 250g",price:2.20,qty:1,cat:"legumes"},
+      {name:"Ail frais 3 pce",price:1.20,qty:1,cat:"legumes"},
+      {name:"Citrons 500g",price:2.50,qty:1,cat:"fruits"},
+      {name:"Mangue 1 pce",price:2.80,qty:1,cat:"fruits"},
+      {name:"Lait de coco 400ml",price:2.20,qty:1,cat:"epicerie"},
+      {name:"The vert 20 sachets",price:2.80,qty:1,cat:"epicerie"},
+      {name:"Cornichons 330g",price:2.20,qty:1,cat:"epicerie"},
+      {name:"Olives vertes 200g",price:2.50,qty:1,cat:"epicerie"},
+      {name:"Pain de mie 500g",price:2.20,qty:1,cat:"boulangerie"},
+      {name:"Baguette tradition",price:1.10,qty:2,cat:"boulangerie"},
+      {name:"Croissants 4 pce",price:3.80,qty:1,cat:"boulangerie"},
+      {name:"Legumes surgelés mix 750g",price:3.20,qty:1,cat:"surgelé"},
+      {name:"Miel de fleur 250g",price:5.50,qty:1,cat:"epicerie"}
+    ];
+
+    // Clear cart first
+    _myCart=[];
+
+    // Add items and register in product catalog
+    var total=0;
+    var catCount={};
+    idealItems.forEach(function(item){
+      // Count items per category
+      if(!catCount[item.cat])catCount[item.cat]=0;
+      catCount[item.cat]++;
+      
+      var bc="IDEAL-"+item.cat.charAt(0)+catCount[item.cat];
+      var priceCents=Math.round(item.price*100);
+      
+      // Add to cart directly
+      var myId="M"+Date.now()+Math.floor(Math.random()*9999);
+      _myCart.push({myId:myId,name:item.name,priceCents:priceCents,bc:bc,cat:item.cat,
+        weight:null,unitType:null,pricePerUnit:null,discountCents:0,qty:item.qty||1});
+      _realBcMap[myId]=bc;
+      
+      total+=priceCents*(item.qty||1);
+      
+      // Register in product catalog if not exists
+      if(!_allProducts.find(function(p){return p.bc===bc;})){
+        _allProducts.push({id:bc,name:item.name,priceCents:priceCents,category:item.cat,image:null,barcode:bc,last_updated:new Date().toISOString()});
+      }
+    });
+
+    // Update categories
+    _buildCategories();
+    _renderPOS();
+    _updateCartFAB();
+
+    // Open cart sheet on mobile
+    if(window.innerWidth<=768){
+      setTimeout(function(){_openCartSheet();},300);
+    }
+
+    // Show success message
+    _toast("\u2705 Panier id\u00e9al charg\u00e9 \u2014 "+(total/100).toFixed(2).replace(".",",")+" \u20AC");
   }
 
   // ─── MAIN MENU (history, settings, invoices, barcodes) ──
@@ -4972,4 +5073,10 @@
   window._acimGetCurrentActor=_getCurrentActor;
   window._acimGetCurrentActorAsync=_getCurrentActorAsync;
   window._acimRefreshActorBadge=_refreshActorBadge;
+  window._closeCartSheet=_closeCartSheet;
+  window._openCartSheet=_openCartSheet;
+  window._filterProducts=_filterProducts;
+  window._showMainMenu=_showMainMenu;
+  window._showIdealCart=_showIdealCart;
+  window._activeCat_ref=function(v){if(v!==undefined)_activeCat=v;return _activeCat;};
 })();
