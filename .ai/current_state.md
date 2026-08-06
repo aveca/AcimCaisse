@@ -1,12 +1,22 @@
 # État courant du projet
 
-> Dernière mise à jour : 2026-08-06 (post-merge Sprint 4.1)
+> Dernière mise à jour : 2026-08-06 (post-fix régression UX)
 
 ## Branche active
 
 - **Branche** : `gh-pages` (branche de déploiement principale du repo)
-- **HEAD** : `e2ea09d Merge pull request #1 from aveca/feat/pr-c-audit-hardening`
-- **Tag jalon** : `sprint-4.1-audit-complete` (poussé sur origin)
+- **HEAD** : `faf344e fix(ui): restore POS DOM IDs broken by Uber Eats refactor + mic emoji`
+- **Tag jalon** : `sprint-4.1-audit-complete` (poussé sur origin — positionné sur `e2ea09d`, fix `faf344e` est postérieur au tag mais sur la même branche)
+
+## Branche HEAD - 5
+```
+faf344e fix(ui): restore POS DOM IDs broken by Uber Eats refactor + mic emoji   (fix incident)
+5d7e29b feat: panier idéal 200€, flash toast, ... (commit externe sans PR)
+ae89a20 feat: auto-fetch product images + smart sort           (commit externe sans PR)
+c27b50d feat: mobile-first Uber Eats style UI                  (commit externe sans PR — a apporté la régression)
+bf206e8 docs(sprint-4.1): finalize PR C plan + .ai project state
+```
+
 
 ## situSprint livré
 

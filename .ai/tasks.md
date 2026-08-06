@@ -1,11 +1,13 @@
 # Tasks — Prochaines P0 / P1 / P2
 
-> Source de priorité : `docs/PR_C_PLAN.md` §11 + §12 (Hors scope PR C, suite logique).
-> État : Sprint 4.1 livré le 2026-08-06, working tree propre.
+> Source de priorité : `docs/PR_C_PLAN.md` §11 + §12 (Hors scope PR C, suite logique) + incident du 2026-08-06 (commits UX externes non-validés).
+> État : Sprint 4.1 livré + correctif UX poussé le 2026-08-06, working tree propre. Toutes les 6 suites E2E vertes (173 assertions).
 
 ## P0 — immédiat (cette session, optionnel)
 
-- [ ] **Committer la doc restante** : `docs/PR_C_PLAN.md` (actuellement untracked) + `.ai/current_state.md` + `.ai/changelog.md` + `.ai/tasks.md`. Un seul commit `docs(sprint-4.1): finalize plan + ai state` dans `gh-pages` directement (pas de PR pour de la doc).
+- [x] **Committer la doc restante** : `docs/PR_C_PLAN.md` + `.ai/*` — fait dans `bf206e8` (avalé par c27b50d mais présent).
+- [x] **Mettre à jour `docs/DATA_MODEL_CURRENT.md` pour le store `users` v3** — fait (et étendu pour couvrir `audit_events`, modèle de session, flows mutation Sprint 4.1).
+- [ ] **CI GitHub Actions sur `gh-pages`** (escaladé suite à l'incident du 2026-08-06) — voir Backlog ci-dessous pour le contenu. Sans CI, n'importe quel commit direct peut casser sans alerte et le jalon `sprint-4.1-audit-complete` n'est protégé que par discipline manuelle.
 
 ---
 
@@ -39,10 +41,15 @@ Source : PR_C_PLAN.md §11.
 - [ ] Re-auth au boot optionnel (configurable par flag `meta.acim-require-boot-auth`)
 
 ### Doc
-- [ ] **Mettre à jour `docs/DATA_MODEL_CURRENT.md` pour le store `users` v3** (actuellement dit "aucune notion d'opérateur/Caissier ni de PIN")
-- [ ] Ajouter schéma `users` + modèle de session + invariant `actorId`
+- [x] ~~Mettre à jour `docs/DATA_MODEL_CURRENT.md` pour le store `users` v3~~ — fait (commit mélangé dans c27b50d par accident, mais contenu présent)
+- [ ] Backporter les doc updates dans le changelog si jamais on split c27b50d
 - [ ] Documenter la politique PIN (sel SHA-256, 4-8 digits, pas de lockout v1 — assumption mono-poste)
 - [ ] Documenter le flow de restauration de session au boot (trust local)
+
+### Process / Sécurité repo
+- [ ] **Branch protection rule sur `gh-pages`** : interdire les push directs sauf pour le bot/owner via PR. Mettre en place via GitHub settings.
+- [ ] **Pre-commit hook local** : `node --check` sur tous `.js` du repo (détecte syntax errors avant push)
+- [ ] **CONTRIBUTING.md** : formatter qu'aucun commit direct sur `gh-pages` n'est admis sans PR + validation E2E
 
 ---
 
@@ -58,18 +65,22 @@ Source : PR_C_PLAN.md §11.
 - [ ] Verification pass au boot (any tampering flags a SYSTEM_ERROR event)
 - [ ] Multi-postes : la hash chain est locale par poste, sync Supabase stocke les hash pour audit forensique global
 
-### Multi-postes
+### Multi-postes (suite)
 - [ ] Auth centralisée (Supabase Auth ou OIDC externe)
 - [ ] Config `storeId` au boot + tag sur chaque event
 - [ ] Conflits de stock gérés par `last_updated` (LWW) ou CRDT si besoin
 
 ---
 
-## Backlog technique (non priorisé)
+## Backlog technique
 
-- [ ] CI GitHub Actions : 6 runners E2E Playwright en matrix sur `push` à `gh-pages`
-- [ ] Pré-commit hooks : `node --check` sur tous `.js` du repo (détecte syntax errors avant push)
-- [ ] Refactor `acim-caisse.js` (5105 lignes) en modules ES pour préparer la maintenance multi-contributeurs
+- [ ] **CI GitHub Actions** (escaladé P0 après l'incident c27b50d) :
+  - Workflow sur `push` à `gh-pages` + sur PR
+  - Matrix : Playwright + Node 18
+  - Steps : `npm ci` → `node tests/serve.js &` (background) → 6 runners lancés en série (`run-e2e.js`, `run-e2e-robust.js`, `run-e2e-sprint3.js`, `run-e2e-audit.js`, `run-e2e-audit-b.js`, `run-e2e-audit-c.js`)
+  - Fail-fast : n'importe quel runner en échec → PR/commit bloqué (ou alerte si push direct autorisé)
+  - Upload screenshots en artifacts pour debug
+- [ ] Refactor `acim-caisse.js` (5100+ lignes désormais) en modules ES pour préparer la maintenance multi-contributeurs
 - [ ] Migration `electron-main.js` pour dernier Electron LTS
 - [ ] Tests de charge : 10k audit_events → bench queries indexées + perf render UI
 

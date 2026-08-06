@@ -1,5 +1,41 @@
 # Changelog
 
+## [post-sprint-4.1] — 2026-08-06 (post-merge follow-ups)
+
+### Commit `bf206e8` — docs(sprint-4.1): finalize PR C plan + .ai project state
+Création du dossier `.ai/` avec `current_state.md`, `changelog.md`, `tasks.md`. Commit aussi `docs/PR_C_PLAN.md` qui avait été laissé untracked volontontairement pendant la PR #1.
+
+### Commits externes (activité parallèle pendant la session doc)
+3 commits ont été poussés directement sur `gh-pages` par un processus externe pendant la session de finalisation doc :
+- `c27b50d feat: mobile-first Uber Eats style UI` — refactor UI POS + nouveau CSS `acim-uber-eats.css` (753 lignes)
+- `ae89a20 feat: auto-fetch product images + smart sort`
+- `5d7e29b feat: panier idéal 200€, flash toast, better placeholders, new categories`
+
+Ces commits n'ont pas été validés par les runners E2E avant d'être poussés. Le commit `c27b50d` a introduit une régression sur 5 tests smoke de `run-e2e.js` + 1 test de `run-e2e-sprint3.js` (bouton mic).
+
+### Commit `faf344e` — fix(ui): restore POS DOM IDs broken by Uber Eats refactor + mic emoji
+Correctif chirurgical apporté après diagnostic par agent `explore` :
+
+**Problème** : le refactor Uber Eats (`c27b50d`) a supprimé 3 attributs `id` du `_createPOS()` qui étaient utilisés par les tests Playwright comme ancres de sélection CSS :
+- `acim-pos-cats` — conteneur catégories (tests 1b/2/3 + `acimcaisse-ux-fix.css`)
+- `acim-pos-grid` — grille produits (tests 1a/2/3 + sprint3 + robust)
+- `acim-pos-total` — label TOTAL (tests 1c/2 verification)
+
+Le code gardait les `className` (le rendu visait correct), mais l'absence d'`id` faisait échouer les sélecteurs `#acim-pos-grid > *` etc. Côté CSS, les règles `#acim-pos-cats button` et `#acim-pos-grid > div` dans `acimcaisse-ux-fix.css` restaient orphelines (perte UX desktop mineure).
+
+**Fix** : 3 lignes ajoutées dans `acim-caisse.js:966, 976, 1074` pour restaurer les `id` à côté des `className`. Aucun changement de classe CSS, aucun impact sur la spécificité CSS, aucun impact sur le rendu mobile.
+
+**Bonus** : ресторé л'emoji `🎤` (U+1F3A4, microphone) du bouton floating voice — c27b50d l'avait remplacé par `🎙` (U+1F399, studio microphone), cassant `run-e2e-sprint3.js TEST 5 "Mic floating button visible"`.
+
+**Validation post-fix** : 173/173 assertions vertes :
+- `run-e2e.js` 13/13, `run-e2e-robust.js` 20/20, `run-e2e-sprint3.js` 8/8
+- `run-e2e-audit.js` 35/35, `run-e2e-audit-b.js` 28/28, `run-e2e-audit-c.js` 69/69
+
+### Note process pour la prochaine session
+Le flux direct-à-`gh-pages` sans PR ni validation E2E des commits externes a failli compromettre le jalon `sprint-4.1-audit-complete`. Recommandation : ajouter une GitHub Action CI sur `gh-pages` qui lance les 6 runners Playwright à chaque push (voir `.ai/tasks.md` Backlog).
+
+---
+
 ## [sprint-4.1-audit-complete] — 2026-08-06
 
 Tag poussé sur origin : `sprint-4.1-audit-complete` (commit `e2ea09d`).
