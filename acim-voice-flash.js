@@ -222,7 +222,7 @@
     micBtn=document.createElement("button");
     micBtn.id="acim-mic-btn";
     micBtn.style.cssText="position:fixed;bottom:80px;left:18px;width:52px;height:52px;border:none;border-radius:50%;background:"+(S.voiceOn?"#4caf50":"#1a1a2e")+";color:#fff;font-size:24px;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,0.3);z-index:10000005;transition:all .15s;";
-    micBtn.textContent="\uD83C\uDF99";
+    micBtn.textContent="🎤";
     micBtn.title="Activer la reconnaissance vocale";
     micBtn.onclick=function(){
       S.voiceOn=!S.voiceOn;

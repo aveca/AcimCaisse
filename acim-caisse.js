@@ -963,6 +963,7 @@
 
     var catsScroll=document.createElement("div");
     catsScroll.className="acim-categories-scroll";
+    catsScroll.id="acim-pos-cats";
     catsWrap.appendChild(catsScroll);
     _posCats=catsScroll;
 
@@ -973,6 +974,7 @@
     productsWrap.className="acim-products";
 
     _posGrid=document.createElement("div");
+    _posGrid.id="acim-pos-grid";
     _posGrid.className="acim-products-grid";
     productsWrap.appendChild(_posGrid);
     _pos.appendChild(productsWrap);
@@ -1071,8 +1073,9 @@
     finalLabel.className="acim-sheet-total-label";
     finalLabel.textContent="TOTAL";
     _posTotal=document.createElement("span");
+    _posTotal.id="acim-pos-total";
     _posTotal.className="acim-sheet-total-value";
-    _posTotal.textContent="0,00 \u20AC";
+    _posTotal.textContent="0,00 €";
     totalRow.appendChild(finalLabel);
     totalRow.appendChild(_posTotal);
     sheetFooter.appendChild(totalRow);
