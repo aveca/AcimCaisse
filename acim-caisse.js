@@ -2007,6 +2007,24 @@
     });
   }
 
+  function _seedDefaultUser(){
+    return _openUnifiedDB().then(function(db){
+      if(!db) return;
+      return new Promise(function(resolve){
+        var tx = db.transaction("users", "readonly");
+        var req = tx.objectStore("users").getAll();
+        req.onsuccess = function(){
+          if(req.result && req.result.length > 0){ resolve(); return; }
+          _createUser("u-admin", "1234", "Administrateur", "manager").then(function(){
+            _log("✅ Utilisateur admin par défaut créé (PIN: 1234)");
+            resolve();
+          });
+        };
+        req.onerror = function(){ resolve(); };
+      });
+    });
+  }
+
   // Login via PIN. Resolve {ok, actor?} où actor = {id, name, role}.
   function _loginWithPin(pin){
     if(!_PIN_REGEX.test(String(pin||""))) return Promise.resolve({ok:false, error:"pin-invalid"});
@@ -5197,6 +5215,8 @@
       return _maybeMigrateLegacy();
     }).then(function(migRes){
       if(migRes) _log("Migration: "+(migRes.ok?(migRes.alreadyMigrated?"already migrated":"done: "+JSON.stringify(migRes.copied)):("FAILED: "+migRes.error)));
+      return _seedDefaultUser();
+    }).then(function(){
       // PR C — Restoring operator session if any (offline-first trust local meta).
       return _restoreSessionIfAny();
     }).then(function(actor){
@@ -5225,9 +5245,13 @@
         _allProducts=all||[];
         _log("Produits charg\u00E9s: "+_allProducts.length);
         _createPOS();
-        _renderPOS();
-        _refreshActorBadge();
-        _batchFetchImages(_allProducts);
+      _renderPOS();
+      _refreshActorBadge();
+      if(!window.getCurrentActor()){
+        _showLogin();
+      }
+      _batchFetchImages(_allProducts);
+
       }).catch(function(e){
         _err("Init error:",e);
         _allProducts=[];
@@ -5238,6 +5262,13 @@
     }).catch(function(e){
       _err("DB migration init failed:",e);
     });
+    
+    // Ensure login is shown if no one is logged in
+    setTimeout(function(){
+      if(!window.getCurrentActor()){
+        _showLogin();
+      }
+    }, 1000);
     document.addEventListener("keydown",function(e){
       if(e.ctrlKey&&e.key==="k"){e.preventDefault();if(_posSearch)_posSearch.focus();}
       if(e.ctrlKey&&e.key==="n"){e.preventDefault();_quickCreate("",0);}
