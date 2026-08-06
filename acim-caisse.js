@@ -1496,7 +1496,10 @@
   }
 
   // ─── SCANNER BUFFER ──────────────────────────────────
-  var _scanBuf="",_scanTimer=null,_scanning=false;
+  // Distinguishes USB/BT scanner (rapid keystrokes + Enter) from manual typing
+  // by tracking inter-key delay. Scanners typically fire <30ms between keys,
+  // manual typing is >80ms.
+  var _scanBuf="",_scanTimer=null,_scanning=false,_lastScanKeyTime=0,_SCAN_SPEED_MS=50;
   function _scanCommit(){
     if(_scanTimer){clearTimeout(_scanTimer);_scanTimer=null;}
     var bc=_scanBuf;
@@ -1514,15 +1517,21 @@
   document.addEventListener("keydown",function(e){
     // Scan toujours prioritaire, quel que soit le focus
     if(/^[0-9]$/.test(e.key)){
-      // Don't interfere with input fields (typing in search bar etc.)
-      if(document.activeElement===_posSearch)return;
+      var now=Date.now();
+      var isScanner=_scanning || (now-_lastScanKeyTime<_SCAN_SPEED_MS);
+      _lastScanKeyTime=now;
+      // If search bar is focused AND manual typing (slow), let browser handle
+      if(document.activeElement===_posSearch && !isScanner && !_scanning){
+        return; // manual typing in search bar — browser adds digit normally
+      }
       _scanning=true;
       _scanBuf+=e.key;
-      if(_pos&&_pos.style.display!=="none"&&_posSearch){
+      // Only write to search bar if it's NOT focused (avoid double-append when focused)
+      if(_pos&&_pos.style.display!=="none"&&_posSearch && document.activeElement!==_posSearch){
         _posSearch.value=_scanBuf;
         _filterProducts();
       }
-      // Enter-terminator scanners commit immediately; else 80ms timeout (was 150ms — caused rapid-scan concat).
+      // Enter-terminator scanners commit immediately; else 80ms timeout.
       clearTimeout(_scanTimer);_scanTimer=setTimeout(_scanCommit,80);
       return;
     }

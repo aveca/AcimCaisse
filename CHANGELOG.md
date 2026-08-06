@@ -4,6 +4,16 @@ Toutes les modifications documentées ici. Sync FTP/local/GitHub à chaque modif
 
 ## 2026-08-06
 
+### Fix: Scanner USB/BT fonctionne sans cliquer dans le champ
+- **Problème**: Le scanner ne fonctionnait que si l'utilisateur cliquait d'abord dans le champ de recherche.
+- **Cause**: Handler global keydown désactivé quand `_posSearch` était focused.
+- **Solution**: Distingue scanner (frappes rapides <50ms) vs saisie manuelle (lente).
+  - Scanner: capture les chiffres + Enter, même si le champ est focused
+  - Saisie manuelle: laisse le navigateur gérer normalement (pas de duplication)
+  - Si champ focused + scanner: le navigateur tape les chiffres, Enter du `_posSearch` déclenche `_processBarcode`
+- **Variable**: `_SCAN_SPEED_MS=50` (seuil de vitesse entre touches)
+- **Commit**: `à venir`
+
 ### Feature: Rôle manager vs cashier
 - **Ajout**: `_isManager()` helper pour vérifier le rôle de l'opérateur.
 - **Restrictions cashier** (masqués dans le menu):
