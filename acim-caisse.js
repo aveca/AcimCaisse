@@ -311,6 +311,20 @@
   }
   var _catBg={viande:"#fce4e4",volaille:"#fef0db",poisson:"#e0f2fe",laitier:"#dbeafe",epicerie:"#dcfce7",boulangerie:"#fef9c3",boisson:"#ccfbf1",snack:"#fef3c7",condiment:"#f3f4f6",menager:"#ede9fe",surgelé:"#cffafe",fruits:"#fef9c3",legumes:"#dcfce7",vin:"#fce7f3",autre:"#f5f5f5"};
 
+  // ─── SVG PRODUCT IMAGE GENERATOR ──
+  function _generateProductSVG(name,category,priceCents){
+    var cat=(category||"autre").toLowerCase();
+    var bg=_catBg[cat]||"#f5f5f5";
+    var icon=_catIcon(cat);
+    var initials=(name||"?").split(" ").slice(0,2).map(function(w){return w.charAt(0).toUpperCase();}).join("");
+    var svg='<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">';
+    svg+='<rect width="200" height="200" fill="'+bg+'"/>';
+    svg+='<text x="100" y="90" text-anchor="middle" font-size="72" fill="rgba(0,0,0,0.08)">'+icon+'</text>';
+    svg+='<text x="100" y="145" text-anchor="middle" font-size="32" font-weight="800" fill="rgba(0,0,0,0.18)" font-family="-apple-system,sans-serif">'+initials+'</text>';
+    svg+='</svg>';
+    return "data:image/svg+xml,"+encodeURIComponent(svg);
+  }
+
 
   // ─── CATALOGUE IndexedDB ─────────────────────────────────
   // Schema versioning — must match version.json "schema" field.
@@ -1240,9 +1254,9 @@
       var icPh=document.createElement("div");
       icPh.className="acim-product-placeholder";
       icPh.style.background="linear-gradient(135deg,"+bg+" 0%,#e8e8e8 100%)";
-      // Generate nice initial-based placeholder
-      var initials=(p.name||"?").split(" ").slice(0,2).map(function(w){return w.charAt(0).toUpperCase();}).join("");
-      icPh.innerHTML='<span style="font-size:28px;font-weight:800;color:rgba(0,0,0,0.12);letter-spacing:1px">'+initials+'</span>';
+      // Generate SVG product image
+      var svgUrl=_generateProductSVG(p.name,cat,p.sale_price_cents);
+      icPh.innerHTML='<img src="'+svgUrl+'" style="width:100%;height:100%;object-fit:cover;border-radius:12px 12px 0 0">';
       card.appendChild(icPh);
 
       // Camera button for adding/changing photo
@@ -1375,9 +1389,21 @@
         row.className="acim-sheet-item";
         row.onclick=function(){_inlineEdit(it.idx,50,50);};
 
-        var icon=document.createElement("span");
+        var icon=document.createElement("div");
         icon.className="acim-sheet-item-icon";
-        icon.textContent=isWeighed?"\u2696\uFE0F":_catIcon(it.cat||"autre");
+        icon.style.cssText="width:40px;height:40px;border-radius:8px;overflow:hidden;flex-shrink:0;background:"+( _catBg[it.cat||"autre"]||"#f5f5f5");
+        // Try to show product image from cache or generate SVG
+        var imgEl=document.createElement("img");
+        imgEl.style.cssText="width:100%;height:100%;object-fit:cover;";
+        var svgUrl=_generateProductSVG(it.name,it.cat,it.price);
+        imgEl.src=svgUrl;
+        icon.appendChild(imgEl);
+        // Try to load real image from cache
+        if(it.bc){
+          _getCachedImage(it.bc).then(function(url){
+            if(url)imgEl.src=url;
+          });
+        }
         row.appendChild(icon);
 
         var infoDiv=document.createElement("div");
@@ -2491,7 +2517,7 @@
       
       // Register in product catalog if not exists
       if(!_allProducts.find(function(p){return p.bc===bc;})){
-        _allProducts.push({id:bc,name:item.name,priceCents:priceCents,category:item.cat,image:null,barcode:bc,last_updated:new Date().toISOString()});
+        _allProducts.push({id:bc,name:item.name,priceCents:priceCents,sale_price_cents:priceCents,category:item.cat,image:null,barcode:bc,last_updated:new Date().toISOString()});
       }
     });
 
