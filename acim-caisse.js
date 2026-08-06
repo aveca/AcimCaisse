@@ -2008,8 +2008,9 @@
   }
 
   function _seedDefaultUser(){
+    _log("Checking for default user...");
     return _openUnifiedDB().then(function(db){
-      if(!db) return;
+      if(!db){ _err("No DB for seed user"); return; }
       return _hashPin("1234").then(function(h){
         return new Promise(function(resolve){
           var tx = db.transaction("users", "readwrite");
@@ -2035,11 +2036,11 @@
             }
           };
           tx.oncomplete = function(){ resolve(); };
-          tx.onerror = function(){ resolve(); };
-          tx.onabort = function(){ resolve(); };
+          tx.onerror = function(){ _err("Seed user tx error"); resolve(); };
+          tx.onabort = function(){ _err("Seed user tx aborted"); resolve(); };
         });
-      });
-    }).catch(function(e){ _err("Seed user error:", e); });
+      }).catch(function(e){ _err("Seed user hash error:", e); });
+    }).catch(function(e){ _err("Seed user DB error:", e); });
   }
 
   // Login via PIN. Resolve {ok, actor?} où actor = {id, name, role}.
