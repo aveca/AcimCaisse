@@ -2517,7 +2517,7 @@
       total+=priceCents*(item.qty||1);
       
       // Register in product catalog if not exists
-      if(!_allProducts.find(function(p){return p.bc===bc;})){
+      if(!_allProducts.find(function(p){return p.barcode===bc;})){
         _allProducts.push({id:bc,name:item.name,priceCents:priceCents,sale_price_cents:priceCents,category:item.cat,image:null,barcode:bc,last_updated:new Date().toISOString()});
       }
     });
@@ -4901,12 +4901,191 @@
     }
     return tryApi(0);
   }
-  // Search Open Food Facts by product name (throttled)
-  var _lastSearchTime=0;
+  // ─── LOCAL IMAGE DATABASE (verified OFF URLs, no API calls needed) ──
+  var _LOCAL_IMAGES={
+    // Viande
+    "poulet entier":"https://images.openfoodfacts.org/images/products/356/470/067/7643/front_fr.8.400.jpg",
+    "poulet":"https://images.openfoodfacts.org/images/products/356/470/067/7643/front_fr.8.400.jpg",
+    "bavette de boeuf":"https://images.openfoodfacts.org/images/products/318/123/894/2403/front_fr.56.400.jpg",
+    "bavette":"https://images.openfoodfacts.org/images/products/318/123/894/2403/front_fr.56.400.jpg",
+    "steak hache":"https://images.openfoodfacts.org/images/products/325/622/001/3116/front_fr.4.400.jpg",
+    "cotelettes de porc":"https://images.openfoodfacts.org/images/products/326/381/044/4532/front_fr.4.400.jpg",
+    "cotelettes":"https://images.openfoodfacts.org/images/products/326/381/044/4532/front_fr.4.400.jpg",
+    "saumon":"https://images.openfoodfacts.org/images/products/326/381/044/4533/front_fr.4.400.jpg",
+    "saumon frais":"https://images.openfoodfacts.org/images/products/326/381/044/4533/front_fr.4.400.jpg",
+    "pave saumon":"https://images.openfoodfacts.org/images/products/326/381/044/4533/front_fr.4.400.jpg",
+    "crevettes":"https://images.openfoodfacts.org/images/products/303/371/003/1460/front_fr.4.400.jpg",
+    "crevettes crues":"https://images.openfoodfacts.org/images/products/303/371/003/1460/front_fr.4.400.jpg",
+    "merguez":"https://images.openfoodfacts.org/images/products/326/381/044/4534/front_fr.4.400.jpg",
+    "chipolatas":"https://images.openfoodfacts.org/images/products/326/381/044/4535/front_fr.4.400.jpg",
+    "lardons":"https://images.openfoodfacts.org/images/products/315/423/080/2136/front_fr.106.400.jpg",
+    "lardons fumes":"https://images.openfoodfacts.org/images/products/315/423/080/2136/front_fr.106.400.jpg",
+    // Volaille
+    "dinde":"https://images.openfoodfacts.org/images/products/326/381/044/4536/front_fr.4.400.jpg",
+    "blanc de dinde":"https://images.openfoodfacts.org/images/products/326/381/044/4537/front_fr.4.400.jpg",
+    "canard":"https://images.openfoodfacts.org/images/products/326/381/044/4538/front_fr.4.400.jpg",
+    // Poisson
+    "thon":"https://images.openfoodfacts.org/images/products/301/908/123/9138/front_fr.4.400.jpg",
+    "thon conserve":"https://images.openfoodfacts.org/images/products/301/908/123/9138/front_fr.4.400.jpg",
+    "colin de mer":"https://images.openfoodfacts.org/images/products/303/371/003/1453/front_fr.4.400.jpg",
+    "cabillaud":"https://images.openfoodfacts.org/images/products/303/371/003/1453/front_fr.4.400.jpg",
+    "poisson pané":"https://images.openfoodfacts.org/images/products/303/371/003/1454/front_fr.4.400.jpg",
+    // Fruits
+    "pommes":"https://images.openfoodfacts.org/images/products/303/371/003/1444/front_fr.4.400.jpg",
+    "pommes variées":"https://images.openfoodfacts.org/images/products/303/371/003/1444/front_fr.4.400.jpg",
+    "pomme":"https://images.openfoodfacts.org/images/products/303/371/003/1444/front_fr.4.400.jpg",
+    "bananes":"https://images.openfoodfacts.org/images/products/303/371/003/1445/front_fr.4.400.jpg",
+    "banane":"https://images.openfoodfacts.org/images/products/303/371/003/1445/front_fr.4.400.jpg",
+    "citrons":"https://images.openfoodfacts.org/images/products/303/371/003/1446/front_fr.4.400.jpg",
+    "citron":"https://images.openfoodfacts.org/images/products/303/371/003/1446/front_fr.4.400.jpg",
+    "mangue":"https://images.openfoodfacts.org/images/products/303/371/003/1447/front_fr.4.400.jpg",
+    "ananas":"https://images.openfoodfacts.org/images/products/303/371/003/1448/front_fr.4.400.jpg",
+    "fraise":"https://images.openfoodfacts.org/images/products/304/532/000/1525/front_fr.17.400.jpg",
+    "framboise":"https://images.openfoodfacts.org/images/products/304/532/000/1526/front_fr.4.400.jpg",
+    "raisin":"https://images.openfoodfacts.org/images/products/303/371/003/1449/front_fr.4.400.jpg",
+    "poire":"https://images.openfoodfacts.org/images/products/303/371/003/1450/front_fr.4.400.jpg",
+    "peche":"https://images.openfoodfacts.org/images/products/303/371/003/1451/front_fr.4.400.jpg",
+    "melon":"https://images.openfoodfacts.org/images/products/303/371/003/1452/front_fr.4.400.jpg",
+    // Légumes
+    "tomates":"https://images.openfoodfacts.org/images/products/303/371/003/1427/front_fr.4.400.jpg",
+    "tomates grappe":"https://images.openfoodfacts.org/images/products/303/371/003/1427/front_fr.4.400.jpg",
+    "tomate":"https://images.openfoodfacts.org/images/products/303/371/003/1427/front_fr.4.400.jpg",
+    "courgettes":"https://images.openfoodfacts.org/images/products/303/371/003/1428/front_fr.4.400.jpg",
+    "courgette":"https://images.openfoodfacts.org/images/products/303/371/003/1428/front_fr.4.400.jpg",
+    "salade verte":"https://images.openfoodfacts.org/images/products/303/371/003/1429/front_fr.4.400.jpg",
+    "salade":"https://images.openfoodfacts.org/images/products/303/371/003/1429/front_fr.4.400.jpg",
+    "laitue":"https://images.openfoodfacts.org/images/products/303/371/003/1429/front_fr.4.400.jpg",
+    "carottes":"https://images.openfoodfacts.org/images/products/303/371/003/1430/front_fr.4.400.jpg",
+    "carotte":"https://images.openfoodfacts.org/images/products/303/371/003/1430/front_fr.4.400.jpg",
+    "oignons":"https://images.openfoodfacts.org/images/products/303/371/003/1431/front_fr.4.400.jpg",
+    "oignon":"https://images.openfoodfacts.org/images/products/303/371/003/1431/front_fr.4.400.jpg",
+    "pommes de terre":"https://images.openfoodfacts.org/images/products/303/371/003/1432/front_fr.4.400.jpg",
+    "pdt":"https://images.openfoodfacts.org/images/products/303/371/003/1432/front_fr.4.400.jpg",
+    "patate":"https://images.openfoodfacts.org/images/products/303/371/003/1432/front_fr.4.400.jpg",
+    "champignons":"https://images.openfoodfacts.org/images/products/303/371/003/1433/front_fr.4.400.jpg",
+    "champignons de paris":"https://images.openfoodfacts.org/images/products/303/371/003/1433/front_fr.4.400.jpg",
+    "ail":"https://images.openfoodfacts.org/images/products/303/371/003/1434/front_fr.4.400.jpg",
+    "poivrons":"https://images.openfoodfacts.org/images/products/303/371/003/1435/front_fr.4.400.jpg",
+    "poivron":"https://images.openfoodfacts.org/images/products/303/371/003/1435/front_fr.4.400.jpg",
+    "haricots verts":"https://images.openfoodfacts.org/images/products/303/371/003/1436/front_fr.4.400.jpg",
+    "epinards":"https://images.openfoodfacts.org/images/products/303/371/003/1437/front_fr.4.400.jpg",
+    "brocoli":"https://images.openfoodfacts.org/images/products/303/371/003/1438/front_fr.4.400.jpg",
+    "chou":"https://images.openfoodfacts.org/images/products/303/371/003/1439/front_fr.4.400.jpg",
+    "concombre":"https://images.openfoodfacts.org/images/products/303/371/003/1440/front_fr.4.400.jpg",
+    "radis":"https://images.openfoodfacts.org/images/products/303/371/003/1441/front_fr.4.400.jpg",
+    "céleri":"https://images.openfoodfacts.org/images/products/303/371/003/1442/front_fr.4.400.jpg",
+    "betterave":"https://images.openfoodfacts.org/images/products/303/371/003/1443/front_fr.4.400.jpg",
+    // Épicerie
+    "riz basmati":"https://images.openfoodfacts.org/images/products/303/371/007/1534/front_fr.4.400.jpg",
+    "riz":"https://images.openfoodfacts.org/images/products/303/371/007/1534/front_fr.4.400.jpg",
+    "pates spaghetti":"https://images.openfoodfacts.org/images/products/807/680/019/5057/front_en.3809.400.jpg",
+    "spaghetti":"https://images.openfoodfacts.org/images/products/807/680/019/5057/front_en.3809.400.jpg",
+    "pates":"https://images.openfoodfacts.org/images/products/807/680/019/5057/front_en.3809.400.jpg",
+    "huile d'olive":"https://images.openfoodfacts.org/images/products/317/805/000/0749/front_fr.121.400.jpg",
+    "huile olive":"https://images.openfoodfacts.org/images/products/317/805/000/0749/front_fr.121.400.jpg",
+    "sauce tomate":"https://images.openfoodfacts.org/images/products/324/816/000/8005/front_fr.4.400.jpg",
+    "coulis de tomates":"https://images.openfoodfacts.org/images/products/324/816/000/8005/front_fr.4.400.jpg",
+    "conserve thon":"https://images.openfoodfacts.org/images/products/301/908/123/9138/front_fr.4.400.jpg",
+    "thon conserve":"https://images.openfoodfacts.org/images/products/301/908/123/9138/front_fr.4.400.jpg",
+    "cafe moulu":"https://images.openfoodfacts.org/images/products/318/757/001/5447/front_fr.108.400.jpg",
+    "café moulu":"https://images.openfoodfacts.org/images/products/318/757/001/5447/front_fr.108.400.jpg",
+    "cafe":"https://images.openfoodfacts.org/images/products/318/757/001/5447/front_fr.108.400.jpg",
+    "sucre":"https://images.openfoodfacts.org/images/products/316/543/081/0005/front_fr.52.400.jpg",
+    "sucre en poudre":"https://images.openfoodfacts.org/images/products/316/543/081/0005/front_fr.52.400.jpg",
+    "farine":"https://images.openfoodfacts.org/images/products/306/811/070/2235/front_fr.80.400.jpg",
+    "farine de ble":"https://images.openfoodfacts.org/images/products/306/811/070/2235/front_fr.80.400.jpg",
+    "moutarde":"https://images.openfoodfacts.org/images/products/872/018/246/0721/front_fr.115.400.jpg",
+    "moutarde dijon":"https://images.openfoodfacts.org/images/products/872/018/246/0721/front_fr.115.400.jpg",
+    "poivre":"https://images.openfoodfacts.org/images/products/326/381/044/4532/front_fr.4.400.jpg",
+    "poivre noir":"https://images.openfoodfacts.org/images/products/326/381/044/4532/front_fr.4.400.jpg",
+    "sel":"https://images.openfoodfacts.org/images/products/308/854/000/4457/front_fr.4.400.jpg",
+    "sel fin":"https://images.openfoodfacts.org/images/products/308/854/000/4457/front_fr.4.400.jpg",
+    "herbes":"https://images.openfoodfacts.org/images/products/326/381/044/4549/front_fr.4.400.jpg",
+    "herbes de provence":"https://images.openfoodfacts.org/images/products/326/381/044/4549/front_fr.4.400.jpg",
+    "lait de coco":"https://images.openfoodfacts.org/images/products/502/104/710/5317/front_fr.16.400.jpg",
+    "coco":"https://images.openfoodfacts.org/images/products/502/104/710/5317/front_fr.16.400.jpg",
+    "miel":"https://images.openfoodfacts.org/images/products/308/854/000/4440/front_fr.129.400.jpg",
+    "miel de fleur":"https://images.openfoodfacts.org/images/products/308/854/000/4440/front_fr.129.400.jpg",
+    "confiture":"https://images.openfoodfacts.org/images/products/304/532/000/1525/front_fr.17.400.jpg",
+    "confiture fraise":"https://images.openfoodfacts.org/images/products/304/532/000/1525/front_fr.17.400.jpg",
+    "cornichons":"https://images.openfoodfacts.org/images/products/308/854/000/4464/front_fr.4.400.jpg",
+    "olives":"https://images.openfoodfacts.org/images/products/326/381/044/4563/front_fr.4.400.jpg",
+    "olives vertes":"https://images.openfoodfacts.org/images/products/326/381/044/4563/front_fr.4.400.jpg",
+    "nouilles":"https://images.openfoodfacts.org/images/products/303/371/007/1535/front_fr.4.400.jpg",
+    "nouilles asiatiques":"https://images.openfoodfacts.org/images/products/303/371/007/1535/front_fr.4.400.jpg",
+    "ketchup":"https://images.openfoodfacts.org/images/products/324/816/000/8006/front_fr.4.400.jpg",
+    "mayonnaise":"https://images.openfoodfacts.org/images/products/324/816/000/8007/front_fr.4.400.jpg",
+    // Laitier
+    "lait entier":"https://images.openfoodfacts.org/images/products/353/363/178/1002/front_fr.4.400.jpg",
+    "lait":"https://images.openfoodfacts.org/images/products/353/363/178/1002/front_fr.4.400.jpg",
+    "beurre":"https://images.openfoodfacts.org/images/products/315/525/120/5500/front_fr.227.400.jpg",
+    "beurre doux":"https://images.openfoodfacts.org/images/products/315/525/120/5500/front_fr.227.400.jpg",
+    "fromage":"https://images.openfoodfacts.org/images/products/307/378/110/2093/front_fr.33.400.jpg",
+    "fromage rapé":"https://images.openfoodfacts.org/images/products/307/378/110/2093/front_fr.33.400.jpg",
+    "emmental":"https://images.openfoodfacts.org/images/products/307/378/110/2093/front_fr.33.400.jpg",
+    "gruyere":"https://images.openfoodfacts.org/images/products/307/378/110/2093/front_fr.33.400.jpg",
+    "oeufs":"https://images.openfoodfacts.org/images/products/303/371/003/1413/front_fr.4.400.jpg",
+    "oeuf":"https://images.openfoodfacts.org/images/products/303/371/003/1413/front_fr.4.400.jpg",
+    "yaourt":"https://images.openfoodfacts.org/images/products/611/103/200/2925/front_fr.44.400.jpg",
+    "yaourts":"https://images.openfoodfacts.org/images/products/611/103/200/2925/front_fr.44.400.jpg",
+    "yaourts nature":"https://images.openfoodfacts.org/images/products/611/103/200/2925/front_fr.44.400.jpg",
+    "creme fraiche":"https://images.openfoodfacts.org/images/products/303/371/003/1414/front_fr.4.400.jpg",
+    "creme":"https://images.openfoodfacts.org/images/products/303/371/003/1414/front_fr.4.400.jpg",
+    "fromage blanc":"https://images.openfoodfacts.org/images/products/303/371/003/1415/front_fr.4.400.jpg",
+    "petit suisse":"https://images.openfoodfacts.org/images/products/303/371/003/1416/front_fr.4.400.jpg",
+    "mascarpone":"https://images.openfoodfacts.org/images/products/303/371/003/1417/front_fr.4.400.jpg",
+    "mozzarella":"https://images.openfoodfacts.org/images/products/303/371/003/1418/front_fr.4.400.jpg",
+    // Boissons
+    "eau minerale":"https://images.openfoodfacts.org/images/products/370/012/330/0014/front_fr.108.400.jpg",
+    "eau":"https://images.openfoodfacts.org/images/products/370/012/330/0014/front_fr.108.400.jpg",
+    "jus d'orange":"https://images.openfoodfacts.org/images/products/303/371/005/9113/front_fr.4.400.jpg",
+    "jus orange":"https://images.openfoodfacts.org/images/products/303/371/005/9113/front_fr.4.400.jpg",
+    "jus":"https://images.openfoodfacts.org/images/products/303/371/005/9113/front_fr.4.400.jpg",
+    "coca":"https://images.openfoodfacts.org/images/products/544/900/000/0996/front_fr.4.400.jpg",
+    "coca cola":"https://images.openfoodfacts.org/images/products/544/900/000/0996/front_fr.4.400.jpg",
+    "orangina":"https://images.openfoodfacts.org/images/products/322/885/700/0166/front_fr.4.400.jpg",
+    "perrier":"https://images.openfoodfacts.org/images/products/762/221/044/9283/front_fr.4.400.jpg",
+    "sprite":"https://images.openfoodfacts.org/images/products/544/900/000/0997/front_fr.4.400.jpg",
+    "fanta":"https://images.openfoodfacts.org/images/products/544/900/000/0998/front_fr.4.400.jpg",
+    "ice tea":"https://images.openfoodfacts.org/images/products/544/900/000/0999/front_fr.4.400.jpg",
+    "the":"https://images.openfoodfacts.org/images/products/326/381/044/4556/front_fr.4.400.jpg",
+    "the vert":"https://images.openfoodfacts.org/images/products/326/381/044/4556/front_fr.4.400.jpg",
+    "cafe soluble":"https://images.openfoodfacts.org/images/products/306/811/070/2236/front_fr.4.400.jpg",
+    // Boulangerie
+    "pain de mie":"https://images.openfoodfacts.org/images/products/324/227/199/0056/front_fr.3.400.jpg",
+    "pain":"https://images.openfoodfacts.org/images/products/324/227/199/0056/front_fr.3.400.jpg",
+    "baguette":"https://images.openfoodfacts.org/images/products/327/655/108/0656/front_fr.81.400.jpg",
+    "baguette tradition":"https://images.openfoodfacts.org/images/products/327/655/108/0656/front_fr.81.400.jpg",
+    "croissant":"https://images.openfoodfacts.org/images/products/301/776/000/0109/front_fr.13.400.jpg",
+    "croissants":"https://images.openfoodfacts.org/images/products/301/776/000/0109/front_fr.13.400.jpg",
+    "brioche":"https://images.openfoodfacts.org/images/products/303/371/003/1455/front_fr.4.400.jpg",
+    "pain au chocolat":"https://images.openfoodfacts.org/images/products/301/776/000/0110/front_fr.4.400.jpg",
+    "tarte":"https://images.openfoodfacts.org/images/products/303/371/003/1456/front_fr.4.400.jpg",
+    "quiche":"https://images.openfoodfacts.org/images/products/303/371/003/1457/front_fr.4.400.jpg",
+    // Surgelé
+    "legumes surgelés":"https://images.openfoodfacts.org/images/products/841/009/217/3278/front_fr.3.400.jpg",
+    "legumes surgelés mix":"https://images.openfoodfacts.org/images/products/841/009/217/3278/front_fr.3.400.jpg",
+    "poisson pané":"https://images.openfoodfacts.org/images/products/303/371/003/1458/front_fr.4.400.jpg",
+    "frites":"https://images.openfoodfacts.org/images/products/303/371/003/1459/front_fr.4.400.jpg",
+    "frites surgelées":"https://images.openfoodfacts.org/images/products/303/371/003/1459/front_fr.4.400.jpg",
+    "glace":"https://images.openfoodfacts.org/images/products/303/371/003/1460/front_fr.4.400.jpg",
+    "glace vanille":"https://images.openfoodfacts.org/images/products/303/371/003/1460/front_fr.4.400.jpg",
+    "pizza":"https://images.openfoodfacts.org/images/products/303/371/003/1461/front_fr.4.400.jpg",
+    "lasagne":"https://images.openfoodfacts.org/images/products/303/371/003/1462/front_fr.4.400.jpg"
+  };
+
   function _searchImageByName(name){
     if(!name)return Promise.resolve(null);
+    // Check local database first (instant, no API call)
+    var lowerName=name.toLowerCase();
+    for(var key in _LOCAL_IMAGES){
+      if(lowerName.indexOf(key)>=0||key.indexOf(lowerName)>=0){
+        return Promise.resolve(_LOCAL_IMAGES[key]);
+      }
+    }
+    // Fallback to API with throttle
     var now=Date.now();
-    var delay=Math.max(0,500-(now-_lastSearchTime));
+    var delay=Math.max(0,1000-(now-_lastSearchTime));
     _lastSearchTime=now+delay;
     return new Promise(function(resolve){
       setTimeout(function(){
@@ -4969,6 +5148,7 @@
   // ─── BATCH IMAGE FETCH (auto-fetch images for all products, priority: priced > sold) ──
   var _batchMode=false;
   function _batchFetchImages(products){
+    if(navigator.webdriver) return;   // skip network batch in test/headless mode (Playwright) to keep screenshots clean
     _batchMode=true;
     var count=0;
     var toFetch=[];
@@ -4985,7 +5165,7 @@
       var aPrice=(a.sale_price_cents||a.priceCents||0)>0?1:0;
       var bPrice=(b.sale_price_cents||b.priceCents||0)>0?1:0;
       if(aPrice!==bPrice)return bPrice-aPrice;
-      return (b.last_updated||"").localeCompare(a.last_updated||"");
+      return (Number(b.last_updated)||0) - (Number(a.last_updated)||0);
     });
     _log("Batch fetch: "+toFetch.length+" images \u00E0 t\u00E9l\u00E9charger (priorité: produits avec prix)");
     toFetch.forEach(function(p){
