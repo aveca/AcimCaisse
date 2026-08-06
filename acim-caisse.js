@@ -1828,16 +1828,20 @@
           }
           var cur=(p.stockQty||0);
           var next=cur-amount;
-          if(next<0){
+          // Allow sale if stock is 0 (unmanaged/demo) — only block if stock > 0 and insufficient
+          if(cur>0 && next<0){
             var unit=(p.unitType||"unit");
             var isKg=(unit==="kg"||unit==="g"||unit==="L");
             try{tx.abort();}catch(_){}
             _toast("⚠️ Stock insuffisant: "+it.name+" (reste "+cur+", demandé "+amount+")");
             return;
           }
-          p.stockQty=next;
-          p.last_updated=Date.now();
-          sProd.put(p);
+          // If stock is 0, don't decrement (treat as unmanaged stock — sale allowed)
+          if(cur>0){
+            p.stockQty=next;
+            p.last_updated=Date.now();
+            sProd.put(p);
+          }
           // Audit STOCK_DECREMENT within the same TX.
           try{
             window._acimAudit.logInTx(tx,{
@@ -2586,6 +2590,68 @@
     _toast("\u2705 Panier id\u00e9al charg\u00e9 \u2014 "+(total/100).toFixed(2).replace(".",",")+" \u20AC");
   }
 
+  // Seed ideal cart products to IndexedDB on boot (so search/voice can find them)
+  function _seedIdealProducts(allProducts){
+    var idealItems=[
+      {name:"Poulet entier",price:8.50,bc:"IDEAL-POULET-ENTIER",cat:"viande"},
+      {name:"Bavette de boeuf 500g",price:9.90,bc:"IDEAL-BAVETTE",cat:"viande"},
+      {name:"Cotelettes de porc 4pce",price:7.50,bc:"IDEAL-COTEL.PORC",cat:"viande"},
+      {name:"Saumon frais 200g",price:6.90,bc:"IDEAL-SAUMON",cat:"poisson"},
+      {name:"Riz basmati 1kg",price:2.80,bc:"IDEAL-RIZ-BASMATI",cat:"epicerie"},
+      {name:"Pates spaghetti 500g",price:1.50,bc:"8076800195057",cat:"epicerie"},
+      {name:"Huile d'olive 75cl",price:6.90,bc:"3178050000749",cat:"epicerie"},
+      {name:"Sauce tomate 680g",price:2.20,bc:"IDEAL-SAUCE-TOMATE",cat:"epicerie"},
+      {name:"Conserve thon 185g",price:2.50,bc:"3019081239138",cat:"epicerie"},
+      {name:"Lait entier 1L",price:1.45,bc:"3533631781002",cat:"laitier"},
+      {name:"Beurre doux 250g",price:2.10,bc:"3155251205500",cat:"laitier"},
+      {name:"Fromage rape 200g",price:3.50,bc:"3073781102093",cat:"laitier"},
+      {name:"Oeufs plein air 12pce",price:3.80,bc:"IDEAL-OEUFS",cat:"laitier"},
+      {name:"Yaourts nature 12pce",price:3.20,bc:"6111032002925",cat:"laitier"},
+      {name:"Pommes variées 1kg",price:3.50,bc:"IDEAL-POMMES",cat:"fruits"},
+      {name:"Bananes 1kg",price:2.20,bc:"IDEAL-BANANES",cat:"fruits"},
+      {name:"Tomates grappe 1kg",price:4.50,bc:"IDEAL-TOMATES-GRAPPE",cat:"legumes"},
+      {name:"Courgettes 1kg",price:3.80,bc:"IDEAL-COURGETTES",cat:"legumes"},
+      {name:"Salade verte 200g",price:1.80,bc:"IDEAL-SALADE-VERTE",cat:"legumes"},
+      {name:"Carottes 1kg",price:2.50,bc:"IDEAL-CAROTTES",cat:"legumes"},
+      {name:"Oignons 1kg",price:1.90,bc:"IDEAL-OIGNONS",cat:"legumes"},
+      {name:"Pommes de terre 2kg",price:3.20,bc:"IDEAL-PDT",cat:"legumes"},
+      {name:"Eau minerale 6x1.5L",price:3.50,bc:"3700123300014",cat:"boisson"},
+      {name:"Jus d'orange 1L",price:2.80,bc:"IDEAL-JUS-ORANGE",cat:"boisson"},
+      {name:"Cafe moulu 250g",price:4.50,bc:"3187570015447",cat:"epicerie"},
+      {name:"Sucre en poudre 1kg",price:1.90,bc:"3165430810005",cat:"epicerie"},
+      {name:"Farine de ble 1kg",price:1.50,bc:"3068110702235",cat:"epicerie"},
+      {name:"Moutarde Dijon 200g",price:1.80,bc:"8720182460721",cat:"epicerie"},
+      {name:"Poivre noir moulin",price:3.50,bc:"IDEAL-POIVRE",cat:"epicerie"},
+      {name:"Sel fin 500g",price:0.90,bc:"IDEAL-SEL",cat:"epicerie"},
+      {name:"Herbes de Provence 20g",price:1.80,bc:"IDEAL-HERBES",cat:"epicerie"},
+      {name:"Champignons de Paris 250g",price:2.20,bc:"IDEAL-CHAMPIGNONS",cat:"legumes"},
+      {name:"Ail frais 3 pce",price:1.20,bc:"IDEAL-AIL",cat:"legumes"},
+      {name:"Citrons 500g",price:2.50,bc:"IDEAL-CITRONS",cat:"fruits"},
+      {name:"Mangue 1 pce",price:2.80,bc:"IDEAL-MANGUE",cat:"fruits"},
+      {name:"Lait de coco 400ml",price:2.20,bc:"5021047105317",cat:"epicerie"},
+      {name:"The vert 20 sachets",price:2.80,bc:"IDEAL-THE-VERT",cat:"epicerie"},
+      {name:"Cornichons 330g",price:2.20,bc:"IDEAL-CORNICHONS",cat:"epicerie"},
+      {name:"Olives vertes 200g",price:2.50,bc:"IDEAL-OLIVES-VERTES",cat:"epicerie"},
+      {name:"Pain de mie 500g",price:2.20,bc:"3242271990056",cat:"boulangerie"},
+      {name:"Baguette tradition",price:1.10,bc:"3276551080656",cat:"boulangerie"},
+      {name:"Croissants 4 pce",price:3.80,bc:"IDEAL-CROISSANTS",cat:"boulangerie"},
+      {name:"Legumes surgelés mix 750g",price:3.20,bc:"8410092173278",cat:"surgelé"},
+      {name:"Miel de fleur 250g",price:5.50,bc:"IDEAL-MIEL",cat:"epicerie"}
+    ];
+    var existingBcs={};
+    allProducts.forEach(function(p){existingBcs[p.barcode]=true;});
+    var toAdd=[];
+    idealItems.forEach(function(item){
+      if(!existingBcs[item.bc]){
+        toAdd.push({id:item.bc,name:item.name,priceCents:Math.round(item.price*100),sale_price_cents:Math.round(item.price*100),category:item.cat,image:null,barcode:item.bc,last_updated:new Date().toISOString(),stockQty:0,low_stock_threshold:0,source:"ideal-cart-seed"});
+      }
+    });
+    if(toAdd.length===0)return Promise.resolve(0);
+    return Promise.all(toAdd.map(function(p){return _dbPut(p);})).then(function(){
+      _log("Seeded "+toAdd.length+" ideal products to IndexedDB");
+      return toAdd.length;
+    });
+  }
   // ─── MAIN MENU (history, settings, invoices, barcodes) ──
   function _showMainMenu(){
     var old=document.getElementById("acim-menu");if(old)old.remove();
@@ -5156,6 +5222,13 @@
       }).then(function(all){
         _allProducts=all||[];
         _log("Produits charg\u00E9s: "+_allProducts.length);
+        // Seed ideal cart products to IndexedDB if not already there
+        return _seedIdealProducts(_allProducts).then(function(seeded){
+          if(seeded>0){
+            return _dbGetAll().then(function(all2){_allProducts=all2||[];_log("Total after seed: "+_allProducts.length);});
+          }
+        });
+      }).then(function(){
         _createPOS();
         _renderPOS();
         _refreshActorBadge();
