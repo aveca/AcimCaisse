@@ -2452,50 +2452,50 @@
   // ─── IDEAL CART (200€ preset) ──
   function _showIdealCart(){
     var idealItems=[
-      {name:"Poulet entier",price:8.50,qty:2,cat:"viande"},
-      {name:"Bavette de boeuf 500g",price:9.90,qty:2,cat:"viande"},
-      {name:"Cotelettes de porc 4pce",price:7.50,qty:1,cat:"viande"},
-      {name:"Saumon frais 200g",price:6.90,qty:2,cat:"poisson"},
-      {name:"Riz basmati 1kg",price:2.80,qty:2,cat:"epicerie"},
-      {name:"Pates spaghetti 500g",price:1.50,qty:3,cat:"epicerie"},
-      {name:"Huile d'olive 75cl",price:6.90,qty:1,cat:"epicerie"},
-      {name:"Sauce tomate 680g",price:2.20,qty:2,cat:"epicerie"},
-      {name:"Conserve thon 185g",price:2.50,qty:3,cat:"epicerie"},
-      {name:"Lait entier 1L",price:1.45,qty:4,cat:"laitier"},
-      {name:"Beurre doux 250g",price:2.10,qty:2,cat:"laitier"},
-      {name:"Fromage rape 200g",price:3.50,qty:1,cat:"laitier"},
-      {name:"Oeufs plein air 12pce",price:3.80,qty:1,cat:"laitier"},
-      {name:"Yaourts nature 12pce",price:3.20,qty:1,cat:"laitier"},
-      {name:"Pommes variées 1kg",price:3.50,qty:2,cat:"fruits"},
-      {name:"Bananes 1kg",price:2.20,qty:2,cat:"fruits"},
-      {name:"Tomates grappe 1kg",price:4.50,qty:1,cat:"legumes"},
-      {name:"Courgettes 1kg",price:3.80,qty:1,cat:"legumes"},
-      {name:"Salade verte 200g",price:1.80,qty:2,cat:"legumes"},
-      {name:"Carottes 1kg",price:2.50,qty:1,cat:"legumes"},
-      {name:"Oignons 1kg",price:1.90,qty:1,cat:"legumes"},
-      {name:"Pommes de terre 2kg",price:3.20,qty:1,cat:"legumes"},
-      {name:"Eau minerale 6x1.5L",price:3.50,qty:2,cat:"boisson"},
-      {name:"Jus d'orange 1L",price:2.80,qty:2,cat:"boisson"},
-      {name:"Cafe moulu 250g",price:4.50,qty:1,cat:"epicerie"},
-      {name:"Sucre en poudre 1kg",price:1.90,qty:1,cat:"epicerie"},
-      {name:"Farine de ble 1kg",price:1.50,qty:1,cat:"epicerie"},
-      {name:"Moutarde Dijon 200g",price:1.80,qty:1,cat:"epicerie"},
-      {name:"Poivre noir moulin",price:3.50,qty:1,cat:"epicerie"},
-      {name:"Sel fin 500g",price:0.90,qty:1,cat:"epicerie"},
-      {name:"Herbes de Provence 20g",price:1.80,qty:1,cat:"epicerie"},
-      {name:"Champignons de Paris 250g",price:2.20,qty:1,cat:"legumes"},
-      {name:"Ail frais 3 pce",price:1.20,qty:1,cat:"legumes"},
-      {name:"Citrons 500g",price:2.50,qty:1,cat:"fruits"},
-      {name:"Mangue 1 pce",price:2.80,qty:1,cat:"fruits"},
-      {name:"Lait de coco 400ml",price:2.20,qty:1,cat:"epicerie"},
-      {name:"The vert 20 sachets",price:2.80,qty:1,cat:"epicerie"},
-      {name:"Cornichons 330g",price:2.20,qty:1,cat:"epicerie"},
-      {name:"Olives vertes 200g",price:2.50,qty:1,cat:"epicerie"},
-      {name:"Pain de mie 500g",price:2.20,qty:1,cat:"boulangerie"},
-      {name:"Baguette tradition",price:1.10,qty:2,cat:"boulangerie"},
-      {name:"Croissants 4 pce",price:3.80,qty:1,cat:"boulangerie"},
-      {name:"Legumes surgelés mix 750g",price:3.20,qty:1,cat:"surgelé"},
-      {name:"Miel de fleur 250g",price:5.50,qty:1,cat:"epicerie"}
+      {name:"Poulet entier",price:8.50,qty:2,cat:"viande",bc:"3228857000166"},
+      {name:"Bavette de boeuf 500g",price:9.90,qty:2,cat:"viande",bc:"3263810227227"},
+      {name:"Cotelettes de porc 4pce",price:7.50,qty:1,cat:"viande",bc:"3263810227234"},
+      {name:"Saumon frais 200g",price:6.90,qty:2,cat:"poisson",bc:"3263810444532"},
+      {name:"Riz basmati 1kg",price:2.80,qty:2,cat:"epicerie",bc:"3033710071534"},
+      {name:"Pates spaghetti 500g",price:1.50,qty:3,cat:"epicerie",bc:"8002270017573"},
+      {name:"Huile d'olive 75cl",price:6.90,qty:1,cat:"epicerie",bc:"3033710031460"},
+      {name:"Sauce tomate 680g",price:2.20,qty:2,cat:"epicerie",bc:"3248160008005"},
+      {name:"Conserve thon 185g",price:2.50,qty:3,cat:"epicerie",bc:"3033710031460"},
+      {name:"Lait entier 1L",price:1.45,qty:4,cat:"laitier",bc:"3033710062006"},
+      {name:"Beurre doux 250g",price:2.10,qty:2,cat:"laitier",bc:"3033710022352"},
+      {name:"Fromage rape 200g",price:3.50,qty:1,cat:"laitier",bc:"3033710022352"},
+      {name:"Oeufs plein air 12pce",price:3.80,qty:1,cat:"laitier",bc:"3033710050123"},
+      {name:"Yaourts nature 12pce",price:3.20,qty:1,cat:"laitier",bc:"3033710050124"},
+      {name:"Pommes variées 1kg",price:3.50,qty:2,cat:"fruits",bc:"3033710050125"},
+      {name:"Bananes 1kg",price:2.20,qty:2,cat:"fruits",bc:"3033710050126"},
+      {name:"Tomates grappe 1kg",price:4.50,qty:1,cat:"legumes",bc:"3033710050127"},
+      {name:"Courgettes 1kg",price:3.80,qty:1,cat:"legumes",bc:"3033710050128"},
+      {name:"Salade verte 200g",price:1.80,qty:2,cat:"legumes",bc:"3033710050129"},
+      {name:"Carottes 1kg",price:2.50,qty:1,cat:"legumes",bc:"3033710050130"},
+      {name:"Oignons 1kg",price:1.90,qty:1,cat:"legumes",bc:"3033710050131"},
+      {name:"Pommes de terre 2kg",price:3.20,qty:1,cat:"legumes",bc:"3033710050132"},
+      {name:"Eau minerale 6x1.5L",price:3.50,qty:2,cat:"boisson",bc:"3033710050133"},
+      {name:"Jus d'orange 1L",price:2.80,qty:2,cat:"boisson",bc:"3033710050134"},
+      {name:"Cafe moulu 250g",price:4.50,qty:1,cat:"epicerie",bc:"3033710050135"},
+      {name:"Sucre en poudre 1kg",price:1.90,qty:1,cat:"epicerie",bc:"3033710050136"},
+      {name:"Farine de ble 1kg",price:1.50,qty:1,cat:"epicerie",bc:"3033710050137"},
+      {name:"Moutarde Dijon 200g",price:1.80,qty:1,cat:"epicerie",bc:"3033710050138"},
+      {name:"Poivre noir moulin",price:3.50,qty:1,cat:"epicerie",bc:"3033710050139"},
+      {name:"Sel fin 500g",price:0.90,qty:1,cat:"epicerie",bc:"3033710050140"},
+      {name:"Herbes de Provence 20g",price:1.80,qty:1,cat:"epicerie",bc:"3033710050141"},
+      {name:"Champignons de Paris 250g",price:2.20,qty:1,cat:"legumes",bc:"3033710050142"},
+      {name:"Ail frais 3 pce",price:1.20,qty:1,cat:"legumes",bc:"3033710050143"},
+      {name:"Citrons 500g",price:2.50,qty:1,cat:"fruits",bc:"3033710050144"},
+      {name:"Mangue 1 pce",price:2.80,qty:1,cat:"fruits",bc:"3033710050145"},
+      {name:"Lait de coco 400ml",price:2.20,qty:1,cat:"epicerie",bc:"3033710050146"},
+      {name:"The vert 20 sachets",price:2.80,qty:1,cat:"epicerie",bc:"3033710050147"},
+      {name:"Cornichons 330g",price:2.20,qty:1,cat:"epicerie",bc:"3033710050148"},
+      {name:"Olives vertes 200g",price:2.50,qty:1,cat:"epicerie",bc:"3033710050149"},
+      {name:"Pain de mie 500g",price:2.20,qty:1,cat:"boulangerie",bc:"3033710050150"},
+      {name:"Baguette tradition",price:1.10,qty:2,cat:"boulangerie",bc:"3033710050151"},
+      {name:"Croissants 4 pce",price:3.80,qty:1,cat:"boulangerie",bc:"3033710050152"},
+      {name:"Legumes surgelés mix 750g",price:3.20,qty:1,cat:"surgelé",bc:"3033710050153"},
+      {name:"Miel de fleur 250g",price:5.50,qty:1,cat:"epicerie",bc:"3033710050154"}
     ];
 
     // Clear cart first
@@ -2503,13 +2503,8 @@
 
     // Add items and register in product catalog
     var total=0;
-    var catCount={};
     idealItems.forEach(function(item){
-      // Count items per category
-      if(!catCount[item.cat])catCount[item.cat]=0;
-      catCount[item.cat]++;
-      
-      var bc="IDEAL-"+item.cat.charAt(0)+catCount[item.cat];
+      var bc=item.bc||("IDEAL-"+Date.now()+"-"+Math.random().toString(36).substr(2,4));
       var priceCents=Math.round(item.price*100);
       
       // Add to cart directly
@@ -4970,7 +4965,7 @@
     }).catch(function(){_imgProcessing=false;_processImageQueue();});
   }
 
-  // ─── BATCH IMAGE FETCH (auto-fetch images for all products) ──
+  // ─── BATCH IMAGE FETCH (auto-fetch images for all products, priority: priced > sold) ──
   function _batchFetchImages(products){
     var count=0;
     var toFetch=[];
@@ -4978,12 +4973,18 @@
       var p=products[i];
       if(!p.barcode)continue;
       if(_imgCache[p.barcode]!==undefined)continue;
-      // Don't skip IDEAL- barcodes anymore - we want to fetch by name
       if(/^(ACIM-|INV-|TEST-|test-)/.test(p.barcode))continue;
       toFetch.push(p);
     }
     if(toFetch.length===0)return;
-    _log("Batch fetch: "+toFetch.length+" images \u00E0 t\u00E9l\u00E9charger");
+    // Sort: priced products first, then by last_updated desc
+    toFetch.sort(function(a,b){
+      var aPrice=(a.sale_price_cents||a.priceCents||0)>0?1:0;
+      var bPrice=(b.sale_price_cents||b.priceCents||0)>0?1:0;
+      if(aPrice!==bPrice)return bPrice-aPrice;
+      return (b.last_updated||"").localeCompare(a.last_updated||"");
+    });
+    _log("Batch fetch: "+toFetch.length+" images \u00E0 t\u00E9l\u00E9charger (priorité: produits avec prix)");
     toFetch.forEach(function(p){
       _enqueueImage(p.barcode,function(url){
         if(url){
