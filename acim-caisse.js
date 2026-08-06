@@ -1182,7 +1182,15 @@
       if(q){var s=((p.name||"")+" "+(p.barcode||"")).toLowerCase();if(s.indexOf(q)<0)return false;}
       return true;
     });
-    _filteredProducts.sort(function(a,b){return(a.name||"").localeCompare(b.name||"");});
+    _filteredProducts.sort(function(a,b){
+      var aPriced=(a.sale_price_cents||0)>0?1:0;
+      var bPriced=(b.sale_price_cents||0)>0?1:0;
+      if(aPriced!==bPriced)return bPriced-aPriced;
+      var aSold=(a.last_updated||0);
+      var bSold=(b.last_updated||0);
+      if(aSold!==bSold)return bSold-aSold;
+      return(a.name||"").localeCompare(b.name||"");
+    });
     _renderGrid();
   }
   function _refreshAndFilter(){
@@ -4732,26 +4740,35 @@
   }
   function _fetchImageFromApi(bc){
     if(!/^\d{8,13}$/.test(bc))return Promise.resolve(null);
-    return fetch("https://world.openfoodfacts.org/api/v0/product/"+bc+".json",{headers:{"User-Agent":"AcimCaisse/1.0"}}).then(function(r){
-      if(!r.ok)return null;
-      return r.json();
-    }).then(function(d){
-      if(!d||!d.product)return null;
-      var u=d.product.image_front_small_url||d.product.image_front_url||d.product.image_url;
-      if(!u)return null;
-      return fetch(u).then(function(ir){
-        if(!ir.ok)return null;
-        return ir.blob();
-      }).then(function(b){
-        if(!b)return null;
-        return new Promise(function(ok){
-          var rd=new FileReader();
-          rd.onload=function(){ok(rd.result);};
-          rd.onerror=function(){ok(null);};
-          rd.readAsDataURL(b);
+    var apis=[
+      "https://world.openfoodfacts.org/api/v0/product/"+bc+".json",
+      "https://world.openbeautyfacts.org/api/v0/product/"+bc+".json",
+      "https://world.openpetfoodfacts.org/api/v0/product/"+bc+".json"
+    ];
+    function tryApi(idx){
+      if(idx>=apis.length)return Promise.resolve(null);
+      return fetch(apis[idx],{headers:{"User-Agent":"AcimCaisse/1.0"}}).then(function(r){
+        if(!r.ok)return tryApi(idx+1);
+        return r.json();
+      }).then(function(d){
+        if(!d||!d.product)return tryApi(idx+1);
+        var u=d.product.image_front_small_url||d.product.image_front_url||d.product.image_url;
+        if(!u)return tryApi(idx+1);
+        return fetch(u).then(function(ir){
+          if(!ir.ok)return tryApi(idx+1);
+          return ir.blob();
+        }).then(function(b){
+          if(!b)return tryApi(idx+1);
+          return new Promise(function(ok){
+            var rd=new FileReader();
+            rd.onload=function(){ok(rd.result);};
+            rd.onerror=function(){ok(null);};
+            rd.readAsDataURL(b);
+          });
         });
-      });
-    }).catch(function(){return null;});
+      }).catch(function(){return tryApi(idx+1);});
+    }
+    return tryApi(0);
   }
   function _enqueueImage(bc,cb){
     if(!bc||_imgCache[bc]!==undefined)return;
@@ -4768,6 +4785,30 @@
       _imgProcessing=false;
       _processImageQueue();
     }).catch(function(){_imgProcessing=false;_processImageQueue();});
+  }
+
+  // ─── BATCH IMAGE FETCH (auto-fetch images for all products) ──
+  function _batchFetchImages(products){
+    var count=0;
+    var toFetch=[];
+    for(var i=0;i<products.length;i++){
+      var p=products[i];
+      if(!p.barcode)continue;
+      if(_imgCache[p.barcode]!==undefined)continue;
+      if(/^(ACIM-|INV-|TEST-|test-)/.test(p.barcode))continue;
+      toFetch.push(p);
+    }
+    if(toFetch.length===0)return;
+    _log("Batch fetch: "+toFetch.length+" images \u00E0 t\u00E9l\u00E9charger");
+    toFetch.forEach(function(p){
+      _enqueueImage(p.barcode,function(url){
+        if(url){
+          count++;
+          if(count%10===0)_log("Images t\u00E9l\u00E9charg\u00E9es: "+count);
+          _renderGrid();
+        }
+      });
+    });
   }
 
   // ─── INIT ────────────────────────────────────────────
@@ -4812,10 +4853,11 @@
         return _dbGetAll();
       }).then(function(all){
         _allProducts=all||[];
-        _log("Produits chargés: "+_allProducts.length);
+        _log("Produits charg\u00E9s: "+_allProducts.length);
         _createPOS();
         _renderPOS();
         _refreshActorBadge();
+        _batchFetchImages(_allProducts);
       }).catch(function(e){
         _err("Init error:",e);
         _allProducts=[];
