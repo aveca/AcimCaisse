@@ -5138,12 +5138,12 @@
       _err("DB migration init failed:",e);
     });
 
-    // Fallback: always show login if no operator is logged in after 2s
+    // Fallback: always show login if no operator is logged in after 5s
     setTimeout(function(){
       if(!_getCurrentActor()){
         _showLogin();
       }
-    }, 2000);
+    }, 5000);
     document.addEventListener("keydown",function(e){
       if(e.ctrlKey&&e.key==="k"){e.preventDefault();if(_posSearch)_posSearch.focus();}
       if(e.ctrlKey&&e.key==="n"){e.preventDefault();_quickCreate("",0);}
