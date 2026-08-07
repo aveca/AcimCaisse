@@ -2631,51 +2631,48 @@ function _showIdealCart(){
     setTimeout(function(){inp.focus();},100);
   }
 
-  function _loadIdealCartForCustomer(customerName){
-    _log("Loading ideal cart for: "+customerName);
+function _loadIdealCartForCustomer(customerName){
+    _log("_loadIdealCartForCustomer START for: "+customerName);
     _toast("👤 Client: "+customerName+" — chargement panier 200€...");
-    
-    var idealItems=[
-      // Viande
-      {name:"STEACK HACHE X2 ANGUS",price:13.00,qty:1,cat:"viande",bc:"2134380003004"},
-      {name:"EPAULE DAGNEAU OS BR",price:14.90,qty:1,cat:"viande",bc:"2147147018029"},
-      {name:"BOUTARGUE 160G",price:39.00,qty:1,cat:"viande",bc:"3440432024040"},
-      {name:"Cabanossi Gendarme",price:11.00,qty:1,cat:"viande",bc:"3760059041917"},
-      // Volaille
-      {name:"KASLER DE DINDE",price:10.00,qty:1,cat:"volaille",bc:"2422607032273"},
-      {name:"PILON",price:17.90,qty:1,cat:"volaille",bc:"2938651010124"},
-      {name:"BLANC DE DINDE",price:10.00,qty:1,cat:"volaille",bc:"3760059041962"},
-      // Poisson/Surgelé
-      {name:"VENTRECHE DE THON HUILE OLIVE",price:12.00,qty:1,cat:"surgelé",bc:"3760034622698"},
-      {name:"BURGER DE POISSON",price:10.00,qty:1,cat:"surgelé",bc:"3448270003173"},
-      {name:"Legumes surgelés mix 750g",price:3.20,qty:1,cat:"surgelé",bc:"8410092173278"},
-      // Épicerie
-      {name:"Huile d'olive 75cl",price:6.90,qty:1,cat:"epicerie",bc:"3178050000749"},
-      {name:"Cafe moulu 250g",price:4.50,qty:1,cat:"epicerie",bc:"3187570015447"},
-      {name:"Pates spaghetti 500g",price:1.50,qty:2,cat:"epicerie",bc:"8076800195057"},
-      {name:"Farine de ble 1kg",price:1.50,qty:1,cat:"epicerie",bc:"3068110702235"},
-      {name:"Sucre en poudre 1kg",price:1.90,qty:1,cat:"epicerie",bc:"3165430810005"},
-      {name:"Conserve thon 185g",price:2.50,qty:2,cat:"epicerie",bc:"3019081239138"},
-      {name:"Moutarde Dijon 200g",price:1.80,qty:1,cat:"epicerie",bc:"8720182460721"},
-      {name:"Lait de coco 400ml",price:2.20,qty:1,cat:"epicerie",bc:"5021047105317"},
-      // Laitier
-      {name:"Lait entier 1L",price:1.45,qty:3,cat:"laitier",bc:"3533631781002"},
-      {name:"Beurre doux 250g",price:2.10,qty:2,cat:"laitier",bc:"3155251205500"},
-      {name:"Fromage rape 200g",price:3.50,qty:1,cat:"laitier",bc:"3073781102093"},
-      {name:"EMMENTAL Ermitage Portion",price:7.00,qty:1,cat:"laitier",bc:"3060921349838"},
-      {name:"Yaourts nature 12pce",price:3.20,qty:1,cat:"laitier",bc:"6111032002925"},
-      // Boulangerie
-      {name:"Pain de mie 500g",price:2.20,qty:1,cat:"boulangerie",bc:"3242271990056"},
-      {name:"Baguette tradition",price:1.10,qty:2,cat:"boulangerie",bc:"3276551080656"},
-      // Boisson
-      {name:"Eau minerale 6x1.5L",price:3.50,qty:1,cat:"boisson",bc:"3700123300014"},
-    ];
+    try {
+      var idealItems=[
+        // Viande
+        {name:"STEACK HACHE X2 ANGUS",price:13.00,qty:1,cat:"viande",bc:"2134380003004"},
+        {name:"EPAULE DAGNEAU OS BR",price:14.90,qty:1,cat:"viande",bc:"2147147018029"},
+        {name:"BOUTARGUE 160G",price:39.00,qty:1,cat:"viande",bc:"3440432024040"},
+        {name:"Cabanossi Gendarme",price:11.00,qty:1,cat:"viande",bc:"3760059041917"},
+        // Volaille
+        {name:"KASLER DE DINDE",price:10.00,qty:1,cat:"volaille",bc:"2422607032273"},
+        {name:"PILON",price:17.90,qty:1,cat:"volaille",bc:"2938651010124"},
+        {name:"BLANC DE DINDE",price:10.00,qty:1,cat:"volaille",bc:"3760059041962"},
+        // Poisson/Surgelé
+        {name:"VENTRECHE DE THON HUILE OLIVE",price:12.00,qty:1,cat:"surgelé",bc:"3760034622698"},
+        {name:"BURGER DE POISSON",price:10.00,qty:1,cat:"surgelé",bc:"3448270003173"},
+        {name:"Legumes surgelés mix 750g",price:3.20,qty:1,cat:"surgelé",bc:"8410092173278"},
+        // Épicerie
+        {name:"Huile d'olive 75cl",price:6.90,qty:1,cat:"epicerie",bc:"3178050000749"},
+        {name:"Cafe moulu 250g",price:4.50,qty:1,cat:"epicerie",bc:"3187570015447"},
+        {name:"Pates spaghetti 500g",price:1.50,qty:2,cat:"epicerie",bc:"8076800195057"},
+        {name:"Farine de ble 1kg",price:1.50,qty:1,cat:"epicerie",bc:"3068110702235"},
+        {name:"Sucre en poudre 1kg",price:1.90,qty:1,cat:"epicerie",bc:"3165430810005"},
+        {name:"Conserve thon 185g",price:2.50,qty:2,cat:"epicerie",bc:"3019081239138"},
+        {name:"Moutarde Dijon 200g",price:1.80,qty:1,cat:"epicerie",bc:"8720182460721"},
+        {name:"Lait de coco 400ml",price:2.20,qty:1,cat:"epicerie",bc:"5021047105317"},
+        // Laitier
+        {name:"Lait entier 1L",price:1.45,qty:3,cat:"laitier",bc:"3533631781002"},
+        {name:"Beurre doux 250g",price:2.10,qty:2,cat:"laitier",bc:"3155251205500"},
+        {name:"Fromage rape 200g",price:3.50,qty:1,cat:"laitier",bc:"3073781102093"},
+        {name:"EMMENTAL Ermitage Portion",price:7.00,qty:1,cat:"laitier",bc:"3060921349838"},
+        {name:"Yaourts nature 12pce",price:3.20,qty:1,cat:"laitier",bc:"6111032002925"},
+        // Boulangerie
+        {name:"Pain de mie 500g",price:2.20,qty:1,cat:"boulangerie",bc:"3242271990056"},
+        {name:"Baguette tradition",price:1.10,qty:2,cat:"boulangerie",bc:"3276551080656"},
+        // Boisson
+        {name:"Eau minerale 6x1.5L",price:3.50,qty:1,cat:"boisson",bc:"3700123300014"},
+      ];
 
-    // Clear cart first
-    _myCart=[];
-
-    // Add items and register in product catalog
-    var total=0;
+      // Clear cart first
+      _myCart=[];
     idealItems.forEach(function(item){
       var bc=item.bc;
       var priceCents=Math.round(item.price*100);
@@ -2716,8 +2713,12 @@ function _showIdealCart(){
       setTimeout(function(){_openCartSheet();},300);
     }
 
-    // Show success message
-    _toast("\u2705 Panier 200\u20AC charg\u00e9 pour "+customerName+" \u2014 "+(total/100).toFixed(2).replace(".",",")+" \u20AC");
+// Show success message
+      _toast("\u2705 Panier 200\u20AC charg\u00e9 pour "+customerName+" \u2014 "+(total/100).toFixed(2).replace(".",",")+" \u20AC");
+    } catch(e) {
+      _err("_loadIdealCartForCustomer error:", e);
+      _toast("❌ Erreur chargement panier: "+e.message);
+    }
   }
 
   // Seed ideal cart products to IndexedDB on boot (so search/voice can find them)
@@ -5400,6 +5401,8 @@ function _showIdealCart(){
   window._acimGetSalesHistory=function(){return _getSalesHistory().then(function(s){return s||[];});};
   // Debug: list customer baskets
   window._acimListCustomerBaskets=function(){return _listCustomerBaskets().then(function(b){return b||[];});};
+  // Debug: load ideal cart for customer
+  window._acimLoadIdealCartForCustomer=function(name){return _loadIdealCartForCustomer(name);};
   window._acimProcessBarcode=_processBarcode;
   window._acimAddToCart=function(name,price,cat){_addToCart(name,price,"",cat);};
   window._acimWeighProduct=_weighProduct;
