@@ -314,18 +314,51 @@
     for(var i=0;i<CATS.length;i++)if(CATS[i].id===id)return CATS[i].ic;
     return "📦";
   }
+  // Product-specific icons for better visual recognition
+  var _productIcons={
+    "poulet":"🍗","poulet entier":"🐔","bavette":"🥩","steak":"🥩","cotelette":"🥩",
+    "saumon":"🐟","thon":"🐟","crevette":"🦐","poisson":"🐟",
+    "lait":"🥛","beurre":"🧈","fromage":"🧀","yaourt":"🥛","creme":"🥛","oeuf":"🥚",
+    "pates":"🍝","spaghetti":"🍝","riz":"🍚","farine":"🌾","sucre":"🍬","huile":"🫒",
+    "pain":"🍞","baguette":"🥖","croissant":"🥐","brioche":"🥯",
+    "pomme":"🍎","banane":"🍌","tomate":"🍅","carotte":"🥕","salade":"🥬",
+    "eau":"💧","jus":"🧃","cafe":"☕","the":"🍵","vin":"🍷","biere":"🍺",
+    "surgelé":"🧊","glace":"🍦","pizza":"🍕",
+    "chocolat":"🍫","bonbon":"🍬","gateau":"🍰",
+    "shampoing":"🧴","savon":"🧼","lessive":"🧺",
+    "default":"📦"
+  };
+  function _getProductIcon(name){
+    var n=(name||"").toLowerCase();
+    for(var key in _productIcons){
+      if(n.indexOf(key)>=0)return _productIcons[key];
+    }
+    return _productIcons.default;
+  }
   var _catBg={viande:"#fce4e4",volaille:"#fef0db",poisson:"#e0f2fe",laitier:"#dbeafe",epicerie:"#dcfce7",boulangerie:"#fef9c3",boisson:"#ccfbf1",snack:"#fef3c7",condiment:"#f3f4f6",menager:"#ede9fe",surgelé:"#cffafe",fruits:"#fef9c3",legumes:"#dcfce7",vin:"#fce7f3",autre:"#f5f5f5"};
 
-  // ─── SVG PRODUCT IMAGE GENERATOR ──
+  // ─── SVG PRODUCT IMAGE GENERATOR (Uber Eats style) ──
   function _generateProductSVG(name,category,priceCents){
     var cat=(category||"autre").toLowerCase();
     var bg=_catBg[cat]||"#f5f5f5";
-    var icon=_catIcon(cat);
+    var icon=_getProductIcon(name);
     var initials=(name||"?").split(" ").slice(0,2).map(function(w){return w.charAt(0).toUpperCase();}).join("");
+    // Uber Eats style: clean white card with subtle category accent
+    var accent=bg;
     var svg='<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">';
-    svg+='<rect width="200" height="200" fill="'+bg+'"/>';
-    svg+='<text x="100" y="90" text-anchor="middle" font-size="72" fill="rgba(0,0,0,0.08)">'+icon+'</text>';
-    svg+='<text x="100" y="145" text-anchor="middle" font-size="32" font-weight="800" fill="rgba(0,0,0,0.18)" font-family="-apple-system,sans-serif">'+initials+'</text>';
+    // White background with subtle rounded corners
+    svg+='<rect x="4" y="4" width="192" height="192" rx="16" ry="16" fill="#ffffff" stroke="'+accent+'" stroke-width="2"/>';
+    // Top accent bar
+    svg+='<rect x="4" y="4" width="192" height="8" rx="12" ry="0" fill="'+accent+'"/>';
+    // Product icon centered, larger
+    svg+='<text x="100" y="85" text-anchor="middle" font-size="64" fill="'+accent+'">'+icon+'</text>';
+    // Product initials
+    svg+='<text x="100" y="130" text-anchor="middle" font-size="28" font-weight="700" fill="#1a1a2e" font-family="-apple-system,BlinkMacSystemFont,Helvetica,Arial,sans-serif">'+initials+'</text>';
+    // Category name small
+    var catLabel=(cat.charAt(0).toUpperCase()+cat.slice(1)).replace("surgelé","Surgelé");
+    svg+='<text x="100" y="160" text-anchor="middle" font-size="11" font-weight="500" fill="#888" font-family="-apple-system,sans-serif">'+catLabel+'</text>';
+    // Subtle bottom line
+    svg+='<line x1="30" y1="175" x2="170" y2="175" stroke="'+accent+'" stroke-width="1" opacity="0.3"/>';
     svg+='</svg>';
     return "data:image/svg+xml,"+encodeURIComponent(svg);
   }
