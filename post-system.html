@@ -937,9 +937,18 @@ function toast(msg){
 /* ── Boot ── */
 load();
 renderAll();
-document.addEventListener("keydown",e=>{
+  document.addEventListener("keydown",e=>{
   if(e.key==="Escape")closeModal();
 });
 </script>
+
+<footer class="ue-footer-screen"><span class="ue-copyright">&copy; 2026 PostSystem &mdash; AcimCaisse. Tous droits réservés.</span><span class="ue-footer-links"><a href="landing.html">Accueil</a> &middot; <a href="post-studio.html">Post Studio</a> &middot; <a href="https://github.com/aveca/AcimCaisse">Source</a></span></footer>
+
+<style>
+.ue-footer-screen{position:fixed;left:0;right:0;bottom:0;background:rgba(255,255,255,.92);backdrop-filter:blur(10px);border-top:1px solid var(--ue-border);padding:8px 12px;font-size:11.5px;color:#757575;text-align:center;z-index:50}
+.ue-footer-screen .ue-copyright{display:block;margin-bottom:2px}
+.ue-footer-screen .ue-footer-links a{color:#757575;font-weight:500}
+@media(min-width:768px){.ue-footer-screen{position:static;background:transparent;padding:12px 0;border:none;font-size:12px}}
+</style>
 </body>
 </html>

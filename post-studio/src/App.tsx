@@ -1139,6 +1139,16 @@ export default function App() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <footer className="fixed inset-x-0 bottom-0 border-t border-black/8 bg-white/90 px-6 py-3 text-center text-xs text-zinc-500 backdrop-blur lg:relative lg:mx-auto lg:max-w-[1600px] lg:rounded-t-3xl lg:border lg:border-black/6 lg:w-full lg:max-w-[1600px]">
+        <span className="font-medium text-zinc-600">&copy; 2026 Post Studio — AcimCaisse. Tous droits réservés.</span>
+        <span className="mx-2 text-zinc-300">·</span>
+        <a href="landing.html" className="text-zinc-600 hover:text-zinc-900">Accueil</a>
+        <span className="mx-2 text-zinc-300">·</span>
+        <a href="post-system.html" className="text-zinc-600 hover:text-zinc-900">Caisse</a>
+        <span className="mx-2 text-zinc-300">·</span>
+        <a href="https://github.com/aveca/AcimCaisse" target="_blank" rel="noopener noreferrer" className="text-zinc-600 hover:text-zinc-900">Source</a>
+      </footer>
     </div>
   );
 }
