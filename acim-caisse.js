@@ -2632,6 +2632,7 @@ function _showIdealCart(){
   }
 
 function _loadIdealCartForCustomer(customerName){
+    console.log(">>> LOAD_FUNCTION_CALLED", customerName);
     console.log("MARKER_LOAD_START", customerName);
     _log("_loadIdealCartForCustomer START for: "+customerName);
     _toast("👤 Client: "+customerName+" — chargement panier 200€...");
