@@ -6,14 +6,13 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <meta name="description" content="AcimCaisse v1.3.0 — POS offline pour epicerie/boucherie">
+  <meta name="description" content="AcimCaisse v1.4.0 — POS offline Makolette style pour epicerie/boucherie">
   <title>AcimCaisse — POS</title>
-  <link rel="stylesheet" href="acimcaisse-ux-fix.css">
-  <link rel="stylesheet" href="acim-uber-eats.css">
+  <link rel="stylesheet" href="acim-makolette.css">
   <link rel="icon" type="image/png" href="favicon.png"/>
   <style>
     /* Loading splash — hidden once acim-caisse.js (init) renders #acim-pos */
-    #acim-splash{position:fixed;inset:0;background:#06C167;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;z-index:9999999;}
+    #acim-splash{position:fixed;inset:0;background:#06C167;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',Roboto,sans-serif;z-index:9999999;}
     #acim-splash h1{color:#fff;font-size:32px;margin:0 0 8px 0;}
     #acim-splash p{color:rgba(255,255,255,0.8);font-size:16px;margin:0;}
     #acim-splash .spin{margin-top:24px;width:36px;height:36px;border:3px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:acimspin 0.8s linear infinite;}
@@ -24,8 +23,8 @@
 </head>
 <body>
   <div id="acim-splash">
-    <h1>\uD83C\uDFEA AcimCaisse</h1>
-    <p>Chargement de la caisse\u2026</p>
+    <h1>🏪 AcimCaisse</h1>
+    <p>Chargement de la caisse Makolette…</p>
     <div class="spin"></div>
   </div>
   <!-- Sprint 4.1 PR A — Audit Core (must load before caisse engine) -->

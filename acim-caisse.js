@@ -942,32 +942,47 @@
     if(_pos)return;
     _pos=document.createElement("div");_pos.id="acim-pos";
 
-    // ── GREEN HEADER ──
+    // ── HEADER ──
     var header=document.createElement("div");
-    header.className="acim-header";
+    header.className="mk-header";
 
     var headerTop=document.createElement("div");
-    headerTop.className="acim-header-top";
+    headerTop.className="mk-header__top";
+
+    var headerBrand=document.createElement("div");
+    headerBrand.className="mk-header__brand";
+
+    var headerLogo=document.createElement("div");
+    headerLogo.className="mk-header__logo";
+    headerLogo.textContent="🏪";
 
     var headerTitle=document.createElement("div");
-    headerTitle.className="acim-header-title";
-    headerTitle.textContent="\uD83C\uDFEA "+(_settings.storeName||"AcimCaisse");
+    headerTitle.className="mk-header__title";
+    headerTitle.textContent=_settings.storeName||"AcimCaisse";
     headerTitle.onclick=function(){_showMainMenu();};
     headerTitle.style.cursor="pointer";
-    headerTop.appendChild(headerTitle);
+
+    var headerSubtitle=document.createElement("div");
+    headerSubtitle.className="mk-header__subtitle";
+    headerSubtitle.textContent="Mode Makolette";
+
+    headerBrand.appendChild(headerLogo);
+    headerBrand.appendChild(headerTitle);
+    headerBrand.appendChild(headerSubtitle);
+    headerTop.appendChild(headerBrand);
 
     var headerActions=document.createElement("div");
-    headerActions.className="acim-header-actions";
+    headerActions.className="mk-header__actions";
 
     var newBtn=document.createElement("button");
-    newBtn.className="acim-header-btn";
+    newBtn.className="mk-icon-btn";
     newBtn.innerHTML="+";
     newBtn.title="Nouveau produit (Ctrl+N)";
     newBtn.onclick=function(){_quickCreate("",0);};
     headerActions.appendChild(newBtn);
 
     var closeBtn=document.createElement("button");
-    closeBtn.className="acim-header-btn";
+    closeBtn.className="mk-icon-btn";
     closeBtn.innerHTML="\u2715";
     closeBtn.title="Fermer la caisse";
     closeBtn.onclick=function(){_togglePOS(false);};
@@ -978,16 +993,16 @@
 
     // Search bar
     var searchWrap=document.createElement("div");
-    searchWrap.className="acim-search";
+    searchWrap.className="mk-search";
 
     var searchIcon=document.createElement("span");
-    searchIcon.className="acim-search-icon";
+    searchIcon.className="mk-search__icon";
     searchIcon.innerHTML="\uD83D\uDD0D";
     searchWrap.appendChild(searchIcon);
 
     _posSearch=document.createElement("input");
     _posSearch.id="acim-pos-search";
-    _posSearch.className="acim-search-input";
+    _posSearch.className="mk-search__input";
     _posSearch.type="text";
     _posSearch.placeholder="Rechercher un produit ou scanner un code-barres...";
     _posSearch.addEventListener("input",function(){
@@ -1000,7 +1015,16 @@
     });
     searchWrap.appendChild(_posSearch);
 
-    // Actor badge (PR C) — inline in search bar
+    // Voice search button
+    var voiceBtn=document.createElement("button");
+    voiceBtn.id="mk-search-voice";
+    voiceBtn.className="mk-search__voice";
+    voiceBtn.innerHTML="🎤";
+    voiceBtn.title="Recherche vocale";
+    voiceBtn.onclick=function(){_toggleVoiceSearch();};
+    searchWrap.appendChild(voiceBtn);
+
+    // Actor badge (inline in search bar)
     var actorBadge=document.createElement("div");
     actorBadge.id="acim-actor-badge";
     searchWrap.appendChild(actorBadge);
@@ -1011,10 +1035,10 @@
 
     // ── CATEGORIES (horizontal scroll icons) ──
     var catsWrap=document.createElement("div");
-    catsWrap.className="acim-categories";
+    catsWrap.className="mk-categories";
 
     var catsScroll=document.createElement("div");
-    catsScroll.className="acim-categories-scroll";
+    catsScroll.className="mk-categories__wrapper";
     catsScroll.id="acim-pos-cats";
     catsWrap.appendChild(catsScroll);
     _posCats=catsScroll;
@@ -1023,28 +1047,45 @@
 
     // ── PRODUCTS GRID ──
     var productsWrap=document.createElement("div");
-    productsWrap.className="acim-products";
+    productsWrap.className="mk-products";
+
+    var productsHeader=document.createElement("div");
+    productsHeader.className="mk-products__header";
+
+    var productsCount=document.createElement("span");
+    productsCount.className="mk-products__count";
+    productsCount.id="mk-products-count";
+    productsHeader.appendChild(productsCount);
+
+    var productsSort=document.createElement("button");
+    productsSort.className="mk-products__sort";
+    productsSort.innerHTML="⇅ Trier";
+    productsSort.title="Trier les produits";
+    productsSort.onclick=function(){_toggleSort();};
+    productsHeader.appendChild(productsSort);
+
+    productsWrap.appendChild(productsHeader);
 
     _posGrid=document.createElement("div");
     _posGrid.id="acim-pos-grid";
-    _posGrid.className="acim-products-grid";
+    _posGrid.className="mk-products__grid";
     productsWrap.appendChild(_posGrid);
     _pos.appendChild(productsWrap);
 
     // ── BOTTOM NAV ──
     var nav=document.createElement("div");
-    nav.className="acim-bottom-nav";
+    nav.className="mk-nav";
 
     var navItems=[
-      {icon:"\uD83C\uDFE0",label:"Accueil",active:true},
-      {icon:"\uD83D\uDED2",label:"Panier 200\u20AC",cart:true,fn:function(){_showIdealCart();}},
-      {icon:"\uD83D\uDCCB",label:"Historique",fn:function(){_showHistory();}},
-      {icon:"\u2699\uFE0F",label:"Menu",fn:function(){_showMainMenu();}}
+      {icon:"🏠",label:"Accueil",active:true},
+      {icon:"🛒",label:"Panier 200€",cart:true,fn:function(){_showIdealCart();}},
+      {icon:"📋",label:"Historique",fn:function(){_showHistory();}},
+      {icon:"⚙️",label:"Menu",fn:function(){_showMainMenu();}}
     ];
     navItems.forEach(function(item){
       var btn=document.createElement("button");
-      btn.className="acim-nav-item"+(item.active?" active":"")+(item.cart?" acim-nav-cart":"");
-      btn.innerHTML='<span class="acim-nav-icon">'+item.icon+'</span><span class="acim-nav-label">'+item.label+'</span>';
+      btn.className="mk-nav__item"+(item.active?" mk-nav__item--active":"")+(item.cart?" mk-nav__item--cart":"");
+      btn.innerHTML='<span class="mk-nav__icon">'+item.icon+'</span><span class="mk-nav__label">'+item.label+'</span>';
       if(item.fn)btn.onclick=item.fn;
       nav.appendChild(btn);
     });
@@ -1052,25 +1093,25 @@
 
     // ── CART FAB (mobile) ──
     var fab=document.createElement("button");
-    fab.className="acim-cart-fab hidden";
+    fab.className="mk-cart-fab hidden";
     fab.id="acim-cart-fab";
-    fab.innerHTML='<span id="acim-cart-fab-count">0</span> article(s) \u2014 <span id="acim-cart-fab-total">0,00 \u20AC</span>';
+    fab.innerHTML='<span class="mk-cart-fab__icon">🛒</span><span>Panier</span><span class="mk-cart-fab__count" id="acim-cart-fab-count">0</span>';
     fab.onclick=function(){_openCartSheet();};
     _pos.appendChild(fab);
 
     // ── CART BOTTOM SHEET ──
     var sheetOverlay=document.createElement("div");
-    sheetOverlay.className="acim-sheet-overlay";
+    sheetOverlay.className="mk-sheet-overlay";
     sheetOverlay.id="acim-sheet-overlay";
     sheetOverlay.onclick=function(){_closeCartSheet();};
     _pos.appendChild(sheetOverlay);
 
     var sheet=document.createElement("div");
-    sheet.className="acim-sheet";
+    sheet.className="mk-sheet";
     sheet.id="acim-sheet";
 
     var sheetHandle=document.createElement("div");
-    sheetHandle.className="acim-sheet-handle";
+    sheetHandle.className="mk-sheet__handle";
     sheet.appendChild(sheetHandle);
 
     var sheetHeader=document.createElement("div");
@@ -1088,22 +1129,22 @@
 
     // Subtotal
     var subRow=document.createElement("div");
-    subRow.className="acim-sheet-row";
-    subRow.innerHTML='<span class="acim-sheet-row-label">Sous-total</span>';
+    subRow.className="mk-sheet__row";
+    subRow.innerHTML='<span class="mk-sheet__row-label">Sous-total</span>';
     _posSubtotal=document.createElement("span");
-    _posSubtotal.className="acim-sheet-row-value";
+    _posSubtotal.className="mk-sheet__row-value";
     _posSubtotal.textContent="0,00 \u20AC";
     subRow.appendChild(_posSubtotal);
     sheetFooter.appendChild(subRow);
 
     // Discount (hidden by default)
     var discRow=document.createElement("div");
-    discRow.className="acim-sheet-row discount";
+    discRow.className="mk-sheet__row mk-sheet__row--discount";
     discRow.id="acim-disc-row";
     discRow.style.display="none";
-    discRow.innerHTML='<span class="acim-sheet-row-label">Remise</span>';
+    discRow.innerHTML='<span class="mk-sheet__row-label">Remise</span>';
     _posDiscount=document.createElement("span");
-    _posDiscount.className="acim-sheet-row-value";
+    _posDiscount.className="mk-sheet__row-value";
     _posDiscount.textContent="-0,00 \u20AC";
     discRow.appendChild(_posDiscount);
     sheetFooter.appendChild(discRow);
@@ -1120,13 +1161,13 @@
 
     // Total
     var totalRow=document.createElement("div");
-    totalRow.className="acim-sheet-total";
+    totalRow.className="mk-sheet__total";
     var finalLabel=document.createElement("span");
-    finalLabel.className="acim-sheet-total-label";
+    finalLabel.className="mk-sheet__total-label";
     finalLabel.textContent="TOTAL";
     _posTotal=document.createElement("span");
     _posTotal.id="acim-pos-total";
-    _posTotal.className="acim-sheet-total-value";
+    _posTotal.className="mk-sheet__total-value";
     _posTotal.textContent="0,00 €";
     totalRow.appendChild(finalLabel);
     totalRow.appendChild(_posTotal);
@@ -1134,7 +1175,7 @@
 
     // Checkout
     _posCheckout=document.createElement("button");
-    _posCheckout.className="acim-sheet-checkout";
+    _posCheckout.className="mk-sheet__checkout";
     _posCheckout.id="acim-pos-checkout";
     _posCheckout.textContent="\uD83D\uDCB0 Encaisser";
     _posCheckout.onclick=function(){_startPayment();};
@@ -1143,23 +1184,23 @@
     sheet.appendChild(sheetFooter);
     _pos.appendChild(sheet);
 
-    // ── DESKTOP CART PANEL (hidden on mobile via CSS) ──
+// ── DESKTOP CART PANEL (hidden on mobile via CSS) ──
     var desktopCart=document.createElement("div");
-    desktopCart.className="acim-desktop-cart";
+    desktopCart.className="mk-desktop-cart";
     desktopCart.id="acim-desktop-cart";
 
     var dcHeader=document.createElement("div");
-    dcHeader.className="acim-desktop-cart-header";
-    dcHeader.innerHTML='<span>\uD83D\uDED2 Ticket</span><span id="acim-pos-count">0 article</span>';
+    dcHeader.className="mk-desktop-cart__header";
+    dcHeader.innerHTML='<span>🛒 Ticket</span><span id="acim-pos-count">0 article</span>';
     desktopCart.appendChild(dcHeader);
 
     var dcItems=document.createElement("div");
-    dcItems.className="acim-desktop-cart-items";
+    dcItems.className="mk-desktop-cart__items";
     dcItems.id="acim-desktop-cart-items";
     desktopCart.appendChild(dcItems);
 
     var dcFooter=document.createElement("div");
-    dcFooter.className="acim-desktop-cart-footer";
+    dcFooter.className="mk-desktop-cart__footer";
     dcFooter.id="acim-desktop-cart-footer";
     desktopCart.appendChild(dcFooter);
 
@@ -1168,7 +1209,7 @@
     bodyRow.style.cssText="flex:1;display:flex;overflow:hidden;";
     bodyRow.appendChild(productsWrap);
     bodyRow.appendChild(desktopCart);
-    _pos.insertBefore(bodyRow,_pos.querySelector(".acim-bottom-nav"));
+    _pos.insertBefore(bodyRow,_pos.querySelector(".mk-nav"));
 
     _buildCategories();
     document.body.appendChild(_pos);
@@ -1180,15 +1221,15 @@
     _posCats.innerHTML="";
     // "Tous" category
     var allItem=document.createElement("div");
-    allItem.className="acim-category-item"+(_activeCat?"":" active");
-    allItem.innerHTML='<div class="acim-category-icon">\uD83D\uDCE6</div><div class="acim-category-label">Tous</div>';
+    allItem.className="mk-category"+(_activeCat?"":" mk-category--active");
+    allItem.innerHTML='<div class="mk-category__icon">📦</div><div class="mk-category__label">Tous</div>';
     allItem.onclick=function(){_activeCat="";_refreshCategories();_filterProducts();};
     _posCats.appendChild(allItem);
     // Other categories
     CATS.forEach(function(cat){
       var item=document.createElement("div");
-      item.className="acim-category-item"+(_activeCat===cat.id?" active":"");
-      item.innerHTML='<div class="acim-category-icon">'+cat.ic+'</div><div class="acim-category-label">'+cat.id+'</div>';
+      item.className="mk-category"+(_activeCat===cat.id?" mk-category--active":"");
+      item.innerHTML='<div class="mk-category__icon">'+cat.ic+'</div><div class="mk-category__label">'+cat.id+'</div>';
       item.onclick=function(){_activeCat=(_activeCat===cat.id)?"":cat.id;_refreshCategories();_filterProducts();};
       _posCats.appendChild(item);
     });
@@ -1263,20 +1304,20 @@
   function _renderGrid(){
     _posGrid.innerHTML="";
     if(_filteredProducts.length===0){
-      _posGrid.innerHTML='<div class="acim-empty"><div class="acim-empty-icon">\uD83D\uDD0D</div><div class="acim-empty-text">Aucun produit trouv\u00E9</div></div>';
+      _posGrid.innerHTML='<div class="mk-empty"><div class="mk-empty__icon">🔍</div><div class="mk-empty__title">Aucun produit</div><div class="mk-empty__text">Aucun produit ne correspond à votre recherche</div></div>';
       return;
     }
     _filteredProducts.forEach(function(p){
       var card=document.createElement("div");
-      card.className="acim-product-card";
+      card.className="mk-product"+(p.pricePerUnit>0&&p.unitType?" mk-product--weight":"");
       var hasPrice=p.sale_price_cents>0;
       var isWeighable=p.pricePerUnit>0&&p.unitType;
       var _cardP=p,_cardHP=hasPrice,_cardW=isWeighable;
 
       // Delete button
       var delBtn=document.createElement("button");
-      delBtn.className="acim-product-delete";
-      delBtn.innerHTML="\u2715";
+      delBtn.className="mk-product__favorite";
+      delBtn.innerHTML="🗑️";
       delBtn.title="Supprimer ce produit";
       delBtn.onclick=function(e){e.stopPropagation();_confirmDeleteProduct(_cardP);};
       card.appendChild(delBtn);
@@ -1285,13 +1326,12 @@
       var cat=(p.category||"autre").toLowerCase();
       var bg=_catBg[cat]||"#f5f5f5";
       var icImg=document.createElement("img");
-      icImg.className="acim-product-image";
+      icImg.className="mk-product__image";
       icImg.style.display="none";
       icImg.style.background=bg;
 
       var icPh=document.createElement("div");
-      icPh.className="acim-product-placeholder";
-      icPh.style.background="linear-gradient(135deg,"+bg+" 0%,#e8e8e8 100%)";
+      icPh.className="mk-product__placeholder";
       // Generate SVG product image
       var svgUrl=_generateProductSVG(p.name,cat,p.sale_price_cents);
       icPh.innerHTML='<img src="'+svgUrl+'" style="width:100%;height:100%;object-fit:cover;border-radius:12px 12px 0 0">';
@@ -1299,8 +1339,8 @@
 
       // Camera button for adding/changing photo
       var camBtn=document.createElement("button");
-      camBtn.className="acim-product-camera";
-      camBtn.innerHTML="\uD83D\uDCF7";
+      camBtn.className="mk-product__favorite";
+      camBtn.innerHTML="📷";
       camBtn.title="Ajouter / changer la photo";
       camBtn.onclick=function(e){
         e.stopPropagation();
@@ -1330,31 +1370,31 @@
 
       // Product info
       var infoDiv=document.createElement("div");
-      infoDiv.className="acim-product-info";
+      infoDiv.className="mk-product__content";
 
       var nm=document.createElement("div");
-      nm.className="acim-product-name";
+      nm.className="mk-product__name";
       nm.textContent=p.name||"?";
       infoDiv.appendChild(nm);
 
       if(isWeighable){
         var badge=document.createElement("div");
-        badge.style.cssText="display:inline-block;font-size:12px;color:#fff;background:#2196f3;border-radius:6px;padding:2px 8px;margin-top:6px;font-weight:600;";
-        badge.textContent="\u2696\uFE0F Au poids";
+        badge.className="mk-badge mk-badge--new";
+        badge.textContent="⚖ Au poids";
         infoDiv.appendChild(badge);
         var ppu=document.createElement("div");
-        ppu.className="acim-product-price";
+        ppu.className="mk-product__unit";
         ppu.textContent=_formatPricePerUnit(p.pricePerUnit,p.unitType);
         infoDiv.appendChild(ppu);
       }else if(hasPrice){
         var pr=document.createElement("div");
-        pr.className="acim-product-price";
+        pr.className="mk-product__price";
         pr.textContent=(p.sale_price_cents/100).toFixed(2)+"\u20AC";
         infoDiv.appendChild(pr);
       }else{
         var noPr=document.createElement("div");
-        noPr.style.cssText="font-size:14px;color:var(--acim-orange);margin-top:6px;font-weight:600;";
-        noPr.textContent="\u270F\uFE0F Sans prix";
+        noPr.style.cssText="font-size:14px;color:var(--mk-accent);margin-top:6px;font-weight:600;";
+        noPr.textContent="✏️ Sans prix";
         infoDiv.appendChild(noPr);
       }
 
@@ -1364,8 +1404,8 @@
         var isLow=p.stockQty<=threshold;
         var isExpired=p.expiry_date&&new Date(p.expiry_date)<new Date();
         var stBadge=document.createElement("div");
-        stBadge.className="acim-product-stock"+(isExpired?" expired":isLow?" low":"");
-        stBadge.textContent=(isExpired?"\u26A0\uFE0F P\u00E9rim\u00E9 !":isLow?"\u26A0\uFE0F Stock bas !":"Stock: ")+p.stockQty;
+        stBadge.className="mk-product__stock"+(isExpired?" mk-product__stock--expired":isLow?" mk-product__stock--low":"");
+        stBadge.textContent=(isExpired?"⚠️ Périmé !":isLow?"⚠️ Stock bas !":"Stock: ")+p.stockQty;
         if(isExpired&&p.expiry_date)stBadge.textContent+=" (DLC: "+p.expiry_date+")";
         infoDiv.appendChild(stBadge);
       }
@@ -1418,18 +1458,55 @@
       }
     }
 
+    function _renderCart(){
+    var info=_cartInfo();var subtotal=_cartSubtotal();var total=_cartTotal();
+    // Update count in both mobile and desktop
+    var countEl=document.getElementById("acim-pos-count");
+    if(countEl)countEl.textContent=info.length+" article"+(info.length!==1?"s":"");
+    _posSubtotal.textContent=(subtotal/100).toFixed(2).replace(".",",")+" \u20AC";
+    _posTotal.textContent=(total/100).toFixed(2).replace(".",",")+" \u20AC";
+    var discRow=document.getElementById("acim-disc-row");
+    if(_cartDiscountCents>0){
+      discRow.style.display="flex";
+      _posDiscount.textContent="-"+(_cartDiscountCents/100).toFixed(2).replace(".",",")+" \u20AC";
+    }else{discRow.style.display="none";}
+
+    // Update cart FAB (mobile)
+    _updateCartFAB();
+
+    // Render into mobile sheet
+    _posItems.innerHTML="";
+    if(info.length===0){
+      _posItems.innerHTML='<div class="mk-sheet__empty"><div class="mk-sheet__empty-icon">🛒</div><div class="mk-sheet__empty-title">Panier vide</div></div>';
+      _posCheckout.textContent="\uD83D\uDCB0 Encaisser (0,00 \u20AC)";
+      _posCheckout.style.opacity="0.5";
+    }else{
+      _posCheckout.textContent="\uD83D\uDCB0 Encaisser "+(total/100).toFixed(2).replace(".",",")+" \u20AC";
+      _posCheckout.style.opacity="1";
+    }
+
+    // Render into desktop cart
+    var dcItems=document.getElementById("acim-desktop-cart-items");
+    var dcFooter=document.getElementById("acim-desktop-cart-footer");
+    if(dcItems){
+      dcItems.innerHTML="";
+      if(info.length===0){
+        dcItems.innerHTML='<div class="mk-sheet__empty"><div class="mk-sheet__empty-icon">🛒</div><div class="mk-sheet__empty-title">Panier vide</div></div>';
+      }
+    }
+
     info.forEach(function(item){
       // Create a helper to build cart item row
       function buildRow(it){
         var row=document.createElement("div");
         var isZero=it.price===0;
         var isWeighed=_isWeightProduct(it);
-        row.className="acim-sheet-item";
+        row.className="mk-sheet__item";
         row.onclick=function(){_inlineEdit(it.idx,50,50);};
 
         var icon=document.createElement("div");
-        icon.className="acim-sheet-item-icon";
-        icon.style.cssText="width:40px;height:40px;border-radius:8px;overflow:hidden;flex-shrink:0;background:"+( _catBg[it.cat||"autre"]||"#f5f5f5");
+        icon.className="mk-sheet__item-image";
+        icon.style.cssText="width:56px;height:56px;border-radius:12px;overflow:hidden;flex-shrink:0;background:"+( _catBg[it.cat||"autre"]||"#f5f5f5");
         // Try to show product image from cache or generate SVG
         var imgEl=document.createElement("img");
         imgEl.style.cssText="width:100%;height:100%;object-fit:cover;";
@@ -1450,16 +1527,16 @@
         row.appendChild(icon);
 
         var infoDiv=document.createElement("div");
-        infoDiv.className="acim-sheet-item-info";
+        infoDiv.className="mk-sheet__item-info";
         var nm=document.createElement("div");
-        nm.className="acim-sheet-item-name";
-        nm.style.color=isZero?"var(--acim-orange)":"";
+        nm.className="mk-sheet__item-name";
+        nm.style.color=isZero?"var(--mk-accent)":"";
         nm.textContent=isZero?"\u270F\uFE0F "+it.name:it.name;
         infoDiv.appendChild(nm);
 
         if(isWeighed&&it.weight!=null){
           var wLine=document.createElement("div");
-          wLine.className="acim-sheet-item-weight";
+          wLine.className="mk-sheet__item-weight";
           wLine.textContent=_formatWeight(it.weight,it.unitType)+" \u00D7 "+_formatPricePerUnit(it.pricePerUnit,it.unitType);
           infoDiv.appendChild(wLine);
         }
