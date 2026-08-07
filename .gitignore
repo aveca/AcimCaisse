@@ -6,3 +6,7 @@ dist/
 .DS_Store
 Thumbs.db
 desktop.ini
+tests/screenshots/
+tests/screenshots-poststudio/
+post-studio/node_modules/
+post-studio/dist/

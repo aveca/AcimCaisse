@@ -28,6 +28,13 @@ async function ok(name, cond, detail){ if(cond){results.pass++; log('  PASS: '+n
   try {
     await p.goto(BASE + 'pos.html', { waitUntil: 'domcontentloaded', timeout: 20000 });
     await p.waitForTimeout(5500);
+    // PR C — operator login modal blocks clicks; auto-login with default admin PIN
+    if (await p.locator('#acim-login').isVisible().catch(() => false)) {
+      await p.locator('#acim-login input[type=password]').fill('1234');
+      await p.locator('#acim-login button').last().click();
+      await p.waitForTimeout(900);
+      log('  Login: default admin PIN 1234');
+    }
     // Override confirmVoice to auto-yes (so voice tests don't get stuck on prompts)
     await p.evaluate(() => { if (window._acimS3) window._acimS3.confirmVoice = function(prompt, yes) { yes(); }; });
     // Click first product card
@@ -73,10 +80,14 @@ async function ok(name, cond, detail){ if(cond){results.pass++; log('  PASS: '+n
 
   log('SPRINT 3 TEST 3: Voice add — "ajoute Tomates" (already in catalog)');
   try {
-    // Find a real product name from the catalog
+    // Find a real product name from the catalog (stable selector: .mk-product__name)
     const prodName = await p.evaluate(() => {
       const grid = document.querySelectorAll('#acim-pos-grid > div');
-      for (const c of grid) { const t = c.textContent.trim(); if (t && t.length > 4 && t.length < 30) return t.split('\n')[0].trim(); }
+      for (const c of grid) {
+        const nm = c.querySelector('.mk-product__name');
+        const t = nm ? nm.textContent.trim() : '';
+        if (t && t.length > 2) return t;
+      }
       return null;
     });
     if (!prodName) { await ok('Voice add: found a product to add', false, 'no product in grid'); }

@@ -1,0 +1,945 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="description" content="PostSystem — Caisse restaurant style Uber Eats. Démo webdesign : menu, panier, encaissement, historique.">
+<title>PostSystem — Caisse Restaurant (Uber Eats style)</title>
+<style>
+:root{
+  --ue-green:#06C167;
+  --ue-green-dark:#059c54;
+  --ue-green-light:#e8fdf0;
+  --ue-black:#1c1c1c;
+  --ue-gray:#757575;
+  --ue-gray-light:#eeeeee;
+  --ue-bg:#fafafa;
+  --ue-surface:#ffffff;
+  --ue-border:#ebebeb;
+  --ue-radius:16px;
+  --ue-shadow:0 4px 14px rgba(0,0,0,.06);
+  --ue-shadow-lg:0 12px 32px rgba(0,0,0,.14);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;
+  background:var(--ue-bg);
+  color:var(--ue-black);
+  font-size:15px;line-height:1.45;
+  overscroll-behavior:none;
+}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+input{font-family:inherit}
+img{display:block}
+
+/* ── HEADER ── */
+.ps-header{
+  position:sticky;top:0;z-index:100;
+  background:rgba(255,255,255,.96);
+  backdrop-filter:saturate(180%) blur(16px);
+  -webkit-backdrop-filter:saturate(180%) blur(16px);
+  border-bottom:1px solid var(--ue-border);
+}
+.ps-header__in{
+  max-width:1280px;margin:0 auto;
+  display:flex;align-items:center;gap:12px;
+  padding:10px 20px;
+}
+.ps-logo{
+  display:flex;align-items:center;gap:9px;
+  font-size:19px;font-weight:800;letter-spacing:-.3px;
+  text-decoration:none;color:var(--ue-black);
+}
+.ps-logo__badge{
+  width:34px;height:34px;border-radius:50%;
+  background:linear-gradient(135deg,var(--ue-green),#0fd07a);
+  color:#fff;display:flex;align-items:center;justify-content:center;
+  font-size:17px;box-shadow:0 3px 8px rgba(6,193,103,.35);
+}
+.ps-resto-switch{
+  margin-left:auto;
+  display:flex;align-items:center;gap:8px;
+  border:1px solid var(--ue-border);border-radius:9999px;
+  padding:7px 14px;font-size:14px;font-weight:600;background:#fff;
+  transition:box-shadow .15s,border-color .15s;
+}
+.ps-resto-switch:hover{border-color:var(--ue-green);box-shadow:var(--ue-shadow)}
+.ps-resto-switch .dot{width:8px;height:8px;border-radius:50%;background:var(--ue-green)}
+.ps-icon-btn{
+  width:38px;height:38px;border-radius:50%;
+  border:1px solid var(--ue-border);background:#fff;
+  display:flex;align-items:center;justify-content:center;font-size:17px;
+  transition:transform .12s;
+}
+.ps-icon-btn:hover{border-color:var(--ue-green)}
+.ps-icon-btn:active{transform:scale(.93)}
+
+/* ── LAYOUT ── */
+.ps-main{
+  max-width:1280px;margin:0 auto;padding:0 20px 40px;
+  display:flex;gap:28px;align-items:flex-start;
+}
+.ps-content{flex:1;min-width:0}
+.ps-cart-col{
+  width:380px;flex-shrink:0;
+  position:sticky;top:84px;
+}
+
+/* ── BANNER ── */
+.ps-banner{
+  position:relative;overflow:hidden;
+  border-radius:22px;color:#fff;
+  margin:20px 0 18px;
+  padding:34px 28px 30px;
+  background:linear-gradient(135deg,#0f9d58 0%,#06C167 45%,#21d97e 100%);
+  box-shadow:0 10px 30px rgba(6,193,103,.25);
+}
+.ps-banner__blob{position:absolute;border-radius:50%;background:rgba(255,255,255,.14)}
+.ps-banner__blob.b1{width:220px;height:220px;top:-80px;right:-40px}
+.ps-banner__blob.b2{width:130px;height:130px;bottom:-60px;right:130px}
+.ps-banner__blob.b3{width:80px;height:80px;top:20px;right:220px;background:rgba(255,255,255,.10)}
+.ps-banner h1{position:relative;font-size:30px;font-weight:800;letter-spacing:-.5px;margin-bottom:6px}
+.ps-banner p{position:relative;font-size:15px;opacity:.92}
+.ps-banner__meta{
+  position:relative;display:flex;gap:18px;flex-wrap:wrap;
+  margin-top:16px;font-size:13px;font-weight:600;
+}
+.ps-banner__meta span{display:flex;align-items:center;gap:5px;background:rgba(255,255,255,.18);border-radius:9999px;padding:5px 12px}
+
+/* ── SEARCH ── */
+.ps-search{
+  display:flex;align-items:center;gap:10px;
+  background:#fff;border:1px solid var(--ue-border);
+  border-radius:9999px;padding:12px 18px;margin-bottom:18px;
+  box-shadow:var(--ue-shadow);
+  transition:border-color .15s,box-shadow .15s;
+}
+.ps-search:focus-within{border-color:var(--ue-green);box-shadow:0 0 0 4px rgba(6,193,103,.12)}
+.ps-search__icon{width:20px;height:20px;color:var(--ue-green);flex-shrink:0}
+.ps-search input{
+  flex:1;border:none;outline:none;font-size:15px;background:transparent;color:var(--ue-black);
+}
+.ps-search input::placeholder{color:#b5b5b5}
+
+/* ── CATEGORIES ── */
+.ps-cats{
+  display:flex;gap:8px;overflow-x:auto;padding:2px 0 14px;
+  scrollbar-width:none;margin-bottom:6px;
+}
+.ps-cats::-webkit-scrollbar{display:none}
+.ps-cat{
+  flex-shrink:0;display:flex;align-items:center;gap:7px;
+  padding:9px 16px;border-radius:9999px;
+  border:1px solid var(--ue-border);background:#fff;
+  font-size:14px;font-weight:600;color:#444;
+  transition:all .15s;
+}
+.ps-cat:hover{border-color:var(--ue-green);color:var(--ue-green-dark)}
+.ps-cat.active{background:var(--ue-green);border-color:var(--ue-green);color:#fff}
+
+/* ── GRID ── */
+.ps-grid{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:16px;
+}
+.ps-card{
+  background:#fff;border-radius:var(--ue-radius);overflow:hidden;
+  box-shadow:var(--ue-shadow);border:1px solid var(--ue-border);
+  transition:transform .18s,box-shadow .18s;
+  position:relative;
+}
+.ps-card:hover{transform:translateY(-3px);box-shadow:var(--ue-shadow-lg)}
+.ps-card__img{
+  position:relative;height:140px;overflow:hidden;background:#f2f2f2;
+  display:flex;align-items:center;justify-content:center;font-size:54px;
+}
+.ps-card__badge{
+  position:absolute;top:10px;left:10px;
+  background:rgba(0,0,0,.65);color:#fff;font-size:11px;font-weight:700;
+  padding:4px 9px;border-radius:9999px;backdrop-filter:blur(4px);
+}
+.ps-card__body{padding:13px 14px 15px}
+.ps-card__name{font-size:15px;font-weight:700;margin-bottom:3px}
+.ps-card__desc{
+  font-size:12.5px;color:var(--ue-gray);line-height:1.35;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+  min-height:34px;margin-bottom:9px;
+}
+.ps-card__foot{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.ps-card__price{font-size:15px;font-weight:800}
+.ps-card__price small{font-size:11px;color:var(--ue-gray);font-weight:500}
+.ps-add{
+  width:36px;height:36px;border-radius:50%;flex-shrink:0;
+  background:var(--ue-green);color:#fff;font-size:22px;font-weight:600;line-height:1;
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 3px 8px rgba(6,193,103,.35);
+  transition:transform .12s,background .12s;
+}
+.ps-add:hover{background:var(--ue-green-dark)}
+.ps-add:active{transform:scale(.88)}
+.ps-stepper{
+  display:flex;align-items:center;gap:2px;
+  border:1px solid var(--ue-green);border-radius:9999px;overflow:hidden;background:#fff;
+}
+.ps-stepper button{
+  width:34px;height:34px;color:var(--ue-green);font-size:20px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;
+}
+.ps-stepper button:active{background:var(--ue-green-light)}
+.ps-stepper .n{min-width:22px;text-align:center;font-weight:800;font-size:14px}
+
+/* ── EMPTY GRID ── */
+.ps-empty{text-align:center;padding:60px 20px;color:#b5b5b5}
+.ps-empty .big{font-size:52px;margin-bottom:12px}
+.ps-empty .t{font-size:16px;font-weight:700;color:#757575}
+.ps-empty .s{font-size:13px;margin-top:4px}
+
+/* ── CART (desktop) ── */
+.ps-cart{
+  background:#fff;border:1px solid var(--ue-border);border-radius:20px;
+  box-shadow:var(--ue-shadow);overflow:hidden;
+  display:flex;flex-direction:column;max-height:calc(100vh - 104px);
+}
+.ps-cart__head{
+  display:flex;align-items:center;gap:8px;
+  padding:16px 18px;border-bottom:1px solid var(--ue-border);
+  font-size:16px;font-weight:800;
+}
+.ps-cart__head .cnt{
+  margin-left:auto;background:var(--ue-green-light);color:var(--ue-green-dark);
+  font-size:12px;font-weight:800;padding:3px 10px;border-radius:9999px;
+}
+.ps-cart__items{flex:1;overflow-y:auto;padding:6px 0}
+.ps-cart__empty{padding:36px 20px;text-align:center;color:#b5b5b5;font-size:13.5px}
+.ps-cart__empty .big{font-size:38px;margin-bottom:8px}
+.ps-ci{
+  display:flex;gap:12px;align-items:center;
+  padding:10px 18px;
+}
+.ps-ci:hover{background:#fbfbfb}
+.ps-ci__img{
+  width:56px;height:56px;border-radius:12px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;font-size:28px;
+  background:#f2f2f2;
+}
+.ps-ci__info{flex:1;min-width:0}
+.ps-ci__name{font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ps-ci__unit{font-size:11.5px;color:var(--ue-gray)}
+.ps-ci__actions{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.ps-ci__line{font-size:13.5px;font-weight:800;min-width:52px;text-align:right}
+.ps-ci__del{color:#d0021b;font-size:16px;padding:4px;opacity:.75}
+.ps-ci__del:hover{opacity:1}
+.ps-cart__foot{padding:14px 18px 18px;border-top:1px solid var(--ue-border)}
+.ps-row{display:flex;justify-content:space-between;font-size:14px;color:#555;margin-bottom:7px}
+.ps-row.free b{color:var(--ue-green)}
+.ps-row.tot{font-size:17px;font-weight:800;color:var(--ue-black);margin:10px 0 0;padding-top:10px;border-top:1px dashed var(--ue-border)}
+.ps-btn{
+  width:100%;margin-top:14px;
+  background:var(--ue-green);color:#fff;
+  border-radius:12px;padding:15px;font-size:16px;font-weight:800;
+  display:flex;align-items:center;justify-content:space-between;
+  transition:background .15s,transform .12s;
+}
+.ps-btn:hover{background:var(--ue-green-dark)}
+.ps-btn:active{transform:scale(.985)}
+.ps-btn:disabled{background:#cfcfcf;cursor:not-allowed;transform:none}
+.ps-btn .ps-btn__sub{font-size:12px;font-weight:600;opacity:.9}
+
+/* ── MOBILE BAR + SHEET ── */
+.ps-mbar{
+  position:fixed;left:12px;right:12px;bottom:12px;z-index:90;
+  display:none;
+}
+.ps-mbar__btn{
+  width:100%;display:flex;align-items:center;gap:12px;
+  background:var(--ue-black);color:#fff;
+  border-radius:16px;padding:15px 20px;
+  box-shadow:0 10px 30px rgba(0,0,0,.35);
+}
+.ps-mbar__icon{width:40px;height:40px;border-radius:12px;background:var(--ue-green);display:flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0}
+.ps-mbar__info{flex:1;text-align:left;min-width:0}
+.ps-mbar__count{font-size:12px;font-weight:600;opacity:.75}
+.ps-mbar__label{font-size:16px;font-weight:800}
+.ps-mbar__total{font-size:16px;font-weight:800;flex-shrink:0}
+
+.ps-sheet-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;opacity:0;pointer-events:none;transition:opacity .2s}
+.ps-sheet-overlay.open{opacity:1;pointer-events:auto}
+.ps-sheet{
+  position:fixed;left:0;right:0;bottom:0;z-index:201;
+  background:#fff;border-radius:24px 24px 0 0;
+  max-height:86vh;display:flex;flex-direction:column;
+  transform:translateY(105%);transition:transform .28s cubic-bezier(.32,.72,.28,1);
+  padding-bottom:env(safe-area-inset-bottom);
+}
+.ps-sheet.open{transform:none}
+.ps-sheet__grab{width:44px;height:5px;border-radius:9999px;background:#dedede;margin:10px auto 4px;flex-shrink:0}
+.ps-sheet__head{display:flex;align-items:center;padding:8px 20px 12px;border-bottom:1px solid var(--ue-border)}
+.ps-sheet__head b{font-size:17px}
+.ps-sheet__head .close{margin-left:auto;font-size:20px;color:#888;padding:6px}
+.ps-sheet__items{flex:1;overflow-y:auto;padding:8px 0}
+.ps-sheet__foot{padding:12px 20px 16px;border-top:1px solid var(--ue-border);background:#fff}
+
+/* ── MODALS ── */
+.ps-modal-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:300;
+  display:flex;align-items:center;justify-content:center;padding:20px;
+  animation:fadeIn .18s;
+}
+.ps-modal{
+  background:#fff;border-radius:20px;width:420px;max-width:100%;
+  max-height:90vh;overflow-y:auto;padding:24px;
+  animation:popIn .22s cubic-bezier(.32,.72,.28,1);
+}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes popIn{from{opacity:0;transform:scale(.94) translateY(8px)}to{opacity:1;transform:none}}
+.ps-modal h2{font-size:20px;font-weight:800;margin-bottom:4px}
+.ps-modal .sub{font-size:13px;color:var(--ue-gray);margin-bottom:18px}
+
+.ps-pay-mode{display:flex;gap:8px;margin-bottom:16px}
+.ps-pay-mode button{
+  flex:1;padding:12px;border-radius:12px;font-size:14px;font-weight:700;
+  border:2px solid var(--ue-border);background:#fff;transition:all .12s;
+}
+.ps-pay-mode button.active{border-color:var(--ue-green);background:var(--ue-green-light);color:var(--ue-green-dark)}
+.ps-field label{display:block;font-size:13px;font-weight:700;margin-bottom:6px;color:#555}
+.ps-field input{
+  width:100%;font-size:24px;font-weight:800;padding:12px 14px;
+  border:2px solid var(--ue-border);border-radius:12px;outline:none;text-align:center;
+  transition:border-color .15s;
+}
+.ps-field input:focus{border-color:var(--ue-green)}
+.ps-quick{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.ps-quick button{
+  padding:8px 14px;border:1px solid var(--ue-border);border-radius:9999px;
+  background:#fff;font-size:13.5px;font-weight:700;transition:all .12s;
+}
+.ps-quick button:hover{border-color:var(--ue-green);color:var(--ue-green-dark)}
+.ps-change{font-size:16px;font-weight:800;color:var(--ue-green-dark);text-align:center;margin:14px 0 6px;min-height:24px}
+.ps-modal .sum{background:#f8f9fa;border-radius:12px;padding:14px;margin-bottom:16px}
+.ps-modal .sum .r{display:flex;justify-content:space-between;font-size:13.5px;color:#555;margin-bottom:6px}
+.ps-modal .sum .r.t{font-weight:800;color:var(--ue-black);font-size:15.5px;margin:10px 0 0;padding-top:8px;border-top:1px dashed var(--ue-border)}
+.ps-btn-row{display:flex;gap:10px}
+.ps-btn-row .ps-btn{flex:1;margin-top:0}
+.ps-btn.ghost{background:#fff;color:var(--ue-black);border:1.5px solid var(--ue-border);box-shadow:none}
+.ps-btn.ghost:hover{border-color:var(--ue-green);color:var(--ue-green-dark)}
+
+/* SUCCESS */
+.ps-success{text-align:center;padding:14px 6px 6px}
+.ps-success__check{
+  width:88px;height:88px;border-radius:50%;margin:0 auto 16px;
+  background:linear-gradient(135deg,var(--ue-green),#0fd07a);color:#fff;
+  display:flex;align-items:center;justify-content:center;font-size:40px;
+  box-shadow:0 10px 30px rgba(6,193,103,.35);
+  animation:popIn .35s cubic-bezier(.32,.72,.28,1);
+}
+.ps-success h2{font-size:22px;font-weight:800;margin-bottom:6px}
+.ps-success .sub{font-size:14px;color:var(--ue-gray);margin-bottom:6px}
+.ps-success .ticket{
+  display:inline-block;background:var(--ue-green-light);color:var(--ue-green-dark);
+  font-size:13px;font-weight:800;padding:6px 16px;border-radius:9999px;margin-bottom:14px;
+}
+.ps-success .eta{font-size:14px;color:#555;margin-bottom:20px}
+.ps-success .eta b{color:var(--ue-green-dark)}
+
+/* RECEIPT */
+.ps-receipt{font-size:12.5px;color:#222;line-height:1.5;margin-bottom:16px}
+.ps-receipt .rc-head{text-align:center;margin-bottom:10px}
+.ps-receipt .rc-head b{font-size:15px;display:block}
+.ps-receipt .rc-sep{border-top:1px dashed #aaa;margin:8px 0}
+.ps-receipt .rc-line{display:flex;justify-content:space-between;gap:8px}
+.ps-receipt .rc-line .l{flex:1}
+.ps-receipt .rc-qty,.ps-receipt .ps-rc-qty{color:#888;font-size:11px}
+
+/* HISTORY */
+.ps-hist-item{
+  display:flex;align-items:center;gap:12px;
+  border:1px solid var(--ue-border);border-radius:14px;padding:12px 14px;margin-bottom:10px;
+  background:#fff;transition:border-color .15s;text-align:left;width:100%;
+}
+.ps-hist-item:hover{border-color:var(--ue-green)}
+.ps-hist-item .ic{width:42px;height:42px;border-radius:12px;background:var(--ue-green-light);display:flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0}
+.ps-hist-item .in{flex:1;min-width:0}
+.ps-hist-item .in b{display:block;font-size:14px}
+.ps-hist-item .in span{font-size:12px;color:var(--ue-gray)}
+.ps-hist-item .tl{font-weight:800;font-size:14.5px}
+.ps-hist-empty{text-align:center;color:#b5b5b5;padding:30px 10px;font-size:13.5px}
+
+/* ── RESPONSIVE ── */
+@media (max-width:1023px){
+  .ps-cart-col{display:none}
+  .ps-mbar{display:block}
+}
+@media (min-width:1024px){
+  .ps-cart{display:flex}
+}
+@media (max-width:560px){
+  .ps-main{padding:0 12px 110px}
+  .ps-banner{padding:26px 20px;border-radius:18px}
+  .ps-banner h1{font-size:24px}
+  .ps-grid{grid-template-columns:repeat(2,1fr);gap:11px}
+  .ps-card__img{height:104px;font-size:42px}
+  .ps-card__desc{font-size:11.5px;min-height:30px}
+  .ps-header__in{padding:8px 12px}
+  .ps-logo span.txt{display:none}
+  .ps-resto-switch .rname{display:none}
+}
+@media print{
+  body *{visibility:hidden}
+  .ps-receipt,.ps-receipt *{visibility:visible}
+  .ps-receipt{position:fixed;inset:0;background:#fff;padding:20px;font-size:13px}
+}
+</style>
+</head>
+<body>
+
+<!-- ═══════════ HEADER ═══════════ -->
+<header class="ps-header">
+  <div class="ps-header__in">
+    <a class="ps-logo" href="#"><span class="ps-logo__badge">🛵</span><span class="txt">Post<span style="color:var(--ue-green)">System</span></span></a>
+    <button class="ps-resto-switch" onclick="switchResto()">
+      <span class="dot"></span><span class="rname" id="ps-resto-name">Chez Mario</span><span style="opacity:.6">▾</span>
+    </button>
+    <button class="ps-icon-btn" title="Historique des commandes" onclick="openHistory()">🕘</button>
+  </div>
+</header>
+
+<div class="ps-main">
+  <!-- ═══════════ CONTENT ═══════════ -->
+  <div class="ps-content">
+    <section class="ps-banner" id="ps-banner">
+      <div class="ps-banner__blob b1"></div><div class="ps-banner__blob b2"></div><div class="ps-banner__blob b3"></div>
+      <h1 id="ps-resto-title">Chez Mario</h1>
+      <p id="ps-resto-desc">Pizzas, pâtes &amp; cuisine italienne — préparé sur place</p>
+      <div class="ps-banner__meta">
+        <span>⭐ <b id="ps-rate">4,8</b></span>
+        <span>🕑 <b id="ps-eta">25–35 min</b></span>
+        <span>🛵 <b id="ps-fee">2,90 €</b></span>
+        <span>💰 <span id="ps-min">10 €</span> minimum</span>
+      </div>
+    </section>
+
+    <div class="ps-search">
+      <svg class="ps-search__icon" viewBox="0 0 24 24" fill="currentColor"><path d="M10 2a8 8 0 1 0 4.9 14.32l5.39 5.39 1.42-1.42-5.39-5.39A8 8 0 0 0 10 2zm0 2a6 6 0 1 1 0 12 6 6 0 0 1 0-12z"/></svg>
+      <input id="ps-search" type="text" placeholder="Rechercher dans le menu… (ex : pizza, salade, frites)" oninput="state.q=this.value.toLowerCase();renderCats();renderGrid();">
+    </div>
+
+    <div class="ps-cats" id="ps-cats"></div>
+    <div class="ps-grid" id="ps-grid"></div>
+    <div class="ps-empty" id="ps-empty" style="display:none">
+      <div class="big">🍽️</div>
+      <div class="t">Aucun plat trouvé</div>
+      <div class="s">Essayez un autre mot-clé ou une autre catégorie</div>
+    </div>
+  </div>
+
+  <!-- ═══════════ CART (desktop) ═══════════ -->
+  <aside class="ps-cart-col">
+    <div class="ps-cart">
+      <div class="ps-cart__head">🛒 Panier <span class="cnt" id="ps-cart-count">0 article</span></div>
+      <div class="ps-cart__items" id="ps-cart-items"></div>
+      <div class="ps-cart__foot" id="ps-cart-foot"></div>
+    </div>
+  </aside>
+</div>
+
+<!-- ═══════════ MOBILE BAR ═══════════ -->
+<div class="ps-mbar" id="ps-mbar">
+  <button class="ps-mbar__btn" onclick="openSheet()">
+    <span class="ps-mbar__icon">🛒</span>
+    <span class="ps-mbar__info">
+      <span class="ps-mbar__count" id="ps-mbar-count">0 article</span><br>
+      <span class="ps-mbar__label">Voir le panier</span>
+    </span>
+    <span class="ps-mbar__total" id="ps-mbar-total">0,00 €</span>
+  </button>
+</div>
+
+<!-- ═══════════ MOBILE SHEET ═══════════ -->
+<div class="ps-sheet-overlay" id="ps-sheet-overlay" onclick="closeSheet()"></div>
+<div class="ps-sheet" id="ps-sheet">
+  <div class="ps-sheet__grab"></div>
+  <div class="ps-sheet__head"><b>🛒 Panier</b><button class="close" onclick="closeSheet()">✕</button></div>
+  <div class="ps-sheet__items" id="ps-sheet-items"></div>
+  <div class="ps-sheet__foot" id="ps-sheet-foot"></div>
+</div>
+
+<!-- ═══════════ MODALS ═══════════ -->
+<div id="ps-modals"></div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════
+   PostSystem — Caisse restaurant (design Uber Eats)
+   Démo webdesign : multi-restaurants, menu, panier, encaissement
+   ═══════════════════════════════════════════════════════════ */
+
+const RESTOS = [
+  {
+    id:"mario", name:"Chez Mario", desc:"Pizzas, pâtes & cuisine italienne — préparé sur place",
+    rating:"4,8", eta:"25–35 min", feeCents:290, minCents:1000, emoji:"🍕",
+    cats:[{id:"pizza",n:"Pizzas",ic:"🍕"},{id:"pasta",n:"Pâtes",ic:"🍝"},{id:"salad",n:"Salades",ic:"🥗"},{id:"dessert",n:"Desserts",ic:"🍰"},{id:"drink",n:"Boissons",ic:"🥤"}],
+    items:[
+      {n:"Margherita",d:"Tomate, mozzarella fior di latte, basilic frais",p:950,cat:"pizza",ic:"🍕",pop:true},
+      {n:"Pepperoni",d:"Tomate, mozzarella, double pepperoni",p:1250,cat:"pizza",ic:"🍕",pop:true},
+      {n:"Quattro Formaggi",d:"Mozzarella, gorgonzola, parmesan, chèvre",p:1350,cat:"pizza",ic:"🧀"},
+      {n:"Diavola",d:"Tomate, mozzarella, salami piquant, piments",p:1300,cat:"pizza",ic:"🌶️"},
+      {n:"Spaghetti Carbonara",d:"Guanciale, œuf, pecorino, poivre noir",p:1350,cat:"pasta",ic:"🍝",pop:true},
+      {n:"Lasagnes Maison",d:"Bœuf mijoté, béchamel, parmesan gratiné",p:1450,cat:"pasta",ic:"🍝"},
+      {n:"Penne Arrabbiata",d:"Sauce tomate piquante, ail, persil",p:1100,cat:"pasta",ic:"🍅"},
+      {n:"Salade César",d:"Poulet grillé, parmesan, croûtons, sauce césar",p:1150,cat:"salad",ic:"🥗",pop:true},
+      {n:"Salade Burrata",d:"Burrata crémeuse, tomates cerises, basilic",p:1250,cat:"salad",ic:"🥬"},
+      {n:"Tiramisu",d:"Mascarpone, café, cacao — fait maison",p:650,cat:"dessert",ic:"🍰",pop:true},
+      {n:"Panna Cotta",d:"Vanille, coulis de fruits rouges",p:550,cat:"dessert",ic:"🍮"},
+      {n:"Coca-Cola 33cl",d:"Boisson fraîche",p:350,cat:"drink",ic:"🥤"},
+      {n:"Eau minérale 50cl",d:"Plate ou pétillante",p:250,cat:"drink",ic:"💧"},
+      {n:"Jus d'orange pressé",d:"Pressé minute",p:450,cat:"drink",ic:"🍊",pop:true}
+    ]
+  },
+  {
+    id:"bistrot", name:"Le Bistrot du Port", desc:"Cuisine française traditionnelle, produits de la mer",
+    rating:"4,6", eta:"20–30 min", feeCents:250, minCents:1500, emoji:"🐟",
+    cats:[{id:"entree",n:"Entrées",ic:"🥖"},{id:"plat",n:"Plats",ic:"🍽️"},{id:"dessert",n:"Desserts",ic:"🍰"},{id:"drink",n:"Boissons",ic:"🍷"}],
+    items:[
+      {n:"Soupe à l'oignon gratinée",d:"Oignons caramélisés, croûtons, comté",p:850,cat:"entree",ic:"🧅",pop:true},
+      {n:"Foie gras maison",d:"Chutney de figues, brioche toastée",p:1450,cat:"entree",ic:"🦆"},
+      {n:"Moules-frites",d:"Moules marinières, frites maison",p:1650,cat:"plat",ic:"🦪",pop:true},
+      {n:"Fish & Chips",d:"Cabillaud pané, frites, sauce tartare",p:1550,cat:"plat",ic:"🐟"},
+      {n:"Magret de canard",d:"Sauce miel-épices, pommes sautées",p:1950,cat:"plat",ic:"🦆",pop:true},
+      {n:"Bœuf bourguignon",d:"Mijoté 4h, carottes, champignons",p:1750,cat:"plat",ic:"🥘"},
+      {n:"Profiteroles",d:"Glace vanille, sauce chocolat chaud",p:750,cat:"dessert",ic:"🍨",pop:true},
+      {n:"Crème brûlée",d:"Vanille de Madagascar",p:650,cat:"dessert",ic:"🍮"},
+      {n:"Verre de rouge",d:"Sélection du sommelier",p:550,cat:"drink",ic:"🍷"},
+      {n:"Café gourmand",d:"Expresso + 3 mini-desserts",p:750,cat:"drink",ic:"☕"}
+    ]
+  },
+  {
+    id:"sushi", name:"Sushi Wok", desc:"Sushis, maki & cuisine japonaise — poisson frais du jour",
+    rating:"4,9", eta:"30–40 min", feeCents:350, minCents:2000, emoji:"🍣",
+    cats:[{id:"maki",n:"Makís",ic:"🍣"},{id:"nigiri",n:"Nigiris",ic:"🍙"},{id:"box",n:"Box",ic:"🍱"},{id:"drink",n:"Boissons",ic:"🍵"}],
+    items:[
+      {n:"Maki Saumon (8pcs)",d:"Riz vinaigré, saumon frais",p:850,cat:"maki",ic:"🍣",pop:true},
+      {n:"California Rolls (8pcs)",d:"Crevette, avocat, mayonnaise japonaise",p:950,cat:"maki",ic:"🥑",pop:true},
+      {n:"Maki Thon (8pcs)",d:"Thon frais, riz vinaigré",p:900,cat:"maki",ic:"🐟"},
+      {n:"Dragon Roll (8pcs)",d:"Anguille grillée, avocat, sauce unagi",p:1250,cat:"maki",ic:"🐉"},
+      {n:"Nigiri Saumon (2pcs)",d:"Saumon frais, riz assaisonné",p:550,cat:"nigiri",ic:"🍙"},
+      {n:"Nigiri Thon (2pcs)",d:"Thon rouge, riz assaisonné",p:600,cat:"nigiri",ic:"🍙"},
+      {n:"Box Sushi 12pcs",d:"Sélection du chef : 12 pièces variées",p:1650,cat:"box",ic:"🍱",pop:true},
+      {n:"Box Maki 16pcs",d:"16 pièces : saumon, thon, california",p:1450,cat:"box",ic:"🍱",pop:true},
+      {n:"Thé vert",d:"Matcha ou jasmin",p:350,cat:"drink",ic:"🍵"},
+      {n:"Milk-shake mangue",d:"Fait maison",p:550,cat:"drink",ic:"🥭"}
+    ]
+  }
+];
+
+const state = { q:"", cat:"", resto:0 };
+let cart = [];            // [{id,restoId,item,qty}]
+let orderSeq = 1;
+
+const $ = id => document.getElementById(id);
+const fmt = c => (c/100).toFixed(2).replace(".",",")+" €";
+const resto = () => RESTOS[state.resto];
+const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+/* ── Persistance ── */
+function save(){
+  try{localStorage.setItem("ps-cart",JSON.stringify(cart));}catch(e){}
+}
+function load(){
+  try{const c=JSON.parse(localStorage.getItem("ps-cart")||"[]");
+    if(Array.isArray(c)&&c.length){cart=c.filter(x=>x&&x.item);renderAll();}
+  }catch(e){}
+  try{const s=localStorage.getItem("ps-orders");history=JSON.parse(s)||[];}catch(e){}
+  try{const n=parseInt(localStorage.getItem("ps-seq")||"1",10);orderSeq=n;}catch(e){}
+}
+let history = [];
+
+/* ── Cart helpers ── */
+function cartCount(){return cart.reduce((a,x)=>a+x.qty,0);}
+function cartTotal(){
+  return cart.reduce((a,x)=>{
+    const i=findItem(x.id);
+    return a+(i?i.p*x.qty:0);
+  },0);
+}
+function findItem(id){return resto().items.find(i=>i.n===id);}
+function cartQty(id){const x=cart.find(c=>c.id===id);return x?x.qty:0;}
+function add(id){
+  const x=cart.find(c=>c.id===id);
+  if(x)x.qty++;else cart.push({id,restoId:resto().id,qty:1});
+  save();renderAll();pulse();
+}
+function dec(id){
+  const x=cart.find(c=>c.id===id);if(!x)return;
+  x.qty--;if(x.qty<=0)cart=cart.filter(c=>c.id!==id);
+  save();renderAll();pulse();
+}
+function remove(id){cart=cart.filter(c=>c.id!==id);save();renderAll();}
+function clearCart(){cart=[];save();renderAll();}
+function pulse(){
+  const btn=$("ps-mbar");if(btn){btn.style.transition="transform .15s";btn.style.transform="scale(1.04)";
+    setTimeout(()=>{btn.style.transform="";},160);}
+}
+
+/* ── Fees ── */
+function feeCents(){
+  const t=cartTotal();if(t<=0)return 0;
+  return t>=2500?0:resto().feeCents;
+}
+
+/* ── Render : header/banner ── */
+function renderResto(){
+  const r=resto();
+  $("ps-resto-name").textContent=r.name;
+  $("ps-resto-title").textContent=r.name;
+  $("ps-resto-desc").textContent=r.desc;
+  $("ps-rate").textContent=r.rating;
+  $("ps-eta").textContent=r.eta;
+  $("ps-fee").textContent=(r.feeCents?fmt(r.feeCents):"Gratuit");
+  $("ps-min").textContent=fmt(r.minCents);
+  $("ps-banner").style.background="linear-gradient(135deg,#0f9d58 0%,#06C167 45%,#21d97e 100%)";
+}
+
+/* ── Render : categories ── */
+function renderCats(){
+  const r=resto();
+  const q=state.q;
+  const html=r.cats.map(c=>{
+    const active=state.cat===c.id?" active":"";
+    return `<button class="ps-cat${active}" onclick="setCat('${c.id}')">${c.ic} ${esc(c.n)}</button>`;
+  }).join("");
+  $("ps-cats").innerHTML=q?'':html;
+  if(q)$("ps-cats").innerHTML="";
+}
+function setCat(id){state.cat=state.cat===id?"":id;renderCats();renderGrid();}
+
+/* ── Render : grid ── */
+function renderGrid(){
+  const r=resto();
+  const q=state.q;
+  const catName=id=>{const c=r.cats.find(x=>x.id===id);return c?c.n:"";};
+  const list=r.items.filter(i=>{
+    if(state.cat&&i.cat!==state.cat)return false;
+    if(q){const s=(i.n+" "+(i.d||"")+" "+catName(i.cat)).toLowerCase();if(s.indexOf(q)<0)return false;}
+    return true;
+  });
+  const grid=$("ps-grid");grid.innerHTML="";
+  $("ps-empty").style.display=list.length?"none":"block";
+  list.forEach(i=>{
+    const card=document.createElement("div");
+    card.className="ps-card";
+    card.innerHTML=`
+      <div class="ps-card__img">${i.ic}
+        ${i.pop?'<span class="ps-card__badge">⭐ Populaire</span>':''}
+      </div>
+      <div class="ps-card__body">
+        <div class="ps-card__name">${esc(i.n)}</div>
+        <div class="ps-card__desc">${esc(i.d||"")}</div>
+        <div class="ps-card__foot">
+          <div class="ps-card__price">${fmt(i.p)}</div>
+          ${renderQty(i)}
+        </div>
+      </div>`;
+    grid.appendChild(card);
+  });
+}
+function renderQty(i){
+  const q=cartQty(i.n);
+  if(q>0)return `<div class="ps-stepper">
+      <button onclick="dec('${i.n.replace(/'/g,"\\'")}')">−</button>
+      <span class="n">${q}</span>
+      <button onclick="add('${i.n.replace(/'/g,"\\'")}')">+</button>
+    </div>`;
+  return `<button class="ps-add" onclick="add('${i.n.replace(/'/g,"\\'")}')">+</button>`;
+}
+
+/* ── Render : cart rows (shared desktop sheet) ── */
+function cartRowHTML(x){
+  const i=findItem(x.id);if(!i)return "";
+  return `
+    <div class="ps-ci">
+      <div class="ps-ci__img">${i.ic}</div>
+      <div class="ps-ci__info">
+        <div class="ps-ci__name">${esc(i.n)}</div>
+        <div class="ps-ci__unit">${fmt(i.p)} / unité</div>
+      </div>
+      <div class="ps-ci__actions">
+        <div class="ps-stepper">
+          <button onclick="dec('${x.id.replace(/'/g,"\\'")}')">−</button>
+          <span class="n">${x.qty}</span>
+          <button onclick="add('${x.id.replace(/'/g,"\\'")}')">+</button>
+        </div>
+        <button class="ps-ci__del" title="Retirer" onclick="remove('${x.id.replace(/'/g,"\\'")}')">🗑</button>
+      </div>
+      <div class="ps-ci__line">${fmt(i.p*x.qty)}</div>
+    </div>`;
+}
+function renderCartItems(){
+  const t=cartTotal();
+  const empty=`<div class="ps-cart__empty"><div class="big">🛒</div>Votre panier est vide<br><span style="font-size:12px">Ajoutez des plats pour commencer</span></div>`;
+  const itemsEls=$("ps-cart-items"),sheetEls=$("ps-sheet-items");
+  const rows=cart.map(cartRowHTML).join("");
+  itemsEls.innerHTML=cart.length?rows:empty;
+  sheetEls.innerHTML=cart.length?rows:empty;
+  $("ps-cart-count").textContent=cartCount()+" article"+(cartCount()>1?"s":"");
+  $("ps-mbar-count").textContent=cartCount()+" article"+(cartCount()>1?"s":"");
+  $("ps-mbar-total").textContent=fmt(t);
+  $("ps-mbar").style.display=cartCount()>0?"block":"none";
+}
+function renderCartFoot(){
+  const t=cartTotal();const f=feeCents();
+  const canOrder=t>0&&t>=resto().minCents;
+  const foot=`
+    <div class="ps-row"><span>Sous-total</span><b>${fmt(t)}</b></div>
+    <div class="ps-row ${f===0?"free":""}"><span>Livraison</span><b>${f===0?"GRATUITE":fmt(f)}</b></div>
+    <div class="ps-row tot"><span>TOTAL</span><span>${fmt(t+f)}</span></div>
+    <button class="ps-btn" onclick="openCheckout()" ${canOrder?"":"disabled"}>
+      <span>💰 Encaisser</span><span class="ps-btn__sub">${fmt(t+f)}</span>
+    </button>
+    ${t>0&&t<resto().minCents?`<div style="text-align:center;font-size:11.5px;color:#d0021b;margin-top:8px">Minimum de commande : ${fmt(resto().minCents)} (il manque ${fmt(resto().minCents-t)})</div>`:""}
+  `;
+  $("ps-cart-foot").innerHTML=foot;
+  $("ps-sheet-foot").innerHTML=foot;
+}
+function renderAll(){renderResto();renderCats();renderGrid();renderCartItems();renderCartFoot();}
+
+/* ── Sheet (mobile) ── */
+function openSheet(){$("ps-sheet").classList.add("open");$("ps-sheet-overlay").classList.add("open");}
+function closeSheet(){$("ps-sheet").classList.remove("open");$("ps-sheet-overlay").classList.remove("open");}
+
+/* ── Checkout ── */
+let payMode="especes",lastOrder=null;
+function openCheckout(){
+  const t=cartTotal();const f=feeCents();const total=t+f;
+  if(!cart.length){toast("Panier vide");return;}
+  const html=`
+    <div class="ps-modal-overlay" id="ps-co-overlay" onclick="if(event.target===this)closeModal('ps-co-overlay')">
+      <div class="ps-modal">
+        <h2>💰 Encaissement</h2>
+        <div class="sub">${resto().name} — ${fmt(total)}</div>
+        <div class="ps-pay-mode" id="ps-pay-mode">
+          <button data-m="especes" class="active" onclick="setMode('especes')">💵 Espèces</button>
+          <button data-m="cb" onclick="setMode('cb')">💳 Carte</button>
+          <button data-m="mixte" onclick="setMode('mixte')">🔀 Mixte</button>
+        </div>
+        <div id="ps-pay-body"></div>
+        <div class="sum">
+          <div class="r"><span>Sous-total</span><span>${fmt(t)}</span></div>
+          <div class="r"><span>Livraison</span><span>${f===0?"Gratuite":fmt(f)}</span></div>
+          <div class="r t"><span>TOTAL À ENCAISSER</span><span>${fmt(total)}</span></div>
+        </div>
+        <div class="ps-btn-row">
+          <button class="ps-btn ghost" onclick="closeModal('ps-co-overlay')">Annuler</button>
+          <button class="ps-btn" id="ps-pay-ok" onclick="payOrder()">✅ Valider</button>
+        </div>
+      </div>
+    </div>`;
+  $("ps-modals").innerHTML=html;
+  renderPayBody();
+}
+function setMode(m){
+  payMode=m;
+  document.querySelectorAll("#ps-pay-mode button").forEach(b=>{
+    b.classList.toggle("active",b.dataset.m===m);
+  });
+  renderPayBody();
+}
+function renderPayBody(){
+  const total=cartTotal()+feeCents();
+  const body=$("ps-pay-body");if(!body)return;
+  let html="";
+  if(payMode==="especes"){
+    html=`
+      <div class="ps-field">
+        <label>Montant reçu (€)</label>
+        <input id="ps-cash" type="number" step="0.01" min="0" inputmode="decimal" placeholder="0,00" oninput="updateChange()" onfocus="this.select()">
+      </div>
+      <div class="ps-quick">
+        <button onclick="setCash(${total})">Exact</button>
+        <button onclick="setCash(500)">5 €</button>
+        <button onclick="setCash(1000)">10 €</button>
+        <button onclick="setCash(2000)">20 €</button>
+        <button onclick="setCash(5000)">50 €</button>
+      </div>
+      <div class="ps-change" id="ps-change-line"></div>`;
+  }else if(payMode==="cb"){
+    html=`
+      <div class="ps-field" style="text-align:center;padding:14px 0 6px">
+        <div style="font-size:44px">💳</div>
+        <div style="font-size:13.5px;color:#757575;margin-top:8px">CB à encaisser : <b style="color:#1c1c1c">${fmt(total)}</b><br>Réglez via le terminal bancaire</div>
+      </div>`;
+  }else{
+    html=`
+      <div class="ps-field">
+        <label>Part espèces (€)</label>
+        <input id="ps-cash" type="number" step="0.01" min="0" inputmode="decimal" placeholder="0,00" oninput="updateChange()" onfocus="this.select()">
+      </div>
+      <div class="ps-change" id="ps-change-line" style="color:#1565c0">Reste à régler par carte : <b>${fmt(total)}</b></div>`;
+  }
+  body.innerHTML=html;
+  if(payMode==="especes")setTimeout(()=>{const c=$("ps-cash");if(c)c.focus();},80);
+}
+function setCash(v){const c=$("ps-cash");if(c){c.value=(v/100).toFixed(2);updateChange();}}
+function updateChange(){
+  const c=$("ps-cash");if(!c)return;
+  const total=cartTotal()+feeCents();
+  const rec=Math.round((parseFloat(c.value)||0)*100);
+  const line=$("ps-change-line");if(!line)return;
+  if(payMode==="especes"){
+    if(rec>=total)line.textContent="Rendu : "+fmt(rec-total);
+    else line.textContent="Il manque "+fmt(total-rec);
+    line.style.color=rec>=total?"#059c54":"#d0021b";
+  }else{
+    const rest=total-rec;
+    line.innerHTML="Reste à régler par carte : <b>"+fmt(Math.max(0,rest))+"</b>";
+    line.style.color="#1565c0";
+  }
+}
+function payOrder(){
+  const total=cartTotal()+feeCents();
+  let payment="";
+  if(payMode==="especes"){
+    const c=$("ps-cash");const rec=Math.round((parseFloat(c&&c.value)||0)*100);
+    if(rec<total){toast("Montant insuffisant");return;}
+    payment="💵 Espèces ("+fmt(rec)+") — rendu "+fmt(rec-total);
+  }else if(payMode==="cb"){
+    payment="💳 Carte ("+fmt(total)+")";
+  }else{
+    const c=$("ps-cash");const rec=Math.round((parseFloat(c&&c.value)||0)*100);
+    if(rec<0||rec>total){toast("Montant espèces invalide");return;}
+    payment="🔀 "+fmt(rec)+" espèces + "+fmt(total-rec)+" carte";
+  }
+  const order={
+    num:orderSeq++,
+    resto:resto().name,
+    restoId:resto().id,
+    time:new Date().toLocaleString("fr-FR"),
+    items:cart.map(x=>({n:findItem(x.id)&&findItem(x.id).n,ic:findItem(x.id)&&findItem(x.id).ic,qty:x.qty,line:(findItem(x.id)&&findItem(x.id).p*x.qty)})),
+    total:total,
+    payment:payment,
+    eta:resto().eta
+  };
+  lastOrder=order;
+  history.unshift(order);
+  try{localStorage.setItem("ps-orders",JSON.stringify(history));localStorage.setItem("ps-seq",String(orderSeq));}catch(e){}
+  closeModal("ps-co-overlay");
+  clearCart();
+  showSuccess(order);
+}
+function showSuccess(o){
+  const itemsHTML=o.items.map(it=>`
+    <div class="rc-line"><span class="l">${it.ic} ${esc(it.n)} <span class="ps-rc-qty">×${it.qty}</span></span><span>${fmt(it.line)}</span></div>`).join("");
+  const html=`
+    <div class="ps-modal-overlay">
+      <div class="ps-modal" style="width:380px">
+        <div class="ps-success">
+          <div class="ps-success__check">✓</div>
+          <h2>Commande enregistrée !</h2>
+          <div class="ticket">Ticket n° ${String(o.num).padStart(4,"0")}</div>
+          <div class="eta">Livraison estimée : <b>${o.eta}</b></div>
+        </div>
+        <div class="ps-receipt" id="ps-receipt">
+          <div class="rc-head"><b>${esc(o.resto)}</b>PostSystem — ${o.time}<div class="rc-sep"></div></div>
+          ${itemsHTML}
+          <div class="rc-sep"></div>
+          <div class="rc-line"><span class="l">Total</span><b>${fmt(o.total)}</b></div>
+          <div class="rc-line"><span class="l">${o.payment}</span><span></span></div>
+          <div class="rc-sep"></div>
+          <div style="text-align:center;color:#059c54;font-weight:700">Merci de votre commande !</div>
+        </div>
+        <div class="ps-btn-row">
+          <button class="ps-btn ghost" onclick="printReceipt()">🖨️ Imprimer</button>
+          <button class="ps-btn" onclick="closeModal()">✅ Nouvelle commande</button>
+        </div>
+      </div>
+    </div>`;
+  $("ps-modals").innerHTML=html;
+}
+function printReceipt(){
+  const r=$("ps-receipt");if(!r)return;
+  const win=window.open("","_blank","width=320,height=560");
+  if(!win){toast("Bloqué par le navigateur");return;}
+  win.document.write(`<html><head><title>Ticket ${String(lastOrder.num).padStart(4,"0")}</title></head>
+    <body style="font-family:monospace;font-size:13px;margin:16px">${r.innerHTML}</body></html>`);
+  win.document.close();win.print();
+}
+
+/* ── History ── */
+function openHistory(){
+  const rows=history.length?history.map(o=>`
+    <button class="ps-hist-item" onclick="showOrderDetail(${o.num})">
+      <div class="ic">🧾</div>
+      <div class="in"><b>${esc(o.resto)}</b><span>${o.time} — ${o.items.length} article${o.items.length>1?"s":""}</span></div>
+      <div class="tl">${fmt(o.total)}</div>
+    </button>`).join(""):
+    `<div class="ps-hist-empty">🕘<br>Aucune commande pour l'instant<br><span style="font-size:12px">Les commandes encaissées apparaîtront ici</span></div>`;
+  const html=`
+    <div class="ps-modal-overlay" onclick="if(event.target===this)closeModal('ps-hist-overlay')">
+      <div class="ps-modal" id="ps-hist-overlay">
+        <h2>🕘 Historique</h2>
+        <div class="sub">${history.length} commande${history.length>1?"s":""} — PostSystem</div>
+        ${rows}
+      </div>
+    </div>`;
+  $("ps-modals").innerHTML=html;
+}
+function showOrderDetail(num){
+  const o=history.find(h=>h.num===num);if(!o)return;
+  const itemsHTML=o.items.map(it=>`
+    <div class="rc-line"><span class="l">${it.ic} ${esc(it.n)} <span class="ps-rc-qty">×${it.qty}</span></span><span>${fmt(it.line)}</span></div>`).join("");
+  const html=`
+    <div class="ps-modal-overlay" onclick="if(event.target===this)closeModal()">
+      <div class="ps-modal">
+        <h2>🧾 Ticket n° ${String(o.num).padStart(4,"0")}</h2>
+        <div class="sub">${esc(o.resto)} — ${o.time}</div>
+        <div class="ps-receipt">${itemsHTML}<div class="rc-sep"></div>
+          <div class="rc-line"><span class="l">Total</span><b>${fmt(o.total)}</b></div>
+          <div class="rc-line"><span class="l">${o.payment}</span><span></span></div>
+        </div>
+        <button class="ps-btn" onclick="closeModal()">Fermer</button>
+      </div>
+    </div>`;
+  $("ps-modals").innerHTML=html;
+}
+
+/* ── Resto switch ── */
+function switchResto(){
+  const html=RESTOS.map((r,i)=>`
+    <button class="ps-hist-item" onclick="selectResto(${i})">
+      <div class="ic" style="background:#e8fdf0">${r.emoji}</div>
+      <div class="in"><b>${esc(r.name)}</b><span>⭐ ${r.rating} — ${r.eta}</span></div>
+      <div class="tl">🛵</div>
+    </button>`).join("");
+  $("ps-modals").innerHTML=`
+    <div class="ps-modal-overlay" onclick="if(event.target===this)closeModal()">
+      <div class="ps-modal">
+        <h2>🏪 Choisir un restaurant</h2>
+        <div class="sub">Tous les restaurants utilisent le même PostSystem</div>
+        ${html}
+      </div>
+    </div>`;
+}
+function selectResto(i){
+  state.resto=i;state.cat="";
+  clearCart();closeModal();renderAll();
+  toast("🏪 "+RESTOS[i].name);
+}
+
+/* ── Modal helpers ── */
+function closeModal(id){$("ps-modals").innerHTML="";}
+function toast(msg){
+  const t=document.createElement("div");
+  t.textContent=msg;
+  t.style.cssText="position:fixed;left:50%;bottom:110px;transform:translateX(-50%);background:#1c1c1c;color:#fff;padding:11px 20px;border-radius:9999px;font-size:14px;font-weight:600;z-index:9999;box-shadow:0 8px 24px rgba(0,0,0,.25);opacity:0;transition:opacity .2s,transform .2s;max-width:90vw;text-align:center";
+  document.body.appendChild(t);
+  requestAnimationFrame(()=>{t.style.opacity="1";});
+  setTimeout(()=>{t.style.opacity="0";t.style.transform="translateX(-50%) translateY(6px)";setTimeout(()=>t.remove(),250);},2200);
+}
+
+/* ── Boot ── */
+load();
+renderAll();
+document.addEventListener("keydown",e=>{
+  if(e.key==="Escape")closeModal();
+});
+</script>
+</body>
+</html>

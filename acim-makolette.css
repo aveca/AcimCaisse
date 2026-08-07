@@ -640,6 +640,19 @@
   padding: 0 6px;
 }
 
+.mk-cart-fab__total {
+  margin-left: 4px;
+  font-size: 15px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.mk-cart-fab__label {
+  font-size: 15px;
+  font-weight: 600;
+  opacity: 0.95;
+}
+
 .mk-cart-fab--empty {
   display: none;
 }

@@ -59,6 +59,17 @@ async function assertOk(name, cond, detail) {
     await assertOk('POS loads', false, String(e.message || e));
   }
 
+  // PR C — operator login modal blocks pointer events; auto-login with default admin PIN
+  try {
+    const loginVisible = await page.locator('#acim-login').isVisible().catch(() => false);
+    if (loginVisible) {
+      await page.locator('#acim-login input[type=password]').fill('1234');
+      await page.locator('#acim-login button').last().click();
+      await page.waitForTimeout(900);
+      log('  Login: default admin PIN 1234');
+    }
+  } catch (e) { /* non-fatal */ }
+
   // ============================================================
   // 2. Add product to cart (click first visible card)
   // ============================================================

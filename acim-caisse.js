@@ -834,6 +834,24 @@
     }return info;
   }
   function _removeFromCart(idx){_myCart.splice(idx,1);_renderPOS();}
+  function _incrementCartItem(idx){
+    var it=_myCart[idx];if(!it)return;
+    var unit=it.unitCents||it.priceCents;
+    it.unitCents=unit;
+    it.qty=(it.qty||1)+1;
+    it.priceCents=unit*it.qty;
+    _renderPOS();
+  }
+  function _decrementCartItem(idx){
+    var it=_myCart[idx];if(!it)return;
+    var q=(it.qty||1)-1;
+    if(q<1){_removeFromCart(idx);return;}
+    var unit=it.unitCents||it.priceCents;
+    it.unitCents=unit;
+    it.qty=q;
+    it.priceCents=unit*q;
+    _renderPOS();
+  }
   function _cartSubtotal(){
     var t=0;for(var i=0;i<_myCart.length;i++)t+=_myCart[i].priceCents;return t;
   }
@@ -1062,7 +1080,7 @@
     var fab=document.createElement("button");
     fab.className="mk-cart-fab hidden";
     fab.id="acim-cart-fab";
-    fab.innerHTML='<span class="mk-cart-fab__icon">🛒</span><span>Panier</span><span class="mk-cart-fab__count" id="acim-cart-fab-count">0</span>';
+    fab.innerHTML='<span class="mk-cart-fab__icon">🛒</span><span class="mk-cart-fab__label">Panier</span><span class="mk-cart-fab__count" id="acim-cart-fab-count">0</span><span class="mk-cart-fab__total" id="acim-cart-fab-total">0,00 \u20AC</span>';
     fab.onclick=function(){_openCartSheet();};
     _pos.appendChild(fab);
 
@@ -1259,13 +1277,41 @@
     var total=_cartTotal();
     if(count>0){
       fab.classList.remove("hidden");
-      document.getElementById("acim-cart-fab-count").textContent=count;
-      document.getElementById("acim-cart-fab-total").textContent=(total/100).toFixed(2).replace(".",",")+" \u20AC";
+      var cEl=document.getElementById("acim-cart-fab-count");if(cEl)cEl.textContent=count;
+      var tEl=document.getElementById("acim-cart-fab-total");if(tEl)tEl.textContent=(total/100).toFixed(2).replace(".",",")+" \u20AC";
     }else{
       fab.classList.add("hidden");
     }
   }
 
+  function _toggleSort(){
+    _sortMode=_sortMode==="smart"?"alpha":(_sortMode==="alpha"?"price":"smart");
+    _filterProducts();
+    var btn=document.querySelector(".mk-products__sort");
+    if(btn)btn.textContent=_sortMode==="smart"?"⇅ Trier":(_sortMode==="alpha"?"⇅ A→Z":"⇅ Prix");
+    _toast("Tri : "+(_sortMode==="smart"?"pertinence":(_sortMode==="alpha"?"alphabétique":"par prix")));
+  }
+
+  function _toggleVoiceSearch(){
+    var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+    if(!SR){_toast("Recherche vocale non supportée par ce navigateur");return;}
+    var vBtn=document.getElementById("mk-search-voice");
+    var rec=new SR();
+    rec.lang="fr-FR";
+    rec.interimResults=false;
+    rec.maxAlternatives=1;
+    rec.onstart=function(){if(vBtn)vBtn.classList.add("mk-search__voice--listening");};
+    rec.onend=function(){if(vBtn)vBtn.classList.remove("mk-search__voice--listening");};
+    rec.onresult=function(ev){
+      var txt="";
+      for(var i=0;i<ev.results.length;i++)txt+=ev.results[i][0].transcript;
+      if(txt){_posSearch.value=txt.trim();_filterProducts();_toast("🔊 "+txt.trim());}
+    };
+    rec.onerror=function(){if(vBtn)vBtn.classList.remove("mk-search__voice--listening");_toast("Micro indisponible");};
+    try{rec.start();_toast("🎤 Parlez...");}catch(e){if(vBtn)vBtn.classList.remove("mk-search__voice--listening");_toast("Micro indisponible");}
+  }
+
+  var _sortMode="smart";
   function _filterProducts(){
     var q=(_posSearch.value||"").toLowerCase();
     _filteredProducts=_allProducts.filter(function(p){
@@ -1274,6 +1320,8 @@
       return true;
     });
     _filteredProducts.sort(function(a,b){
+      if(_sortMode==="alpha")return(a.name||"").localeCompare(b.name||"");
+      if(_sortMode==="price")return((b.sale_price_cents||0)-(a.sale_price_cents||0))||(a.name||"").localeCompare(b.name||"");
       var aPriced=(a.sale_price_cents||0)>0?1:0;
       var bPriced=(b.sale_price_cents||0)>0?1:0;
       if(aPriced!==bPriced)return bPriced-aPriced;
@@ -1290,6 +1338,8 @@
 
   function _renderGrid(){
     _posGrid.innerHTML="";
+    var countEl=document.getElementById("mk-products-count");
+    if(countEl)countEl.textContent=_filteredProducts.length+" produit"+( _filteredProducts.length!==1?"s":"");
     if(_filteredProducts.length===0){
       _posGrid.innerHTML='<div class="mk-empty"><div class="mk-empty__icon">🔍</div><div class="mk-empty__title">Aucun produit</div><div class="mk-empty__text">Aucun produit ne correspond à votre recherche</div></div>';
       return;
@@ -1416,10 +1466,12 @@
     _posSubtotal.textContent=(subtotal/100).toFixed(2).replace(".",",")+" \u20AC";
     _posTotal.textContent=(total/100).toFixed(2).replace(".",",")+" \u20AC";
     var discRow=document.getElementById("acim-disc-row");
-    if(_cartDiscountCents>0){
-      discRow.style.display="flex";
-      _posDiscount.textContent="-"+(_cartDiscountCents/100).toFixed(2).replace(".",",")+" \u20AC";
-    }else{discRow.style.display="none";}
+    if(discRow&&_posDiscount){
+      if(_cartDiscountCents>0){
+        discRow.style.display="flex";
+        _posDiscount.textContent="-"+(_cartDiscountCents/100).toFixed(2).replace(".",",")+" \u20AC";
+      }else{discRow.style.display="none";}
+    }
 
     // Update cart FAB (mobile)
     _updateCartFAB();
@@ -1427,12 +1479,12 @@
     // Render into mobile sheet
     _posItems.innerHTML="";
     if(info.length===0){
-      _posItems.innerHTML='<div class="acim-sheet-empty">\uD83D\uDED2 Panier vide</div>';
+      _posItems.innerHTML='<div class="mk-sheet__empty"><div class="mk-sheet__empty-icon">🛒</div><div class="mk-sheet__empty-title">Panier vide</div></div>';
       _posCheckout.textContent="\uD83D\uDCB0 Encaisser (0,00 \u20AC)";
-      _posCheckout.style.opacity="0.5";
+      _posCheckout.disabled=true;
     }else{
       _posCheckout.textContent="\uD83D\uDCB0 Encaisser "+(total/100).toFixed(2).replace(".",",")+" \u20AC";
-      _posCheckout.style.opacity="1";
+      _posCheckout.disabled=false;
     }
 
     // Render into desktop cart
@@ -1441,7 +1493,7 @@
     if(dcItems){
       dcItems.innerHTML="";
       if(info.length===0){
-        dcItems.innerHTML='<div class="acim-sheet-empty">\uD83D\uDED2 Panier vide</div>';
+        dcItems.innerHTML='<div class="mk-sheet__empty"><div class="mk-sheet__empty-icon">🛒</div><div class="mk-sheet__empty-title">Panier vide</div></div>';
       }
     }
 
@@ -1451,12 +1503,12 @@
         var row=document.createElement("div");
         var isZero=it.price===0;
         var isWeighed=_isWeightProduct(it);
-        row.className="acim-sheet-item";
+        row.className="mk-sheet__item";
         row.onclick=function(){_inlineEdit(it.idx,50,50);};
 
         var icon=document.createElement("div");
-        icon.className="acim-sheet-item-icon";
-        icon.style.cssText="width:40px;height:40px;border-radius:8px;overflow:hidden;flex-shrink:0;background:"+( _catBg[it.cat||"autre"]||"#f5f5f5");
+        icon.className="mk-sheet__item-image";
+        icon.style.cssText="width:56px;height:56px;border-radius:12px;overflow:hidden;flex-shrink:0;background:"+( _catBg[it.cat||"autre"]||"#f5f5f5");
         // Try to show product image from cache or generate SVG
         var imgEl=document.createElement("img");
         imgEl.style.cssText="width:100%;height:100%;object-fit:cover;";
@@ -1477,76 +1529,132 @@
         row.appendChild(icon);
 
         var infoDiv=document.createElement("div");
-        infoDiv.className="acim-sheet-item-info";
+        infoDiv.className="mk-sheet__item-info";
         var nm=document.createElement("div");
-        nm.className="acim-sheet-item-name";
-        nm.style.color=isZero?"var(--acim-orange)":"";
+        nm.className="mk-sheet__item-name";
+        nm.style.color=isZero?"var(--mk-accent)":"";
         nm.textContent=isZero?"\u270F\uFE0F "+it.name:it.name;
         infoDiv.appendChild(nm);
-
-        if(isWeighed&&it.weight!=null){
+if(isWeighed&&it.weight!=null){
           var wLine=document.createElement("div");
-          wLine.className="acim-sheet-item-weight";
+          wLine.className="mk-sheet__item-weight";
           wLine.textContent=_formatWeight(it.weight,it.unitType)+" \u00D7 "+_formatPricePerUnit(it.pricePerUnit,it.unitType);
           infoDiv.appendChild(wLine);
         }
 
         if(it.price>0){
           var pr=document.createElement("div");
-          pr.className="acim-sheet-item-price";
+          pr.className="mk-sheet__item-price";
           pr.textContent=(it.price/100).toFixed(2).replace(".",",")+" \u20AC";
           infoDiv.appendChild(pr);
         }
         row.appendChild(infoDiv);
 
         var actions=document.createElement("div");
-        actions.className="acim-sheet-item-actions";
+        actions.className="mk-sheet__item-actions";
 
         var dupBtn=document.createElement("button");
-        dupBtn.className="acim-sheet-item-btn";
+        dupBtn.className="mk-sheet__qty-btn";
         dupBtn.innerHTML="\u27F3";
         dupBtn.title="Ajouter encore";
         dupBtn.onclick=function(e){e.stopPropagation();_addToCart(it.name,it.price,it.bc,it.cat,it.weight,it.unitType,it.pricePerUnit);};
         actions.appendChild(dupBtn);
 
+        var qtyWrap=document.createElement("div");
+        qtyWrap.className="mk-sheet__qty";
+
+        var decBtn=document.createElement("button");
+        decBtn.className="mk-sheet__qty-btn";
+        decBtn.innerHTML="\u2212";
+        decBtn.onclick=function(e){e.stopPropagation();_decrementCartItem(it.idx);};
+        qtyWrap.appendChild(decBtn);
+
+        var qtyVal=document.createElement("span");
+        qtyVal.className="mk-sheet__qty-value";
+        qtyVal.textContent=it.qty||1;
+        qtyWrap.appendChild(qtyVal);
+
+        var incBtn=document.createElement("button");
+        incBtn.className="mk-sheet__qty-btn";
+        incBtn.innerHTML="+";
+        incBtn.onclick=function(e){e.stopPropagation();_incrementCartItem(it.idx);};
+        qtyWrap.appendChild(incBtn);
+
+        actions.appendChild(qtyWrap);
+
         var delBtn=document.createElement("button");
-        delBtn.className="acim-sheet-item-btn danger";
-        delBtn.innerHTML="\u2715";
-        delBtn.title="Supprimer";
-        delBtn.onclick=function(e){e.stopPropagation();_removeFromCart(it.idx);_toast("Supprim\u00E9");};
+        delBtn.className="mk-sheet__remove";
+        delBtn.innerHTML="\uD83D\uDDD1\uFE0F";
+        delBtn.onclick=function(e){e.stopPropagation();_removeFromCart(it.idx);};
         actions.appendChild(delBtn);
 
         row.appendChild(actions);
+
         return row;
       }
 
-      // Append to mobile sheet
+      // Mobile sheet
       _posItems.appendChild(buildRow(item));
-      // Append to desktop cart
+
+      // Desktop cart
       if(dcItems){
         dcItems.appendChild(buildRow(item));
       }
     });
 
-    // Render desktop footer
+    // Update subtitles
+    var subTitle=document.getElementById("mk-sheet-subtitle");
+    if(subTitle)subTitle.textContent=info.length+" article"+(info.length!==1?"s":"");
+    var dcHeader=document.querySelector(".mk-desktop-cart__header");
+    if(dcHeader){
+      var dcCount=document.getElementById("acim-pos-count");
+      if(dcCount)dcCount.textContent=info.length+" article"+(info.length!==1?"s":"");
+    }
+
+    // Update desktop footer
     if(dcFooter){
       dcFooter.innerHTML='';
       var subR=document.createElement("div");
-      subR.className="acim-sheet-row";
-      subR.innerHTML='<span class="acim-sheet-row-label">Sous-total</span><span class="acim-sheet-row-value">'+(subtotal/100).toFixed(2).replace(".",",")+" \u20AC</span>";
+      subR.className="mk-sheet__row";
+      subR.innerHTML='<span class="mk-sheet__row-label">Sous-total</span>';
+      var dcSubtotal=document.createElement("span");
+      dcSubtotal.className="mk-sheet__row-value";
+      dcSubtotal.textContent=(subtotal/100).toFixed(2).replace(".",",")+" \u20AC";
+      subR.appendChild(dcSubtotal);
       dcFooter.appendChild(subR);
-      if(_cartDiscountCents>0){
-        var discR=document.createElement("div");
-        discR.className="acim-sheet-row discount";
-        discR.innerHTML='<span class="acim-sheet-row-label">Remise</span><span class="acim-sheet-row-value">-'+(_cartDiscountCents/100).toFixed(2).replace(".",",")+" \u20AC</span>";
-        dcFooter.appendChild(discR);
-      }
-      var totR=document.createElement("div");
-      totR.className="acim-sheet-total";
-      totR.innerHTML='<span class="acim-sheet-total-label">TOTAL</span><span class="acim-sheet-total-value">'+(total/100).toFixed(2).replace(".",",")+" \u20AC</span>";
-      dcFooter.appendChild(totR);
+
+      var dcDisc=document.createElement("div");
+      dcDisc.id="acim-disc-row";
+      dcDisc.className="mk-sheet__row mk-sheet__row--discount";
+      dcDisc.style.display="none";
+      dcDisc.innerHTML='<span class="mk-sheet__row-label">Remise</span>';
+      var dcDiscVal=document.createElement("span");
+      dcDiscVal.className="mk-sheet__row-value";
+      dcDiscVal.textContent="-0,00 \u20AC";
+      dcDisc.appendChild(dcDiscVal);
+      dcFooter.appendChild(dcDisc);
+
+      var dcDiscBtn=document.createElement("button");
+      dcDiscBtn.textContent="Appliquer une remise";
+      dcDiscBtn.style.cssText="margin-top:8px;width:100%;padding:10px;border:1px solid var(--mk-border);border-radius:8px;background:var(--mk-bg);font-size:14px;cursor:pointer;";
+      dcDiscBtn.onclick=function(){_applyTicketDiscount();};
+      dcFooter.appendChild(dcDiscBtn);
+
+      var dcTotal=document.createElement("div");
+      dcTotal.className="mk-sheet__total";
+      var dcLabel=document.createElement("span");
+      dcLabel.className="mk-sheet__total-label";
+      dcLabel.textContent="TOTAL";
+      var dcTotalVal=document.createElement("span");
+      dcTotalVal.className="mk-sheet__total-value";
+      dcTotalVal.textContent=(total/100).toFixed(2).replace(".",",")+" \u20AC";
+      dcTotal.appendChild(dcLabel);
+      dcTotal.appendChild(dcTotalVal);
+      dcFooter.appendChild(dcTotal);
+
       var dcCheckout=document.createElement("button");
-      dcCheckout.className="acim-sheet-checkout";
+      dcCheckout.className="mk-btn mk-btn--primary";
+      dcCheckout.style.cssText="width:100%;margin-top:12px;";
       dcCheckout.textContent="\uD83D\uDCB0 Encaisser "+(total/100).toFixed(2).replace(".",",")+" \u20AC";
       dcCheckout.onclick=function(){_startPayment();};
       dcFooter.appendChild(dcCheckout);
@@ -1886,6 +1994,15 @@
       //    risk invalidating the transaction context on some browsers).
       var decProbes=[];
       var i=0;
+      // Pre-compute total demand per barcode so insufficient-stock aborts the
+      // whole TX (all-or-nothing) instead of degrading stock line by line.
+      var demandMap={};
+      saleItems.forEach(function(it){
+        if(!it.bc)return;
+        var amt=(_isWeightProduct(it)&&it.weight!=null)?it.weight:(it.qty||1);
+        demandMap[it.bc]=(demandMap[it.bc]||0)+amt;
+      });
+      var seenBc={};
       function processItem(){
         if(i>=saleItems.length){ afterItems(); return; }
         var it=saleItems[i++];
@@ -1902,21 +2019,21 @@
           }
           var cur=(p.stockQty||0);
           var next=cur-amount;
-          // Allow sale if stock is 0 (unmanaged/demo) — only block if stock > 0 and insufficient
-          if(cur>0 && next<0){
-            var unit=(p.unitType||"unit");
-            var isKg=(unit==="kg"||unit==="g"||unit==="L");
+          var totalDemand=demandMap[it.bc]||0;
+          // Allow sale if stock is 0 (unmanaged/demo) — only block if stock > 0 and total demand exceeds it.
+          if(cur>0 && !seenBc[it.bc] && cur-totalDemand<0){
             try{tx.abort();}catch(_){}
-            _toast("⚠️ Stock insuffisant: "+it.name+" (reste "+cur+", demandé "+amount+")");
+            _toast("⚠️ Stock insuffisant: "+it.name+" (reste "+cur+", demandé "+totalDemand+")");
             return;
           }
+          seenBc[it.bc]=true;
           // If stock is 0, don't decrement (treat as unmanaged stock — sale allowed)
           if(cur>0){
             p.stockQty=next;
             p.last_updated=Date.now();
             sProd.put(p);
           }
-          // Audit STOCK_DECREMENT within the same TX.
+          // Audit STOCK_DECREMENT within the same TX (only when stock was actually decremented).
           try{
             window._acimAudit.logInTx(tx,{
               type:window._acimAudit.TYPE.STOCK_DECREMENT,
@@ -1925,7 +2042,7 @@
               action:"decrement",
               payload:{barcode:it.bc,amount:amount,reason:"sale"},
               previousState:{stockQty:cur},
-              newState:{stockQty:next}
+              newState:{stockQty:cur>0?next:cur}
             });
           }catch(e){
             _err("Audit STOCK_DECREMENT append failed — aborting TX:",e);
@@ -5470,14 +5587,21 @@ idealItems.forEach(function(item, index){
       var matches=[];
       for(var i=0;i<all.length;i++){var p=all[i];
         var n=(p.name||"").toLowerCase();
-        if(n.indexOf(q)>=0||q.indexOf(n)>=0){matches.push(p);}
+        if(!n)continue;
+        var score=0;
+        if(n===q)score=100;
+        else if(n.indexOf(q)>=0)score=60;
+        else if(q.indexOf(n)>=0)score=20;
+        if(score===0)continue;
+        matches.push({p:p,score:score});
       }
+      matches.sort(function(a,b){return b.score-a.score;});
       if(matches.length===0){
         if(window._acimS3&&window._acimS3.speak)window._acimS3.speak("Produit introuvable: "+prodName);
         return;
       }
-      if(matches.length===1){
-        var p=matches[0];
+      if(matches.length===1||(matches[0].score>=60&&matches[0].score>matches[1].score)){
+        var p=matches[0].p;
         var promptTxt=(qty!=null?"Ajouter "+qty+" "+(unit||"unité")+" de ":"Ajouter ")+p.name+" à "+((p.sale_price_cents||0)/100).toFixed(2).replace(".",",")+" euros ?";
         if(window._acimS3&&window._acimS3.confirmVoice){
           window._acimS3.confirmVoice(promptTxt,function(){
@@ -5500,7 +5624,7 @@ idealItems.forEach(function(item, index){
         return;
       }
       // Multiple matches → flash list (max 3) — user can scan or click the right one
-      var top3=matches.slice(0,3);
+      var top3=matches.slice(0,3).map(function(m){return m.p;});
       var listTxt=top3.map(function(p){
         return p.name+" — "+((p.sale_price_cents||0)/100).toFixed(2).replace(".",",")+" euros";
       }).join(" / ");
