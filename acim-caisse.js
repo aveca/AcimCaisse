@@ -2632,6 +2632,7 @@ function _showIdealCart(){
   }
 
 function _loadIdealCartForCustomer(customerName){
+    console.log("MARKER_LOAD_START", customerName);
     _log("_loadIdealCartForCustomer START for: "+customerName);
     _toast("👤 Client: "+customerName+" — chargement panier 200€...");
     try {
@@ -2716,10 +2717,12 @@ idealItems.forEach(function(item, index){
     }
 
 // Show success message
+      _log("MARKER_LOAD_SUCCESS: about to show toast");
       _toast("\u2705 Panier 200\u20AC charg\u00e9 pour "+customerName+" \u2014 "+(total/100).toFixed(2).replace(".",",")+" \u20AC");
     } catch(e) {
-      _err("_loadIdealCartForCustomer error:", e);
-      _toast("❌ Erreur chargement panier: "+e.message);
+        console.log("MARKER_LOAD_ERROR", e.message);
+        _err("_loadIdealCartForCustomer error:", e);
+        _toast("❌ Erreur chargement panier: "+e.message);
     }
   }
 
