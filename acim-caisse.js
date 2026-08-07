@@ -1,4 +1,4 @@
-﻿// ─── AcimCaisse v1.3.0#40 — Transactional stock + kg weight fix + version unification ──
+// ─── AcimCaisse v1.3.0#40 — Transactional stock + kg weight fix + version unification ──
 ;(function(){
   "use strict";
   var _log=function(m){console.log("[Acim] "+m);};
@@ -24,7 +24,7 @@
   window.addEventListener("beforeunload",_releaseTabLock);
   setInterval(_refreshTabLock,3000);
 
-  // ─── AUTO-BARCODE ────────────────────────────────────
+  // ─── AUTO-BARCODE ────────────────���───────────────────
   var _bcSeq=2000;
   var _bcSeqKey="acim-bc-seq";
   function _nextBarcode(){return "ACIM-"+(_bcSeq++);}
@@ -314,51 +314,18 @@
     for(var i=0;i<CATS.length;i++)if(CATS[i].id===id)return CATS[i].ic;
     return "📦";
   }
-  // Product-specific icons for better visual recognition
-  var _productIcons={
-    "poulet":"🍗","poulet entier":"🐔","bavette":"🥩","steak":"🥩","cotelette":"🥩",
-    "saumon":"🐟","thon":"🐟","crevette":"🦐","poisson":"🐟",
-    "lait":"🥛","beurre":"🧈","fromage":"🧀","yaourt":"🥛","creme":"🥛","oeuf":"🥚",
-    "pates":"🍝","spaghetti":"🍝","riz":"🍚","farine":"🌾","sucre":"🍬","huile":"🫒",
-    "pain":"🍞","baguette":"🥖","croissant":"🥐","brioche":"🥯",
-    "pomme":"🍎","banane":"🍌","tomate":"🍅","carotte":"🥕","salade":"🥬",
-    "eau":"💧","jus":"🧃","cafe":"☕","the":"🍵","vin":"🍷","biere":"🍺",
-    "surgelé":"🧊","glace":"🍦","pizza":"🍕",
-    "chocolat":"🍫","bonbon":"🍬","gateau":"🍰",
-    "shampoing":"🧴","savon":"🧼","lessive":"🧺",
-    "default":"📦"
-  };
-  function _getProductIcon(name){
-    var n=(name||"").toLowerCase();
-    for(var key in _productIcons){
-      if(n.indexOf(key)>=0)return _productIcons[key];
-    }
-    return _productIcons.default;
-  }
   var _catBg={viande:"#fce4e4",volaille:"#fef0db",poisson:"#e0f2fe",laitier:"#dbeafe",epicerie:"#dcfce7",boulangerie:"#fef9c3",boisson:"#ccfbf1",snack:"#fef3c7",condiment:"#f3f4f6",menager:"#ede9fe",surgelé:"#cffafe",fruits:"#fef9c3",legumes:"#dcfce7",vin:"#fce7f3",autre:"#f5f5f5"};
 
-  // ─── SVG PRODUCT IMAGE GENERATOR (Uber Eats style) ──
+  // ─── SVG PRODUCT IMAGE GENERATOR ──
   function _generateProductSVG(name,category,priceCents){
     var cat=(category||"autre").toLowerCase();
     var bg=_catBg[cat]||"#f5f5f5";
-    var icon=_getProductIcon(name);
+    var icon=_catIcon(cat);
     var initials=(name||"?").split(" ").slice(0,2).map(function(w){return w.charAt(0).toUpperCase();}).join("");
-    // Uber Eats style: clean white card with subtle category accent
-    var accent=bg;
     var svg='<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">';
-    // White background with subtle rounded corners
-    svg+='<rect x="4" y="4" width="192" height="192" rx="16" ry="16" fill="#ffffff" stroke="'+accent+'" stroke-width="2"/>';
-    // Top accent bar
-    svg+='<rect x="4" y="4" width="192" height="8" rx="12" ry="0" fill="'+accent+'"/>';
-    // Product icon centered, larger
-    svg+='<text x="100" y="85" text-anchor="middle" font-size="64" fill="'+accent+'">'+icon+'</text>';
-    // Product initials
-    svg+='<text x="100" y="130" text-anchor="middle" font-size="28" font-weight="700" fill="#1a1a2e" font-family="-apple-system,BlinkMacSystemFont,Helvetica,Arial,sans-serif">'+initials+'</text>';
-    // Category name small
-    var catLabel=(cat.charAt(0).toUpperCase()+cat.slice(1)).replace("surgelé","Surgelé");
-    svg+='<text x="100" y="160" text-anchor="middle" font-size="11" font-weight="500" fill="#888" font-family="-apple-system,sans-serif">'+catLabel+'</text>';
-    // Subtle bottom line
-    svg+='<line x1="30" y1="175" x2="170" y2="175" stroke="'+accent+'" stroke-width="1" opacity="0.3"/>';
+    svg+='<rect width="200" height="200" fill="'+bg+'"/>';
+    svg+='<text x="100" y="90" text-anchor="middle" font-size="72" fill="rgba(0,0,0,0.08)">'+icon+'</text>';
+    svg+='<text x="100" y="145" text-anchor="middle" font-size="32" font-weight="800" fill="rgba(0,0,0,0.18)" font-family="-apple-system,sans-serif">'+initials+'</text>';
     svg+='</svg>';
     return "data:image/svg+xml,"+encodeURIComponent(svg);
   }
@@ -1074,18 +1041,18 @@
 
     // ── BOTTOM NAV ──
     var nav=document.createElement("div");
-    nav.className="mk-nav";
+    nav.className="acim-bottom-nav";
 
     var navItems=[
-      {icon:"🏠",label:"Accueil",active:true},
-      {icon:"🛒",label:"Panier 200€",cart:true,fn:function(){_showIdealCart();}},
-      {icon:"📋",label:"Historique",fn:function(){_showHistory();}},
-      {icon:"⚙️",label:"Menu",fn:function(){_showMainMenu();}}
+      {icon:"\uD83C\uDFE0",label:"Accueil",active:true},
+      {icon:"\uD83D\uDED2",label:"Panier 200\u20AC",cart:true,fn:function(){_showIdealCart();}},
+      {icon:"\uD83D\uDCCB",label:"Historique",fn:function(){_showHistory();}},
+      {icon:"\u2699\uFE0F",label:"Menu",fn:function(){_showMainMenu();}}
     ];
     navItems.forEach(function(item){
       var btn=document.createElement("button");
-      btn.className="mk-nav__item"+(item.active?" mk-nav__item--active":"")+(item.cart?" mk-nav__item--cart":"");
-      btn.innerHTML='<span class="mk-nav__icon">'+item.icon+'</span><span class="mk-nav__label">'+item.label+'</span>';
+      btn.className="acim-nav-item"+(item.active?" active":"")+(item.cart?" acim-nav-cart":"");
+      btn.innerHTML='<span class="acim-nav-icon">'+item.icon+'</span><span class="acim-nav-label">'+item.label+'</span>';
       if(item.fn)btn.onclick=item.fn;
       nav.appendChild(btn);
     });
@@ -1112,20 +1079,40 @@
 
     var sheetHandle=document.createElement("div");
     sheetHandle.className="mk-sheet__handle";
-    sheet.appendChild(sheetHandle);
 
     var sheetHeader=document.createElement("div");
-    sheetHeader.className="acim-sheet-header";
-    sheetHeader.innerHTML='<div class="acim-sheet-title">Panier<button class="acim-sheet-close" onclick="_closeCartSheet()">\u2715</button></div>';
+    sheetHeader.className="mk-sheet__header";
+
+    var sheetTitleRow=document.createElement("div");
+    sheetTitleRow.className="mk-sheet__title-row";
+
+    var sheetTitle=document.createElement("div");
+    sheetTitle.className="mk-sheet__title";
+    sheetTitle.textContent="🛒 Panier";
+
+    var sheetClose=document.createElement("button");
+    sheetClose.className="mk-sheet__close";
+    sheetClose.innerHTML="✕";
+    sheetClose.onclick=function(){_closeCartSheet();};
+    sheetTitleRow.appendChild(sheetTitle);
+    sheetTitleRow.appendChild(sheetClose);
+    sheetHeader.appendChild(sheetTitleRow);
+
+    var sheetSubtitle=document.createElement("div");
+    sheetSubtitle.className="mk-sheet__subtitle";
+    sheetSubtitle.id="mk-sheet-subtitle";
+    sheetSubtitle.textContent="0 article(s)";
+    sheetHeader.appendChild(sheetSubtitle);
     sheet.appendChild(sheetHeader);
 
     _posItems=document.createElement("div");
-    _posItems.className="acim-sheet-items";
+    _posItems.className="mk-sheet__items";
     _posItems.id="acim-pos-items";
     sheet.appendChild(_posItems);
 
     var sheetFooter=document.createElement("div");
-    sheetFooter.className="acim-sheet-footer";
+    sheetFooter.className="mk-sheet__footer";
+    sheetFooter.id="acim-sheet-footer";
 
     // Subtotal
     var subRow=document.createElement("div");
@@ -1184,7 +1171,7 @@
     sheet.appendChild(sheetFooter);
     _pos.appendChild(sheet);
 
-// ── DESKTOP CART PANEL (hidden on mobile via CSS) ──
+    // ── DESKTOP CART PANEL (hidden on mobile via CSS) ──
     var desktopCart=document.createElement("div");
     desktopCart.className="mk-desktop-cart";
     desktopCart.id="acim-desktop-cart";
@@ -1394,7 +1381,7 @@
       }else{
         var noPr=document.createElement("div");
         noPr.style.cssText="font-size:14px;color:var(--mk-accent);margin-top:6px;font-weight:600;";
-        noPr.textContent="✏️ Sans prix";
+        noPr.textContent="\u270F\uFE0F Sans prix";
         infoDiv.appendChild(noPr);
       }
 
@@ -1458,55 +1445,18 @@
       }
     }
 
-    function _renderCart(){
-    var info=_cartInfo();var subtotal=_cartSubtotal();var total=_cartTotal();
-    // Update count in both mobile and desktop
-    var countEl=document.getElementById("acim-pos-count");
-    if(countEl)countEl.textContent=info.length+" article"+(info.length!==1?"s":"");
-    _posSubtotal.textContent=(subtotal/100).toFixed(2).replace(".",",")+" \u20AC";
-    _posTotal.textContent=(total/100).toFixed(2).replace(".",",")+" \u20AC";
-    var discRow=document.getElementById("acim-disc-row");
-    if(_cartDiscountCents>0){
-      discRow.style.display="flex";
-      _posDiscount.textContent="-"+(_cartDiscountCents/100).toFixed(2).replace(".",",")+" \u20AC";
-    }else{discRow.style.display="none";}
-
-    // Update cart FAB (mobile)
-    _updateCartFAB();
-
-    // Render into mobile sheet
-    _posItems.innerHTML="";
-    if(info.length===0){
-      _posItems.innerHTML='<div class="mk-sheet__empty"><div class="mk-sheet__empty-icon">🛒</div><div class="mk-sheet__empty-title">Panier vide</div></div>';
-      _posCheckout.textContent="\uD83D\uDCB0 Encaisser (0,00 \u20AC)";
-      _posCheckout.style.opacity="0.5";
-    }else{
-      _posCheckout.textContent="\uD83D\uDCB0 Encaisser "+(total/100).toFixed(2).replace(".",",")+" \u20AC";
-      _posCheckout.style.opacity="1";
-    }
-
-    // Render into desktop cart
-    var dcItems=document.getElementById("acim-desktop-cart-items");
-    var dcFooter=document.getElementById("acim-desktop-cart-footer");
-    if(dcItems){
-      dcItems.innerHTML="";
-      if(info.length===0){
-        dcItems.innerHTML='<div class="mk-sheet__empty"><div class="mk-sheet__empty-icon">🛒</div><div class="mk-sheet__empty-title">Panier vide</div></div>';
-      }
-    }
-
     info.forEach(function(item){
       // Create a helper to build cart item row
       function buildRow(it){
         var row=document.createElement("div");
         var isZero=it.price===0;
         var isWeighed=_isWeightProduct(it);
-        row.className="mk-sheet__item";
+        row.className="acim-sheet-item";
         row.onclick=function(){_inlineEdit(it.idx,50,50);};
 
         var icon=document.createElement("div");
-        icon.className="mk-sheet__item-image";
-        icon.style.cssText="width:56px;height:56px;border-radius:12px;overflow:hidden;flex-shrink:0;background:"+( _catBg[it.cat||"autre"]||"#f5f5f5");
+        icon.className="acim-sheet-item-icon";
+        icon.style.cssText="width:40px;height:40px;border-radius:8px;overflow:hidden;flex-shrink:0;background:"+( _catBg[it.cat||"autre"]||"#f5f5f5");
         // Try to show product image from cache or generate SVG
         var imgEl=document.createElement("img");
         imgEl.style.cssText="width:100%;height:100%;object-fit:cover;";
@@ -1527,16 +1477,16 @@
         row.appendChild(icon);
 
         var infoDiv=document.createElement("div");
-        infoDiv.className="mk-sheet__item-info";
+        infoDiv.className="acim-sheet-item-info";
         var nm=document.createElement("div");
-        nm.className="mk-sheet__item-name";
-        nm.style.color=isZero?"var(--mk-accent)":"";
+        nm.className="acim-sheet-item-name";
+        nm.style.color=isZero?"var(--acim-orange)":"";
         nm.textContent=isZero?"\u270F\uFE0F "+it.name:it.name;
         infoDiv.appendChild(nm);
 
         if(isWeighed&&it.weight!=null){
           var wLine=document.createElement("div");
-          wLine.className="mk-sheet__item-weight";
+          wLine.className="acim-sheet-item-weight";
           wLine.textContent=_formatWeight(it.weight,it.unitType)+" \u00D7 "+_formatPricePerUnit(it.pricePerUnit,it.unitType);
           infoDiv.appendChild(wLine);
         }
@@ -2820,7 +2770,7 @@ idealItems.forEach(function(item, index){
     }
 
 // Show success message
-      _toast("\u2705 Panier 200\u20AC charg\u00e9 pour "+customerName+" \u2014 "+(total/100).toFixed(2).replace(".",",")+" \u20AC");
+      _toast("\u2705 Panier 200\u20AC chargé pour "+customerName+" \u2014 "+(total/100).toFixed(2).replace(".",",")+" \u20AC");
     } catch(e) {
       _err("_loadIdealCartForCustomer error:", e);
       _toast("❌ Erreur chargement panier: "+e.message);
