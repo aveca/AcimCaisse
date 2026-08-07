@@ -74,6 +74,12 @@ img{display:block}
 }
 .ps-icon-btn:hover{border-color:var(--ue-green)}
 .ps-icon-btn:active{transform:scale(.93)}
+.ps-demo-btn{
+  margin-left:6px;padding:7px 14px;border-radius:999px;
+  background:var(--ue-green);color:#fff;font-size:12.5px;font-weight:700;
+  border:none;cursor:pointer;box-shadow:0 6px 16px rgba(6,193,103,.28);
+  transition:transform .12s,box-shadow .2s;
+}
 
 /* ── LAYOUT ── */
 .ps-main{
@@ -399,8 +405,9 @@ img{display:block}
     <button class="ps-resto-switch" onclick="switchResto()">
       <span class="dot"></span><span class="rname" id="ps-resto-name">Chez Mario</span><span style="opacity:.6">▾</span>
     </button>
-    <button class="ps-icon-btn" title="Historique des commandes" onclick="openHistory()">🕘</button>
-  </div>
+     <button class="ps-icon-btn" title="Historique des commandes" onclick="openHistory()">🕘</button>
+     <button class="ps-demo-btn" title="Voir une commande complète en 1 clic" onclick="demoOrder()">🎬 Mode démo</button>
+   </div>
 </header>
 
 <div class="ps-main">
@@ -706,6 +713,29 @@ function underMinCheckout(){
   toast("Ajoutez encore " + fmt(min - t) + " pour atteindre le minimum de commande de " + fmt(min) + ".");
   const grid=$("ps-grid");if(grid){grid.scrollIntoView({behavior:"smooth",block:"start"});}
   const cats=$("ps-cats");if(cats){cats.scrollIntoView({behavior:"smooth",block:"start"});}
+}
+function demoOrder(){
+  if(!cart.length){
+    const first=$("ps-grid");if(first){first.scrollIntoView({behavior:"smooth",block:"start"});}
+  }
+  const steps=[];
+  function tick(fn){steps.push(fn);}
+  // 1) ensure at least one item
+  tick(function(){addFirstToCart();});
+  // 2) open checkout
+  tick(function(){openCheckout();});
+  // 3) cash mode + exact amount (so pay works without typing)
+  tick(function(){setMode('especes');setTimeout(function(){const total=cartTotal()+feeCents();if($("ps-cash")){$("ps-cash").value=(total/100).toFixed(2);updateChange();}},60);});
+  // 4) confirm payment
+  tick(function(){payOrder();});
+  let i=0;
+  function next(){if(i>=steps.length){toast("Commande de démonstration terminée");return;}steps[i]();i++;setTimeout(next,650);}
+  next();
+  function addFirstToCart(){
+    // find the first product card's add button programmatically
+    const addBtn=document.querySelector('button[onclick^="add("]');
+    if(addBtn){addBtn.click();}else{toast("Aucun produit disponible");}
+  }
 }
 function renderAll(){renderResto();renderCats();renderGrid();renderCartItems();renderCartFoot();}
 

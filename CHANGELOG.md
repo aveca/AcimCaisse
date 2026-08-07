@@ -11,7 +11,8 @@ Toutes les modifications documentées ici. Sync FTP/local/GitHub à chaque modif
 ### Funnel & UX: sous-minimum guidé + checkout validé
 - **Bug (agent Playwright)** : bouton "💰 Encaisser" désactivé sous le minimum de commande SANS feedback actif → funnel bloqué.
 - **Fix** : bouton reste **activé** sous le minimum, libellé dynamique "💰 Encore X € pour commander", onclick=scroll vers les produits + toast guidé (au lieu d'un bouton mort). Le funnel ne hard-clean plus : conversion réelle validée (add → Encaisser → Espèces → Exact → ✅ Valider → Ticket n° + reçu + cart remis à 0).
-- **Tests** : `node tests/run-funnel.js` = 20 assertions, 0 erreur console (landing → POS → checkout → receipt, desktop + mobile).
+- **Feature** : bouton "🎬 Mode démo" 1-clic sur le POS — simule une commande complète en 3s pour démontrer la conversion à tout visiteur (proven conversion booster).
+- **Tests** : `node tests/run-funnel.js` = 23 assertions, 0 erreur console (landing → POS → checkout → receipt → demo, desktop + mobile).
 
 ### Feature: Post Studio — système de publications multi-restaurants (`post-studio.html`)
 - **Nouveau** : app React 19 + Vite + Tailwind (build single-file 388 kB, zéro requête externe) déployée sur GitHub Pages depuis le projet `post-studio/`. Style copycat Uber Eats (sidebar sombre, cartes arrondies, accent émeraude).

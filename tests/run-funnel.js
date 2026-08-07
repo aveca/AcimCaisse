@@ -226,6 +226,31 @@ async function assertOk(name, cond, detail) {
   }
 
   // ============================================================
+  // 7b. Mode démo (1-clic conversion demo)
+  // ============================================================
+  log('TEST 7b: Mode démo 1-clic');
+  try {
+    const pos = await newPage(ctx);
+    await pos.goto(BASE + 'post-system.html', { waitUntil: 'domcontentloaded', timeout: 20000 });
+    await pos.waitForSelector('#ps-grid', { state: 'attached', timeout: 10000 }).catch(() => {});
+    await pos.waitForTimeout(700);
+    await pos.evaluate(() => localStorage.clear());
+    await pos.reload({ waitUntil: 'domcontentloaded' });
+    await pos.waitForTimeout(700);
+    await pos.locator('button', { hasText: 'Mode démo' }).click();
+    await pos.waitForTimeout(3500);
+    const success = await pos.locator('.ps-success').count();
+    const ticket = await pos.locator('.ps-success .ticket').count();
+    await assertOk('Mode démo termine par success', success > 0);
+    await assertOk('Ticket n° généré en démo', ticket > 0);
+    const mbar = await pos.locator('#ps-mbar-total').textContent().catch(() => '');
+    await assertOk('Panier vidé après démo', String(mbar).includes('0,00'), mbar);
+    await shot(pos, '08-demo-order');
+  } catch (e) {
+    await assertOk('Mode démo', false, String(e.message || e));
+  }
+
+  // ============================================================
   // 8. No console errors across the funnel
   // ============================================================
   log('TEST 8: console errors');
