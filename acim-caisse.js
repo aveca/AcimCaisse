@@ -5392,6 +5392,8 @@ function _showIdealCart(){
   window._acimGetAllProducts=function(){return _dbGetAll().then(function(all){return all||[];});};
   // Debug: get sales history with products sold
   window._acimGetSalesHistory=function(){return _getSalesHistory().then(function(s){return s||[];});};
+  // Debug: list customer baskets
+  window._acimListCustomerBaskets=function(){return _listCustomerBaskets().then(function(b){return b||[];});};
   window._acimProcessBarcode=_processBarcode;
   window._acimAddToCart=function(name,price,cat){_addToCart(name,price,"",cat);};
   window._acimWeighProduct=_weighProduct;
