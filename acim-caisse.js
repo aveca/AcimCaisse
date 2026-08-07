@@ -2673,9 +2673,10 @@ function _loadIdealCartForCustomer(customerName){
         {name:"Eau minerale 6x1.5L",price:3.50,qty:1,cat:"boisson",bc:"3700123300014"},
       ];
 
-      // Clear cart first
+// Clear cart first
       _myCart=[];
-idealItems.forEach(function(item, index){
+      var total=0;
+      idealItems.forEach(function(item, index){
         var bc=item.bc;
         var priceCents=Math.round(item.price*100);
         _log("Adding item " + index + ": " + item.name);
