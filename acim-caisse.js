@@ -2673,25 +2673,27 @@ function _loadIdealCartForCustomer(customerName){
 
       // Clear cart first
       _myCart=[];
-    idealItems.forEach(function(item){
-      var bc=item.bc;
-      var priceCents=Math.round(item.price*100);
-      
-      // Add to cart directly
-      var myId="M"+Date.now()+Math.floor(Math.random()*9999);
-      _myCart.push({myId:myId,name:item.name,priceCents:priceCents,bc:bc,cat:item.cat,
-        weight:null,unitType:null,pricePerUnit:null,discountCents:0,qty:item.qty||1});
-      _realBcMap[myId]=bc;
-      
-      total+=priceCents*(item.qty||1);
-      
-      // Register in product catalog if not exists
-      if(!_allProducts.find(function(p){return p.barcode===bc;})){
-        var prodObj={id:bc,name:item.name,priceCents:priceCents,sale_price_cents:priceCents,category:item.cat,image:null,barcode:bc,last_updated:new Date().toISOString()};
-        _allProducts.push(prodObj);
-        _dbPut(prodObj);
-      }
-    });
+idealItems.forEach(function(item, index){
+        var bc=item.bc;
+        var priceCents=Math.round(item.price*100);
+        _log("Adding item " + index + ": " + item.name);
+        
+        // Add to cart directly
+        var myId="M"+Date.now()+Math.floor(Math.random()*9999);
+        _myCart.push({myId:myId,name:item.name,priceCents:priceCents,bc:bc,cat:item.cat,
+          weight:null,unitType:null,pricePerUnit:null,discountCents:0,qty:item.qty||1});
+        _realBcMap[myId]=bc;
+        
+        total+=priceCents*(item.qty||1);
+        
+        // Register in product catalog if not exists
+        if(!_allProducts.find(function(p){return p.barcode===bc;})){
+          var prodObj={id:bc,name:item.name,priceCents:priceCents,sale_price_cents:priceCents,category:item.cat,image:null,barcode:bc,last_updated:new Date().toISOString()};
+          _allProducts.push(prodObj);
+          _dbPut(prodObj);
+        }
+      });
+      _log("Finished adding items. Cart size: " + _myCart.length);
 
     // Save basket to customer
     _log("Saving basket for "+customerName+" with "+_myCart.length+" items");
