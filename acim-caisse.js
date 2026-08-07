@@ -2294,27 +2294,25 @@
   // ─── CUSTOMER BASKETS (per-client saved baskets) ──────────
   function _loadCustomerBasket(name){
     if(!name) return Promise.resolve([]);
-    _log("_loadCustomerBasket called for: "+name);
     return _openUnifiedDB().then(function(db){
       if(!db) return [];
       return new Promise(function(resolve){
         var tx = db.transaction("customer_baskets", "readonly");
         var req = tx.objectStore("customer_baskets").get(name);
-        req.onsuccess = function(){ _log("_loadCustomerBasket result: "+((req.result&&req.result.basket)||[]).length+" items"); resolve((req.result&&req.result.basket)||[]); };
+        req.onsuccess = function(){ resolve((req.result&&req.result.basket)||[]); };
         req.onerror = function(){ resolve([]); };
       });
     });
   }
   function _saveCustomerBasket(name, basket){
     if(!name) return Promise.resolve();
-    _log("_saveCustomerBasket called for: "+name+" items: "+basket.length);
     return _openUnifiedDB().then(function(db){
       if(!db) return;
       return new Promise(function(resolve){
         var tx = db.transaction("customer_baskets", "readwrite");
         var req = tx.objectStore("customer_baskets").put({id:name, basket:basket, updatedAt:Date.now()});
-        req.onsuccess = function(){ _log("_saveCustomerBasket success"); resolve(); };
-        req.onerror = function(){ _log("_saveCustomerBasket error"); resolve(); };
+        req.onsuccess = function(){ resolve(); };
+        req.onerror = function(){ resolve(); };
       });
     });
   }
@@ -2336,7 +2334,7 @@
       return new Promise(function(resolve){
         var tx = db.transaction("customer_baskets", "readonly");
         var req = tx.objectStore("customer_baskets").getAll();
-        req.onsuccess = function(){ _log("_listCustomerBaskets: "+(req.result||[]).length+" baskets"); resolve((req.result||[]).map(function(r){return {name:r.id, updatedAt:r.updatedAt};})); };
+        req.onsuccess = function(){ resolve((req.result||[]).map(function(r){return {name:r.id, updatedAt:r.updatedAt};})); };
         req.onerror = function(){ resolve([]); };
       });
     });
@@ -2632,8 +2630,6 @@ function _showIdealCart(){
   }
 
 function _loadIdealCartForCustomer(customerName){
-    console.log(">>> LOAD_FUNCTION_CALLED", customerName);
-    console.log("MARKER_LOAD_START", customerName);
     _log("_loadIdealCartForCustomer START for: "+customerName);
     _toast("👤 Client: "+customerName+" — chargement panier 200€...");
     try {
@@ -2676,10 +2672,9 @@ function _loadIdealCartForCustomer(customerName){
 // Clear cart first
       _myCart=[];
       var total=0;
-      idealItems.forEach(function(item, index){
+idealItems.forEach(function(item, index){
         var bc=item.bc;
         var priceCents=Math.round(item.price*100);
-        _log("Adding item " + index + ": " + item.name);
         
         // Add to cart directly
         var myId="M"+Date.now()+Math.floor(Math.random()*9999);
@@ -2696,17 +2691,13 @@ function _loadIdealCartForCustomer(customerName){
           _dbPut(prodObj);
         }
       });
-      _log("Finished adding items. Cart size: " + _myCart.length);
 
     // Save basket to customer
-    _log("Saving basket for "+customerName+" with "+_myCart.length+" items");
     _saveCustomerBasket(customerName, _myCart.map(function(it){
       return {myId:it.myId,name:it.name,priceCents:it.priceCents,bc:it.bc,cat:it.cat,
         weight:it.weight,unitType:it.unitType,pricePerUnit:it.pricePerUnit,
         discountCents:it.discountCents||0,qty:it.qty||1};
-    })).then(function(){
-      _log("Basket saved successfully");
-    });
+    }));
 
     // Update categories
     _buildCategories();
@@ -2719,12 +2710,10 @@ function _loadIdealCartForCustomer(customerName){
     }
 
 // Show success message
-      _log("MARKER_LOAD_SUCCESS: about to show toast");
       _toast("\u2705 Panier 200\u20AC charg\u00e9 pour "+customerName+" \u2014 "+(total/100).toFixed(2).replace(".",",")+" \u20AC");
     } catch(e) {
-        console.log("MARKER_LOAD_ERROR", e.message);
-        _err("_loadIdealCartForCustomer error:", e);
-        _toast("❌ Erreur chargement panier: "+e.message);
+      _err("_loadIdealCartForCustomer error:", e);
+      _toast("❌ Erreur chargement panier: "+e.message);
     }
   }
 
