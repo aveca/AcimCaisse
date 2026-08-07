@@ -121,6 +121,11 @@
             var u=d.createObjectStore("users",{keyPath:"id"});
             u.createIndex("by_active","active",{unique:false});
           }
+          // Customer baskets store: {id: customerName, basket: [...], updatedAt: number}
+          if(!d.objectStoreNames.contains("customer_baskets")){
+            var cb=d.createObjectStore("customer_baskets",{keyPath:"id"});
+            cb.createIndex("by_updated","updatedAt",{unique:false});
+          }
           _log("Unified DB upgrade v"+e.target.result.version+" — stores: "+Array.prototype.slice.call(d.objectStoreNames).join(", "));
         };
         r.onsuccess=function(e){_unifiedDb=e.target.result;ok(_unifiedDb);};
@@ -2286,6 +2291,55 @@
     return actor && actor.role === "manager";
   }
 
+  // ─── CUSTOMER BASKETS (per-client saved baskets) ──────────
+  function _loadCustomerBasket(name){
+    if(!name) return Promise.resolve([]);
+    return _openUnifiedDB().then(function(db){
+      if(!db) return [];
+      return new Promise(function(resolve){
+        var tx = db.transaction("customer_baskets", "readonly");
+        var req = tx.objectStore("customer_baskets").get(name);
+        req.onsuccess = function(){ resolve((req.result&&req.result.basket)||[]); };
+        req.onerror = function(){ resolve([]); };
+      });
+    });
+  }
+  function _saveCustomerBasket(name, basket){
+    if(!name) return Promise.resolve();
+    return _openUnifiedDB().then(function(db){
+      if(!db) return;
+      return new Promise(function(resolve){
+        var tx = db.transaction("customer_baskets", "readwrite");
+        var req = tx.objectStore("customer_baskets").put({id:name, basket:basket, updatedAt:Date.now()});
+        req.onsuccess = function(){ resolve(); };
+        req.onerror = function(){ resolve(); };
+      });
+    });
+  }
+  function _deleteCustomerBasket(name){
+    if(!name) return Promise.resolve();
+    return _openUnifiedDB().then(function(db){
+      if(!db) return;
+      return new Promise(function(resolve){
+        var tx = db.transaction("customer_baskets", "readwrite");
+        var req = tx.objectStore("customer_baskets").delete(name);
+        req.onsuccess = function(){ resolve(); };
+        req.onerror = function(){ resolve(); };
+      });
+    });
+  }
+  function _listCustomerBaskets(){
+    return _openUnifiedDB().then(function(db){
+      if(!db) return [];
+      return new Promise(function(resolve){
+        var tx = db.transaction("customer_baskets", "readonly");
+        var req = tx.objectStore("customer_baskets").getAll();
+        req.onsuccess = function(){ resolve((req.result||[]).map(function(r){return {name:r.id, updatedAt:r.updatedAt};})); };
+        req.onerror = function(){ resolve([]); };
+      });
+    });
+  }
+
   // ─── END PR C ─────────────────────────────────────────
 
   // ─── RECEIPT ─────────────────────────────────────────
@@ -2511,52 +2565,107 @@
 
   // ─── IDEAL CART (200€ preset) ──
   // Real verified EAN barcodes from Open Food Facts; fresh produce uses name search
-  function _showIdealCart(){
+function _showIdealCart(){
+    // First, select customer
+    _showCustomerSelector(function(customerName){
+      _loadIdealCartForCustomer(customerName);
+    });
+  }
+
+  function _showCustomerSelector(onSelect){
+    var old=document.getElementById("acim-customer-selector");if(old)old.remove();
+    var ov=document.createElement("div");ov.id="acim-customer-selector";
+    ov.style.cssText="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:10000002;display:flex;align-items:center;justify-content:center;";
+    var card=document.createElement("div");
+    card.style.cssText="background:#fff;border-radius:14px;padding:20px;width:380px;max-width:95vw;box-shadow:0 8px 24px rgba(0,0,0,0.3);font-family:Segoe UI,Arial,sans-serif;";
+    var ti=document.createElement("div");ti.style.cssText="font-size:22px;font-weight:700;margin-bottom:8px;color:#1a1a2e;text-align:center;";
+    ti.textContent="👤 Choisir le client";card.appendChild(ti);
+    var subtitle=document.createElement("div");subtitle.style.cssText="font-size:13px;color:#666;margin-bottom:16px;text-align:center;";
+    subtitle.textContent="Le panier sera sauvegardé pour ce client";card.appendChild(subtitle);
+
+    // Existing customers list
+    var listDiv=document.createElement("div");listDiv.style.cssText="max-height:300px;overflow-y:auto;margin-bottom:16px;";
+    _listCustomerBaskets().then(function(baskets){
+      if(baskets.length>0){
+        var existingLabel=document.createElement("div");existingLabel.style.cssText="font-size:13px;font-weight:700;color:#888;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid #eee;";
+        existingLabel.textContent="Clients existants :";listDiv.appendChild(existingLabel);
+        baskets.forEach(function(b){
+          var btn=document.createElement("button");btn.textContent="👤 "+b.name;
+          btn.style.cssText="width:100%;padding:12px;border:2px solid #e0e0e0;border-radius:8px;background:#fff;font-size:16px;cursor:pointer;text-align:left;margin-bottom:8px;";
+          btn.onmouseenter=function(){this.style.borderColor="#e65100";this.style.background="#fff3e0";};
+          btn.onmouseleave=function(){this.style.borderColor="#e0e0e0";this.style.background="#fff";};
+          btn.onclick=function(){ov.remove();_loadIdealCartForCustomer(b.name);};
+          listDiv.appendChild(btn);
+        });
+      }
+    });
+
+    card.appendChild(listDiv);
+
+    // New customer input
+    var newLabel=document.createElement("div");newLabel.style.cssText="font-size:13px;font-weight:700;color:#888;margin-bottom:8px;";
+    newLabel.textContent="Nouveau client :";card.appendChild(newLabel);
+    var inp=document.createElement("input");inp.type="text";inp.placeholder="Nom du client";
+    inp.style.cssText="width:100%;padding:12px;border:2px solid #e0e0e0;border-radius:8px;font-size:16px;box-sizing:border-box;margin-bottom:12px;";
+    card.appendChild(inp);
+
+    var btnRow=document.createElement("div");btnRow.style.cssText="display:flex;gap:8px;";
+    var btnCancel=document.createElement("button");btnCancel.textContent="Annuler";
+    btnCancel.style.cssText="flex:1;padding:12px;border:2px solid #e0e0e0;border-radius:8px;background:#fff;font-size:15px;cursor:pointer;";
+    btnCancel.onclick=function(){ov.remove();};
+    var btnCreate=document.createElement("button");btnCreate.textContent="✅ Créer / Sélectionner";
+    btnCreate.style.cssText="flex:2;padding:12px;border:none;border-radius:8px;background:#e65100;color:#fff;font-size:15px;cursor:pointer;font-weight:700;";
+    btnCreate.onclick=function(){
+      var name=inp.value.trim();
+      if(!name){_toast("Nom requis");return;}
+      ov.remove();
+      _loadIdealCartForCustomer(name);
+    };
+    btnRow.appendChild(btnCancel);btnRow.appendChild(btnCreate);
+    card.appendChild(btnRow);
+
+    ov.appendChild(card);ov.onclick=function(e){if(e.target===ov)ov.remove();};
+    document.body.appendChild(ov);
+    setTimeout(function(){inp.focus();},100);
+  }
+
+  function _loadIdealCartForCustomer(customerName){
+    _toast("👤 Client: "+customerName+" — chargement panier 200€...");
+    
     var idealItems=[
-      {name:"Poulet entier",price:8.50,qty:2,cat:"viande"},
-      {name:"Bavette de boeuf 500g",price:9.90,qty:2,cat:"viande"},
-      {name:"Cotelettes de porc 4pce",price:7.50,qty:1,cat:"viande"},
-      {name:"Saumon frais 200g",price:6.90,qty:2,cat:"poisson"},
-      {name:"Riz basmati 1kg",price:2.80,qty:2,cat:"epicerie"},
-      {name:"Pates spaghetti 500g",price:1.50,qty:3,cat:"epicerie",bc:"8076800195057"},
+      // Viande
+      {name:"STEACK HACHE X2 ANGUS",price:13.00,qty:1,cat:"viande",bc:"2134380003004"},
+      {name:"EPAULE DAGNEAU OS BR",price:14.90,qty:1,cat:"viande",bc:"2147147018029"},
+      {name:"BOUTARGUE 160G",price:39.00,qty:1,cat:"viande",bc:"3440432024040"},
+      {name:"Cabanossi Gendarme",price:11.00,qty:1,cat:"viande",bc:"3760059041917"},
+      // Volaille
+      {name:"KASLER DE DINDE",price:10.00,qty:1,cat:"volaille",bc:"2422607032273"},
+      {name:"PILON",price:17.90,qty:1,cat:"volaille",bc:"2938651010124"},
+      {name:"BLANC DE DINDE",price:10.00,qty:1,cat:"volaille",bc:"3760059041962"},
+      // Poisson/Surgelé
+      {name:"VENTRECHE DE THON HUILE OLIVE",price:12.00,qty:1,cat:"surgelé",bc:"3760034622698"},
+      {name:"BURGER DE POISSON",price:10.00,qty:1,cat:"surgelé",bc:"3448270003173"},
+      {name:"Legumes surgelés mix 750g",price:3.20,qty:1,cat:"surgelé",bc:"8410092173278"},
+      // Épicerie
       {name:"Huile d'olive 75cl",price:6.90,qty:1,cat:"epicerie",bc:"3178050000749"},
-      {name:"Sauce tomate 680g",price:2.20,qty:2,cat:"epicerie"},
-      {name:"Conserve thon 185g",price:2.50,qty:3,cat:"epicerie",bc:"3019081239138"},
-      {name:"Lait entier 1L",price:1.45,qty:4,cat:"laitier",bc:"3533631781002"},
+      {name:"Cafe moulu 250g",price:4.50,qty:1,cat:"epicerie",bc:"3187570015447"},
+      {name:"Pates spaghetti 500g",price:1.50,qty:2,cat:"epicerie",bc:"8076800195057"},
+      {name:"Farine de ble 1kg",price:1.50,qty:1,cat:"epicerie",bc:"3068110702235"},
+      {name:"Sucre en poudre 1kg",price:1.90,qty:1,cat:"epicerie",bc:"3165430810005"},
+      {name:"Conserve thon 185g",price:2.50,qty:2,cat:"epicerie",bc:"3019081239138"},
+      {name:"Moutarde Dijon 200g",price:1.80,qty:1,cat:"epicerie",bc:"8720182460721"},
+      {name:"Lait de coco 400ml",price:2.20,qty:1,cat:"epicerie",bc:"5021047105317"},
+      // Laitier
+      {name:"Lait entier 1L",price:1.45,qty:3,cat:"laitier",bc:"3533631781002"},
       {name:"Beurre doux 250g",price:2.10,qty:2,cat:"laitier",bc:"3155251205500"},
       {name:"Fromage rape 200g",price:3.50,qty:1,cat:"laitier",bc:"3073781102093"},
-      {name:"Oeufs plein air 12pce",price:3.80,qty:1,cat:"laitier"},
+      {name:"EMMENTAL Ermitage Portion",price:7.00,qty:1,cat:"laitier",bc:"3060921349838"},
       {name:"Yaourts nature 12pce",price:3.20,qty:1,cat:"laitier",bc:"6111032002925"},
-      {name:"Pommes variées 1kg",price:3.50,qty:2,cat:"fruits"},
-      {name:"Bananes 1kg",price:2.20,qty:2,cat:"fruits"},
-      {name:"Tomates grappe 1kg",price:4.50,qty:1,cat:"legumes"},
-      {name:"Courgettes 1kg",price:3.80,qty:1,cat:"legumes"},
-      {name:"Salade verte 200g",price:1.80,qty:2,cat:"legumes"},
-      {name:"Carottes 1kg",price:2.50,qty:1,cat:"legumes"},
-      {name:"Oignons 1kg",price:1.90,qty:1,cat:"legumes"},
-      {name:"Pommes de terre 2kg",price:3.20,qty:1,cat:"legumes"},
-      {name:"Eau minerale 6x1.5L",price:3.50,qty:2,cat:"boisson",bc:"3700123300014"},
-      {name:"Jus d'orange 1L",price:2.80,qty:2,cat:"boisson"},
-      {name:"Cafe moulu 250g",price:4.50,qty:1,cat:"epicerie",bc:"3187570015447"},
-      {name:"Sucre en poudre 1kg",price:1.90,qty:1,cat:"epicerie",bc:"3165430810005"},
-      {name:"Farine de ble 1kg",price:1.50,qty:1,cat:"epicerie",bc:"3068110702235"},
-      {name:"Moutarde Dijon 200g",price:1.80,qty:1,cat:"epicerie",bc:"8720182460721"},
-      {name:"Poivre noir moulin",price:3.50,qty:1,cat:"epicerie"},
-      {name:"Sel fin 500g",price:0.90,qty:1,cat:"epicerie"},
-      {name:"Herbes de Provence 20g",price:1.80,qty:1,cat:"epicerie"},
-      {name:"Champignons de Paris 250g",price:2.20,qty:1,cat:"legumes"},
-      {name:"Ail frais 3 pce",price:1.20,qty:1,cat:"legumes"},
-      {name:"Citrons 500g",price:2.50,qty:1,cat:"fruits"},
-      {name:"Mangue 1 pce",price:2.80,qty:1,cat:"fruits"},
-      {name:"Lait de coco 400ml",price:2.20,qty:1,cat:"epicerie",bc:"5021047105317"},
-      {name:"The vert 20 sachets",price:2.80,qty:1,cat:"epicerie"},
-      {name:"Cornichons 330g",price:2.20,qty:1,cat:"epicerie"},
-      {name:"Olives vertes 200g",price:2.50,qty:1,cat:"epicerie"},
+      // Boulangerie
       {name:"Pain de mie 500g",price:2.20,qty:1,cat:"boulangerie",bc:"3242271990056"},
       {name:"Baguette tradition",price:1.10,qty:2,cat:"boulangerie",bc:"3276551080656"},
-      {name:"Croissants 4 pce",price:3.80,qty:1,cat:"boulangerie"},
-      {name:"Legumes surgelés mix 750g",price:3.20,qty:1,cat:"surgelé",bc:"8410092173278"},
-      {name:"Miel de fleur 250g",price:5.50,qty:1,cat:"epicerie"}
+      // Boisson
+      {name:"Eau minerale 6x1.5L",price:3.50,qty:1,cat:"boisson",bc:"3700123300014"},
     ];
 
     // Clear cart first
@@ -2565,7 +2674,7 @@
     // Add items and register in product catalog
     var total=0;
     idealItems.forEach(function(item){
-      var bc=item.bc||("IDEAL-"+Date.now()+"-"+Math.random().toString(36).substr(2,4));
+      var bc=item.bc;
       var priceCents=Math.round(item.price*100);
       
       // Add to cart directly
@@ -2580,10 +2689,16 @@
       if(!_allProducts.find(function(p){return p.barcode===bc;})){
         var prodObj={id:bc,name:item.name,priceCents:priceCents,sale_price_cents:priceCents,category:item.cat,image:null,barcode:bc,last_updated:new Date().toISOString()};
         _allProducts.push(prodObj);
-        // Persist to IndexedDB so voice search can find it
         _dbPut(prodObj);
       }
     });
+
+    // Save basket to customer
+    _saveCustomerBasket(customerName, _myCart.map(function(it){
+      return {myId:it.myId,name:it.name,priceCents:it.priceCents,bc:it.bc,cat:it.cat,
+        weight:it.weight,unitType:it.unitType,pricePerUnit:it.pricePerUnit,
+        discountCents:it.discountCents||0,qty:it.qty||1};
+    }));
 
     // Update categories
     _buildCategories();
@@ -2596,7 +2711,7 @@
     }
 
     // Show success message
-    _toast("\u2705 Panier id\u00e9al charg\u00e9 \u2014 "+(total/100).toFixed(2).replace(".",",")+" \u20AC");
+    _toast("\u2705 Panier 200\u20AC charg\u00e9 pour "+customerName+" \u2014 "+(total/100).toFixed(2).replace(".",",")+" \u20AC");
   }
 
   // Seed ideal cart products to IndexedDB on boot (so search/voice can find them)
