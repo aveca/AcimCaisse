@@ -5273,6 +5273,10 @@
 
   window._acimGetCartInfo=_cartInfo;
   window._acimDebug=function(){return{cart:_myCart.length,ticket:_ticketSeq};};
+  // Debug: expose all products
+  window._acimGetAllProducts=function(){return _dbGetAll().then(function(all){return all||[];});};
+  // Debug: get sales history with products sold
+  window._acimGetSalesHistory=function(){return _getSalesHistory().then(function(s){return s||[];});};
   window._acimProcessBarcode=_processBarcode;
   window._acimAddToCart=function(name,price,cat){_addToCart(name,price,"",cat);};
   window._acimWeighProduct=_weighProduct;
