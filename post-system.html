@@ -686,18 +686,26 @@ function renderCartItems(){
 }
 function renderCartFoot(){
   const t=cartTotal();const f=feeCents();
-  const canOrder=t>0&&t>=resto().minCents;
-  const foot=`
-    <div class="ps-row"><span>Sous-total</span><b>${fmt(t)}</b></div>
-    <div class="ps-row ${f===0?"free":""}"><span>Livraison</span><b>${f===0?"GRATUITE":fmt(f)}</b></div>
-    <div class="ps-row tot"><span>TOTAL</span><span>${fmt(t+f)}</span></div>
-    <button class="ps-btn" onclick="openCheckout()" ${canOrder?"":"disabled"}>
-      <span>💰 Encaisser</span><span class="ps-btn__sub">${fmt(t+f)}</span>
-    </button>
-    ${t>0&&t<resto().minCents?`<div style="text-align:center;font-size:11.5px;color:#d0021b;margin-top:8px">Minimum de commande : ${fmt(resto().minCents)} (il manque ${fmt(resto().minCents-t)})</div>`:""}
-  `;
+  const min=resto().minCents;
+  const canOrder=t>0&&t>=min;
+  const underMin=t>0&&t<min;
+  const totalFmt=fmt(t+f);
+  const btnLabel = canOrder ? "💰 Encaisser" : (underMin ? "💰 Encore " + fmt(min - t) + " pour commander" : "💰 Ajoutez un produit");
+  const foot =
+    '<div class="ps-row"><span>Sous-total</span><b>' + fmt(t) + '</b></div>'
+    + '<div class="ps-row' + (f === 0 ? ' free' : '') + '"><span>Livraison</span><b>' + (f === 0 ? 'GRATUITE' : fmt(f)) + '</b></div>'
+    + '<div class="ps-row tot"><span>TOTAL</span><span>' + totalFmt + '</span></div>'
+    + '<button class="ps-btn" onclick="' + (canOrder ? "openCheckout()" : "underMinCheckout()") + '" ' + (t > 0 ? "" : "disabled") + '>'
+    + '<span>' + btnLabel + '</span><span class="ps-btn__sub">' + totalFmt + '</span></button>'
+    + (underMin ? '<div style="text-align:center;font-size:11.5px;color:#d0021b;margin-top:8px">Minimum de commande : ' + fmt(min) + ' &mdash; il manque ' + fmt(min - t) + '</div>' : '');
   $("ps-cart-foot").innerHTML=foot;
   $("ps-sheet-foot").innerHTML=foot;
+}
+function underMinCheckout(){
+  const t=cartTotal();const min=resto().minCents;
+  toast("Ajoutez encore " + fmt(min - t) + " pour atteindre le minimum de commande de " + fmt(min) + ".");
+  const grid=$("ps-grid");if(grid){grid.scrollIntoView({behavior:"smooth",block:"start"});}
+  const cats=$("ps-cats");if(cats){cats.scrollIntoView({behavior:"smooth",block:"start"});}
 }
 function renderAll(){renderResto();renderCats();renderGrid();renderCartItems();renderCartFoot();}
 

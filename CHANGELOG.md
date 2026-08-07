@@ -4,6 +4,15 @@ Toutes les modifications documentées ici. Sync FTP/local/GitHub à chaque modif
 
 ## 2026-08-07
 
+### Feature: Landing funnel de conversion (`landing.html`)
+- **Nouveau** : page d'accueil marketing style Uber Eats (hero, USP 3 blocs, carousel restaurants, CTA "Commander" sticky). Hero CTA + sticky CTA ouvrent `post-system.html` = funnel top → checkout.
+- **Pos** : footer copyright + liens Caisse/Post Studio/Source sur toutes les pages (`post-system.html`, `landing.html`).
+
+### Funnel & UX: sous-minimum guidé + checkout validé
+- **Bug (agent Playwright)** : bouton "💰 Encaisser" désactivé sous le minimum de commande SANS feedback actif → funnel bloqué.
+- **Fix** : bouton reste **activé** sous le minimum, libellé dynamique "💰 Encore X € pour commander", onclick=scroll vers les produits + toast guidé (au lieu d'un bouton mort). Le funnel ne hard-clean plus : conversion réelle validée (add → Encaisser → Espèces → Exact → ✅ Valider → Ticket n° + reçu + cart remis à 0).
+- **Tests** : `node tests/run-funnel.js` = 20 assertions, 0 erreur console (landing → POS → checkout → receipt, desktop + mobile).
+
 ### Feature: Post Studio — système de publications multi-restaurants (`post-studio.html`)
 - **Nouveau** : app React 19 + Vite + Tailwind (build single-file 388 kB, zéro requête externe) déployée sur GitHub Pages depuis le projet `post-studio/`. Style copycat Uber Eats (sidebar sombre, cartes arrondies, accent émeraude).
 - **Base** : fusion des 2 zips fournis (`uber-eats-restaurant-post-system` + `initial-user-greeting`) — le studio de publications de l'un, l'esprit dashboard de l'autre.

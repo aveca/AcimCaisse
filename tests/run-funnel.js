@@ -171,9 +171,64 @@ async function assertOk(name, cond, detail) {
   }
 
   // ============================================================
-  // 7. No console errors across the funnel
+  // 7. Real conversion funnel: POS checkout -> payment -> receipt
   // ============================================================
-  log('TEST 7: console errors');
+  log('TEST 7: POS checkout funnel (under-min guidance + conversion)');
+  try {
+    const pos = await newPage(ctx);
+    await pos.goto(BASE + 'post-system.html', { waitUntil: 'domcontentloaded', timeout: 20000 });
+    await pos.waitForSelector('#ps-grid', { state: 'attached', timeout: 10000 }).catch(() => {});
+    await pos.waitForTimeout(700);
+
+    // Add first product (single) -> should be UNDER minimum, button guided (not hard-disabled)
+    await pos.locator('button[onclick*="add("]').first().click();
+    await pos.waitForTimeout(500);
+    const underMinLabel = await pos.locator('.ps-btn').filter({ hasText: 'minimum' }).count();
+    if (underMinLabel === 0) {
+      // try alternate: button shows "pour commander"
+    }
+    const btnText = await pos.locator('button[onclick*="underMinCheckout"]').first().textContent().catch(() => '');
+    await assertOk('Bouton sous-minimum activé + guidé', btnText && btnText.toLowerCase().includes('encore'), String(btnText));
+
+    // Add a second product to clear the 10€ minimum and proceed to conversion
+    await pos.locator('button[onclick*="add("]').nth(2).click();
+    await pos.waitForTimeout(500);
+
+    // checkout
+    const encBtn = pos.locator('button', { hasText: 'Encaisser' });
+    const encCount = await encBtn.count();
+    await assertOk('Bouton 💰 Encaisser débloqué au-dessus du min', encCount > 0);
+    if (encCount > 0) await encBtn.first().click();
+    await pos.waitForTimeout(500);
+    const payModal = await pos.locator('#ps-co-overlay').count();
+    await assertOk('Modal paiement ouverte', payModal > 0);
+
+    // especes + Exact
+    await pos.locator('button', { hasText: 'Espèces' }).click();
+    await pos.waitForTimeout(300);
+    const exactBtn = pos.locator('button', { hasText: 'Exact' });
+    const exactCount = await exactBtn.count();
+    if (exactCount > 0) await exactBtn.first().click();
+    await pos.waitForTimeout(400);
+    await pos.locator('#ps-pay-ok').click(); // ✅ Valider
+    await pos.waitForTimeout(900);
+
+    const success = await pos.locator('.ps-success').count();
+    const ticket = await pos.locator('.ps-success .ticket').count();
+    await assertOk('✅ Commande enregistrée (success modal)', success > 0);
+    await assertOk('Ticket n° affiché', ticket > 0);
+    await pos.waitForTimeout(800);
+    const cartReset = await pos.locator('#ps-mbar-total').textContent().catch(() => '');
+    await assertOk('Cart vidé après paiement (0,00 €)', String(cartReset).includes('0,00'), cartReset);
+    await shot(pos, '07-pos-checkout');
+  } catch (e) {
+    await assertOk('POS checkout funnel', false, String(e.message || e));
+  }
+
+  // ============================================================
+  // 8. No console errors across the funnel
+  // ============================================================
+  log('TEST 8: console errors');
   await assertOk('Zero console errors', consoleErrors.length === 0, consoleErrors.slice(0, 3).join(' | '));
 
   await browser.close();
