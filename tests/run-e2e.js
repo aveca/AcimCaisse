@@ -161,7 +161,11 @@ async function assertOk(name, cond, detail) {
   try {
     await page.goto(BASE + 'tests.html', { waitUntil: 'domcontentloaded' });
     await page.waitForTimeout(7000);
-    await shot(page, '08-tests-html');
+    // Use viewport-only screenshot for tests.html — fullPage times out on the 1.7MB results DOM.
+    const file = path.join(SHOTS, '08-tests-html.png');
+    await page.screenshot({ path: file, fullPage: false });
+    results.shots++;
+    log('  Screenshot: 08-tests-html.png');
     const summary = await page.locator('#summary').textContent();
     log('  Self-test summary: ' + summary.trim());
     const failMatch = summary.match(/(\d+)\s*fail/i);
