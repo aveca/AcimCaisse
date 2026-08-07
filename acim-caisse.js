@@ -2294,25 +2294,27 @@
   // ─── CUSTOMER BASKETS (per-client saved baskets) ──────────
   function _loadCustomerBasket(name){
     if(!name) return Promise.resolve([]);
+    _log("_loadCustomerBasket called for: "+name);
     return _openUnifiedDB().then(function(db){
       if(!db) return [];
       return new Promise(function(resolve){
         var tx = db.transaction("customer_baskets", "readonly");
         var req = tx.objectStore("customer_baskets").get(name);
-        req.onsuccess = function(){ resolve((req.result&&req.result.basket)||[]); };
+        req.onsuccess = function(){ _log("_loadCustomerBasket result: "+((req.result&&req.result.basket)||[]).length+" items"); resolve((req.result&&req.result.basket)||[]); };
         req.onerror = function(){ resolve([]); };
       });
     });
   }
   function _saveCustomerBasket(name, basket){
     if(!name) return Promise.resolve();
+    _log("_saveCustomerBasket called for: "+name+" items: "+basket.length);
     return _openUnifiedDB().then(function(db){
       if(!db) return;
       return new Promise(function(resolve){
         var tx = db.transaction("customer_baskets", "readwrite");
         var req = tx.objectStore("customer_baskets").put({id:name, basket:basket, updatedAt:Date.now()});
-        req.onsuccess = function(){ resolve(); };
-        req.onerror = function(){ resolve(); };
+        req.onsuccess = function(){ _log("_saveCustomerBasket success"); resolve(); };
+        req.onerror = function(){ _log("_saveCustomerBasket error"); resolve(); };
       });
     });
   }
@@ -2334,7 +2336,7 @@
       return new Promise(function(resolve){
         var tx = db.transaction("customer_baskets", "readonly");
         var req = tx.objectStore("customer_baskets").getAll();
-        req.onsuccess = function(){ resolve((req.result||[]).map(function(r){return {name:r.id, updatedAt:r.updatedAt};})); };
+        req.onsuccess = function(){ _log("_listCustomerBaskets: "+(req.result||[]).length+" baskets"); resolve((req.result||[]).map(function(r){return {name:r.id, updatedAt:r.updatedAt};})); };
         req.onerror = function(){ resolve([]); };
       });
     });
@@ -2630,6 +2632,7 @@ function _showIdealCart(){
   }
 
   function _loadIdealCartForCustomer(customerName){
+    _log("Loading ideal cart for: "+customerName);
     _toast("👤 Client: "+customerName+" — chargement panier 200€...");
     
     var idealItems=[
@@ -2694,11 +2697,14 @@ function _showIdealCart(){
     });
 
     // Save basket to customer
+    _log("Saving basket for "+customerName+" with "+_myCart.length+" items");
     _saveCustomerBasket(customerName, _myCart.map(function(it){
       return {myId:it.myId,name:it.name,priceCents:it.priceCents,bc:it.bc,cat:it.cat,
         weight:it.weight,unitType:it.unitType,pricePerUnit:it.pricePerUnit,
         discountCents:it.discountCents||0,qty:it.qty||1};
-    }));
+    })).then(function(){
+      _log("Basket saved successfully");
+    });
 
     // Update categories
     _buildCategories();
