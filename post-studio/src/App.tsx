@@ -298,6 +298,7 @@ export default function App() {
   };
 
   const deletePublication = (id: string) => {
+    if (!window.confirm("Supprimer cette publication ? Cette action est irréversible.")) return;
     setPublications((current) => current.filter((item) => item.id !== id));
     setToast("Publication supprimée");
   };

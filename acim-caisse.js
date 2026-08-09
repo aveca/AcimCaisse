@@ -2404,6 +2404,11 @@ if(isWeighed&&it.weight!=null){
   }
 
   // ─── PR C — UI minimale (login + badge opérateur) ─────────────────
+  var _loginAttempts = 0;
+  var _loginLockoutUntil = 0;
+  var _LOGIN_MAX_ATTEMPTS = 5;
+  var _LOGIN_LOCKOUT_MS = 30000; // 30s lockout
+
   function _showLogin(){
     var old=document.getElementById("acim-login"); if(old) old.remove();
     var ov=document.createElement("div"); ov.id="acim-login";
@@ -2416,6 +2421,8 @@ if(isWeighed&&it.weight!=null){
     var inp=document.createElement("input"); inp.type="password"; inp.inputMode="numeric"; inp.pattern="[0-9]*";
     inp.placeholder="PIN"; inp.style.cssText="width:100%;font-size:22px;font-weight:700;padding:10px;border:3px solid #e0e0e0;border-radius:8px;outline:none;text-align:center;letter-spacing:8px;box-sizing:border-box;";
     card.appendChild(inp);
+    var hint=document.createElement("div"); hint.style.cssText="font-size:11px;color:#999;text-align:center;margin-top:6px;";
+    hint.textContent="PIN par défaut : 1234"; card.appendChild(hint);
     var br=document.createElement("div"); br.style.cssText="display:flex;gap:8px;margin-top:12px;";
     var bCancel=document.createElement("button"); bCancel.textContent="Annuler";
     bCancel.style.cssText="flex:1;padding:10px;border:2px solid #e0e0e0;border-radius:8px;background:#fff;font-size:15px;cursor:pointer;";
@@ -2423,13 +2430,32 @@ if(isWeighed&&it.weight!=null){
     var bOk=document.createElement("button"); bOk.textContent="✅ Connexion";
     bOk.style.cssText="flex:2;padding:10px;border:none;border-radius:8px;background:#2e7d32;color:#fff;font-size:15px;cursor:pointer;font-weight:700;";
     bOk.onclick=function(){
+      var now = Date.now();
+      if(now < _loginLockoutUntil){
+        var remaining = Math.ceil((_loginLockoutUntil - now) / 1000);
+        err.textContent = "Trop de tentatives. Réessayez dans " + remaining + "s";
+        return;
+      }
       var pin = inp.value.trim();
       if(!_PIN_REGEX.test(pin)){ err.textContent="PIN invalide (4-8 chiffres)"; return; }
       bOk.disabled = true; bOk.textContent = "…";
       _loginWithPin(pin).then(function(r){
         bOk.disabled = false; bOk.textContent = "✅ Connexion";
-        if(r.ok){ ov.remove(); _toast("👤 Bonjour "+r.actor.name); _refreshActorBadge(); }
-        else { err.textContent = "PIN incorrect"; inp.value=""; inp.focus(); }
+        if(r.ok){
+          _loginAttempts = 0; _loginLockoutUntil = 0;
+          ov.remove(); _toast("👤 Bonjour "+r.actor.name); _refreshActorBadge();
+        } else {
+          _loginAttempts++;
+          if(_loginAttempts >= _LOGIN_MAX_ATTEMPTS){
+            _loginLockoutUntil = Date.now() + _LOGIN_LOCKOUT_MS;
+            _loginAttempts = 0;
+            err.textContent = "Trop de tentatives. Verrouillé 30 secondes.";
+          } else {
+            var remaining = _LOGIN_MAX_ATTEMPTS - _loginAttempts;
+            err.textContent = "PIN incorrect (" + remaining + " tentative" + (remaining>1?"s":"") + " restante" + (remaining>1?"s":"") + ")";
+          }
+          inp.value=""; inp.focus();
+        }
       });
     };
     br.appendChild(bCancel); br.appendChild(bOk); card.appendChild(br);

@@ -818,8 +818,10 @@ function renderPayBody(){
 function setCash(v){const c=$("ps-cash");if(c){c.value=(v/100).toFixed(2);updateChange();}}
 function updateChange(){
   const c=$("ps-cash");if(!c)return;
+  let val=parseFloat(c.value)||0;
+  if(val<0){val=0;c.value="0";}
   const total=cartTotal()+feeCents();
-  const rec=Math.round((parseFloat(c.value)||0)*100);
+  const rec=Math.round(val*100);
   const line=$("ps-change-line");if(!line)return;
   if(payMode==="especes"){
     if(rec>=total)line.textContent="Rendu : "+fmt(rec-total);
@@ -956,6 +958,25 @@ function switchResto(){
     </div>`;
 }
 function selectResto(i){
+  if(cart.length>0){
+    const html=`
+      <div class="ps-modal-overlay" onclick="if(event.target===this)closeModal()">
+        <div class="ps-modal" style="width:360px">
+          <h2>⚠️ Panier non vide</h2>
+          <div class="sub">Voulez-vous vraiment changer de restaurant ? Le panier actuel (${cartCount()} article${cartCount()>1?"s":""}) sera vidé.</div>
+          <div class="ps-btn-row">
+            <button class="ps-btn ghost" onclick="closeModal()">Annuler</button>
+            <button class="ps-btn" style="background:#d0021b" onclick="_confirmSwitchResto(${i})">Vider et changer</button>
+          </div>
+        </div>
+      </div>`;
+    $("ps-modals").innerHTML=html;
+    return;
+  }
+  _doSwitchResto(i);
+}
+function _confirmSwitchResto(i){closeModal();_doSwitchResto(i);}
+function _doSwitchResto(i){
   state.resto=i;state.cat="";
   clearCart();closeModal();renderAll();
   toast("🏪 "+RESTOS[i].name);
