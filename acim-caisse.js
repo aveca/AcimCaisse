@@ -990,13 +990,16 @@
     _posSearch.className="mk-search__input";
     _posSearch.type="text";
     _posSearch.placeholder="Rechercher un produit ou scanner un code-barres...";
+    var _searchDebounce=null;
     _posSearch.addEventListener("input",function(){
+      var self=this;
       if(_allProducts.length===0){_refreshAndFilter();return;}
-      _filterProducts();
+      clearTimeout(_searchDebounce);
+      _searchDebounce=setTimeout(function(){_filterProducts();},250);
     });
     _posSearch.addEventListener("keydown",function(e){
       if(e.key==="Enter"){var v=this.value.trim();if(v.length>=2){_processBarcode(v);this.value="";this.focus();}}
-      if(e.key==="Escape"){this.value="";_filterProducts();this.blur();}
+      if(e.key==="Escape"){this.value="";clearTimeout(_searchDebounce);_filterProducts();this.blur();}
     });
     searchWrap.appendChild(_posSearch);
 
@@ -1948,6 +1951,8 @@ if(isWeighed&&it.weight!=null){
     ov.appendChild(card);
     ov.onclick=function(e){if(e.target===ov)ov.remove();};
     document.body.appendChild(ov);
+    _trapFocus(ov);
+    ov.addEventListener("keydown",function(e){if(e.key==="Escape"){ov.remove();}});
     setTimeout(function(){if(selectedMode==="especes")cashInput.focus();},100);
   }
 
@@ -5231,6 +5236,24 @@ idealItems.forEach(function(item, index){
     });
   }
 
+  // ─── FOCUS TRAP ──────────────────────────────────────
+  function _trapFocus(overlay){
+    if(!overlay)return;
+    var focusableSelectors='button:not([disabled]),[href],input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
+    overlay.addEventListener("keydown",function(e){
+      if(e.key!=="Tab")return;
+      var focusable=Array.prototype.slice.call(overlay.querySelectorAll(focusableSelectors));
+      if(focusable.length===0)return;
+      var first=focusable[0],last=focusable[focusable.length-1];
+      if(e.shiftKey){
+        if(document.activeElement===first){e.preventDefault();last.focus();}
+      }else{
+        if(document.activeElement===last){e.preventDefault();first.focus();}
+      }
+    });
+    setTimeout(function(){var first=overlay.querySelector(focusableSelectors);if(first)first.focus();},100);
+  }
+
   // ─── TOAST ────────────────────────────────────────────
   function _toast(msg){
     if(!msg)return;var old=document.getElementById("acim-toast");if(old)old.remove();
@@ -5588,6 +5611,12 @@ idealItems.forEach(function(item, index){
       if(e.ctrlKey&&e.key==="k"){e.preventDefault();if(_posSearch)_posSearch.focus();}
       if(e.ctrlKey&&e.key==="n"){e.preventDefault();_quickCreate("",0);}
     });
+    // Offline indicator
+    var offlineBanner=document.createElement("div");offlineBanner.className="mk-offline-banner";offlineBanner.id="acim-offline-banner";
+    offlineBanner.textContent="⚡ Mode hors-ligne — les données seront synchronisées";
+    document.body.appendChild(offlineBanner);
+    window.addEventListener("offline",function(){offlineBanner.classList.add("visible");});
+    window.addEventListener("online",function(){offlineBanner.classList.remove("visible");_toast("✅ Connexion rétablie");});
   }
 
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",init);else init();
