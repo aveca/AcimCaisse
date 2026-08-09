@@ -323,9 +323,13 @@
     var icon=_catIcon(cat);
     var initials=(name||"?").split(" ").slice(0,2).map(function(w){return w.charAt(0).toUpperCase();}).join("");
     var svg='<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">';
-    svg+='<rect width="200" height="200" fill="'+bg+'"/>';
-    svg+='<text x="100" y="90" text-anchor="middle" font-size="72" fill="rgba(0,0,0,0.08)">'+icon+'</text>';
-    svg+='<text x="100" y="145" text-anchor="middle" font-size="32" font-weight="800" fill="rgba(0,0,0,0.18)" font-family="-apple-system,sans-serif">'+initials+'</text>';
+    svg+='<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">';
+    svg+='<stop offset="0%" stop-color="'+bg+'" stop-opacity="1"/>';
+    svg+='<stop offset="100%" stop-color="'+bg+'" stop-opacity="0.6"/>';
+    svg+='</linearGradient></defs>';
+    svg+='<rect width="200" height="200" fill="url(#g)"/>';
+    svg+='<text x="100" y="85" text-anchor="middle" font-size="56" opacity="0.25">'+icon+'</text>';
+    svg+='<text x="100" y="150" text-anchor="middle" font-size="36" font-weight="800" fill="rgba(0,0,0,0.22)" font-family="-apple-system,BlinkMacSystemFont,sans-serif">'+initials+'</text>';
     svg+='</svg>';
     return "data:image/svg+xml,"+encodeURIComponent(svg);
   }
@@ -1021,6 +1025,8 @@
 
     _pos.appendChild(header);
 
+    _pos.appendChild(header);
+
     // ── CATEGORIES (horizontal scroll icons) ──
     var catsWrap=document.createElement("div");
     catsWrap.className="mk-categories";
@@ -1057,12 +1063,13 @@
     _posGrid=document.createElement("div");
     _posGrid.id="acim-pos-grid";
     _posGrid.className="mk-products__grid";
+    _renderSkeletonGrid(24);
     productsWrap.appendChild(_posGrid);
     _pos.appendChild(productsWrap);
 
     // ── BOTTOM NAV ──
     var nav=document.createElement("div");
-    nav.className="acim-bottom-nav";
+    nav.className="mk-nav";
 
     var navItems=[
       {icon:"\uD83C\uDFE0",label:"Accueil",active:true},
@@ -1214,7 +1221,7 @@
 
     // Wrap products + desktop cart in a flex row, insert before bottom nav
     var bodyRow=document.createElement("div");
-    bodyRow.style.cssText="flex:1;display:flex;overflow:hidden;";
+    bodyRow.style.cssText="flex:1 1 0%;display:flex;overflow:hidden;min-height:0;";
     bodyRow.appendChild(productsWrap);
     bodyRow.appendChild(desktopCart);
     _pos.insertBefore(bodyRow,_pos.querySelector(".mk-nav"));
@@ -1337,6 +1344,32 @@
   }
   function _refreshAndFilter(){
     _dbGetAll().then(function(all){_allProducts=all||[];_filterProducts();});
+  }
+
+  function _renderSkeletonGrid(count){
+    if(!_posGrid)return;
+    _posGrid.innerHTML="";
+    var n=count||24;
+    for(var i=0;i<n;i++){
+      var card=document.createElement("div");
+      card.className="mk-skeleton-card";
+      var img=document.createElement("div");
+      img.className="mk-skeleton-card__img";
+      card.appendChild(img);
+      var body=document.createElement("div");
+      body.className="mk-skeleton-card__body";
+      var name1=document.createElement("div");
+      name1.className="mk-skeleton-card__name";
+      body.appendChild(name1);
+      var name2=document.createElement("div");
+      name2.className="mk-skeleton-card__name-2";
+      body.appendChild(name2);
+      var price=document.createElement("div");
+      price.className="mk-skeleton-card__price";
+      body.appendChild(price);
+      card.appendChild(body);
+      _posGrid.appendChild(card);
+    }
   }
 
   function _renderGrid(){
