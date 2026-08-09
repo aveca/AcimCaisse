@@ -4,6 +4,14 @@
   var _log=function(m){console.log("[Acim] "+m);};
   var _err=function(m,e){console.error("[Acim] "+m,e);};
 
+  // ─── AUDIT LOG (Sprint 3 — immuable) ────────────────────
+  function _logAudit(action, detail){
+    try{
+      var entry={action:action, detail:detail||"", timestamp:Date.now(), actor:_getCurrentActor?(_getCurrentActor()?_getCurrentActor().name||"unknown":"unknown"):"unknown"};
+      _openUnifiedDB().then(function(db){ if(!db) return; try{ var tx=db.transaction("audit","readwrite"); var st=tx.objectStore("audit"); st.add(entry); }catch(e){} });
+    }catch(e){}
+  }
+
   // ─── MULTI-TAB LOCK ──────────────────────────────────
   var _tabLockKey="acim-caisse-tab-lock";
   var _tabId=Date.now()+"-"+Math.floor(Math.random()*99999);
