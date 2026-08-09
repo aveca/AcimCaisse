@@ -1724,6 +1724,9 @@ if(isWeighed&&it.weight!=null){
     _scanBuf="";
   }
   document.addEventListener("keydown",function(e){
+    // Ne pas intercepter si un champ de saisie est focus
+    var ae=document.activeElement;
+    if(ae&&(ae.tagName==="INPUT"||ae.tagName==="TEXTAREA"||ae.isContentEditable))return;
     // Scan toujours prioritaire, quel que soit le focus
     if(/^[0-9]$/.test(e.key)){
       var now=Date.now();
