@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+    branches: [gh-pages]
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Syntax check acim-caisse.js
+        run: node -c acim-caisse.js
+      - name: Start serve.js
+        run: node serve.js &
+      - name: Run E2E tests
+        run: node tests/run-e2e.js
+
+  deploy:
+    needs: ci
+    runs-on: ubuntu-latest
+    if: success()
+    steps:
+      - uses: actions/checkout@v4
+      - name: Push / Deploy
+        run: echo "CI passed — push/deploy permitted."

@@ -323,13 +323,9 @@
     var icon=_catIcon(cat);
     var initials=(name||"?").split(" ").slice(0,2).map(function(w){return w.charAt(0).toUpperCase();}).join("");
     var svg='<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">';
-    svg+='<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">';
-    svg+='<stop offset="0%" stop-color="'+bg+'" stop-opacity="1"/>';
-    svg+='<stop offset="100%" stop-color="'+bg+'" stop-opacity="0.6"/>';
-    svg+='</linearGradient></defs>';
-    svg+='<rect width="200" height="200" fill="url(#g)"/>';
-    svg+='<text x="100" y="85" text-anchor="middle" font-size="56" opacity="0.25">'+icon+'</text>';
-    svg+='<text x="100" y="150" text-anchor="middle" font-size="36" font-weight="800" fill="rgba(0,0,0,0.22)" font-family="-apple-system,BlinkMacSystemFont,sans-serif">'+initials+'</text>';
+    svg+='<rect width="200" height="200" fill="'+bg+'"/>';
+    svg+='<text x="100" y="90" text-anchor="middle" font-size="72" fill="rgba(0,0,0,0.08)">'+icon+'</text>';
+    svg+='<text x="100" y="145" text-anchor="middle" font-size="32" font-weight="800" fill="rgba(0,0,0,0.18)" font-family="-apple-system,sans-serif">'+initials+'</text>';
     svg+='</svg>';
     return "data:image/svg+xml,"+encodeURIComponent(svg);
   }
@@ -838,24 +834,6 @@
     }return info;
   }
   function _removeFromCart(idx){_myCart.splice(idx,1);_renderPOS();}
-  function _incrementCartItem(idx){
-    var it=_myCart[idx];if(!it)return;
-    var unit=it.unitCents||it.priceCents;
-    it.unitCents=unit;
-    it.qty=(it.qty||1)+1;
-    it.priceCents=unit*it.qty;
-    _renderPOS();
-  }
-  function _decrementCartItem(idx){
-    var it=_myCart[idx];if(!it)return;
-    var q=(it.qty||1)-1;
-    if(q<1){_removeFromCart(idx);return;}
-    var unit=it.unitCents||it.priceCents;
-    it.unitCents=unit;
-    it.qty=q;
-    it.priceCents=unit*q;
-    _renderPOS();
-  }
   function _cartSubtotal(){
     var t=0;for(var i=0;i<_myCart.length;i++)t+=_myCart[i].priceCents;return t;
   }
@@ -931,47 +909,32 @@
     if(_pos)return;
     _pos=document.createElement("div");_pos.id="acim-pos";
 
-    // ── HEADER ──
+    // ── GREEN HEADER ──
     var header=document.createElement("div");
-    header.className="mk-header";
+    header.className="acim-header";
 
     var headerTop=document.createElement("div");
-    headerTop.className="mk-header__top";
-
-    var headerBrand=document.createElement("div");
-    headerBrand.className="mk-header__brand";
-
-    var headerLogo=document.createElement("div");
-    headerLogo.className="mk-header__logo";
-    headerLogo.textContent="🏪";
+    headerTop.className="acim-header-top";
 
     var headerTitle=document.createElement("div");
-    headerTitle.className="mk-header__title";
-    headerTitle.textContent=_settings.storeName||"AcimCaisse";
+    headerTitle.className="acim-header-title";
+    headerTitle.textContent="\uD83C\uDFEA "+(_settings.storeName||"AcimCaisse");
     headerTitle.onclick=function(){_showMainMenu();};
     headerTitle.style.cursor="pointer";
-
-    var headerSubtitle=document.createElement("div");
-    headerSubtitle.className="mk-header__subtitle";
-    headerSubtitle.textContent="Mode Makolette";
-
-    headerBrand.appendChild(headerLogo);
-    headerBrand.appendChild(headerTitle);
-    headerBrand.appendChild(headerSubtitle);
-    headerTop.appendChild(headerBrand);
+    headerTop.appendChild(headerTitle);
 
     var headerActions=document.createElement("div");
-    headerActions.className="mk-header__actions";
+    headerActions.className="acim-header-actions";
 
     var newBtn=document.createElement("button");
-    newBtn.className="mk-icon-btn";
+    newBtn.className="acim-header-btn";
     newBtn.innerHTML="+";
     newBtn.title="Nouveau produit (Ctrl+N)";
     newBtn.onclick=function(){_quickCreate("",0);};
     headerActions.appendChild(newBtn);
 
     var closeBtn=document.createElement("button");
-    closeBtn.className="mk-icon-btn";
+    closeBtn.className="acim-header-btn";
     closeBtn.innerHTML="\u2715";
     closeBtn.title="Fermer la caisse";
     closeBtn.onclick=function(){_togglePOS(false);};
@@ -982,41 +945,29 @@
 
     // Search bar
     var searchWrap=document.createElement("div");
-    searchWrap.className="mk-search";
+    searchWrap.className="acim-search";
 
     var searchIcon=document.createElement("span");
-    searchIcon.className="mk-search__icon";
+    searchIcon.className="acim-search-icon";
     searchIcon.innerHTML="\uD83D\uDD0D";
     searchWrap.appendChild(searchIcon);
 
     _posSearch=document.createElement("input");
     _posSearch.id="acim-pos-search";
-    _posSearch.className="mk-search__input";
+    _posSearch.className="acim-search-input";
     _posSearch.type="text";
     _posSearch.placeholder="Rechercher un produit ou scanner un code-barres...";
-    var _searchDebounce=null;
     _posSearch.addEventListener("input",function(){
-      var self=this;
       if(_allProducts.length===0){_refreshAndFilter();return;}
-      clearTimeout(_searchDebounce);
-      _searchDebounce=setTimeout(function(){_filterProducts();},250);
+      _filterProducts();
     });
     _posSearch.addEventListener("keydown",function(e){
       if(e.key==="Enter"){var v=this.value.trim();if(v.length>=2){_processBarcode(v);this.value="";this.focus();}}
-      if(e.key==="Escape"){this.value="";clearTimeout(_searchDebounce);_filterProducts();this.blur();}
+      if(e.key==="Escape"){this.value="";_filterProducts();this.blur();}
     });
     searchWrap.appendChild(_posSearch);
 
-    // Voice search button
-    var voiceBtn=document.createElement("button");
-    voiceBtn.id="mk-search-voice";
-    voiceBtn.className="mk-search__voice";
-    voiceBtn.innerHTML="🎤";
-    voiceBtn.title="Recherche vocale";
-    voiceBtn.onclick=function(){_toggleVoiceSearch();};
-    searchWrap.appendChild(voiceBtn);
-
-    // Actor badge (inline in search bar)
+    // Actor badge (PR C) — inline in search bar
     var actorBadge=document.createElement("div");
     actorBadge.id="acim-actor-badge";
     searchWrap.appendChild(actorBadge);
@@ -1025,14 +976,12 @@
 
     _pos.appendChild(header);
 
-    _pos.appendChild(header);
-
     // ── CATEGORIES (horizontal scroll icons) ──
     var catsWrap=document.createElement("div");
-    catsWrap.className="mk-categories";
+    catsWrap.className="acim-categories";
 
     var catsScroll=document.createElement("div");
-    catsScroll.className="mk-categories__wrapper";
+    catsScroll.className="acim-categories-scroll";
     catsScroll.id="acim-pos-cats";
     catsWrap.appendChild(catsScroll);
     _posCats=catsScroll;
@@ -1041,35 +990,17 @@
 
     // ── PRODUCTS GRID ──
     var productsWrap=document.createElement("div");
-    productsWrap.className="mk-products";
-
-    var productsHeader=document.createElement("div");
-    productsHeader.className="mk-products__header";
-
-    var productsCount=document.createElement("span");
-    productsCount.className="mk-products__count";
-    productsCount.id="mk-products-count";
-    productsHeader.appendChild(productsCount);
-
-    var productsSort=document.createElement("button");
-    productsSort.className="mk-products__sort";
-    productsSort.innerHTML="⇅ Trier";
-    productsSort.title="Trier les produits";
-    productsSort.onclick=function(){_toggleSort();};
-    productsHeader.appendChild(productsSort);
-
-    productsWrap.appendChild(productsHeader);
+    productsWrap.className="acim-products";
 
     _posGrid=document.createElement("div");
     _posGrid.id="acim-pos-grid";
-    _posGrid.className="mk-products__grid";
-    _renderSkeletonGrid(24);
+    _posGrid.className="acim-products-grid";
     productsWrap.appendChild(_posGrid);
     _pos.appendChild(productsWrap);
 
     // ── BOTTOM NAV ──
     var nav=document.createElement("div");
-    nav.className="mk-nav";
+    nav.className="acim-bottom-nav";
 
     var navItems=[
       {icon:"\uD83C\uDFE0",label:"Accueil",active:true},
@@ -1088,78 +1019,58 @@
 
     // ── CART FAB (mobile) ──
     var fab=document.createElement("button");
-    fab.className="mk-cart-fab hidden";
+    fab.className="acim-cart-fab hidden";
     fab.id="acim-cart-fab";
-    fab.innerHTML='<span class="mk-cart-fab__icon">🛒</span><span class="mk-cart-fab__label">Panier</span><span class="mk-cart-fab__count" id="acim-cart-fab-count">0</span><span class="mk-cart-fab__total" id="acim-cart-fab-total">0,00 \u20AC</span>';
+    fab.innerHTML='<span id="acim-cart-fab-count">0</span> article(s) \u2014 <span id="acim-cart-fab-total">0,00 \u20AC</span>';
     fab.onclick=function(){_openCartSheet();};
     _pos.appendChild(fab);
 
     // ── CART BOTTOM SHEET ──
     var sheetOverlay=document.createElement("div");
-    sheetOverlay.className="mk-sheet-overlay";
+    sheetOverlay.className="acim-sheet-overlay";
     sheetOverlay.id="acim-sheet-overlay";
     sheetOverlay.onclick=function(){_closeCartSheet();};
     _pos.appendChild(sheetOverlay);
 
     var sheet=document.createElement("div");
-    sheet.className="mk-sheet";
+    sheet.className="acim-sheet";
     sheet.id="acim-sheet";
 
     var sheetHandle=document.createElement("div");
-    sheetHandle.className="mk-sheet__handle";
+    sheetHandle.className="acim-sheet-handle";
+    sheet.appendChild(sheetHandle);
 
     var sheetHeader=document.createElement("div");
-    sheetHeader.className="mk-sheet__header";
-
-    var sheetTitleRow=document.createElement("div");
-    sheetTitleRow.className="mk-sheet__title-row";
-
-    var sheetTitle=document.createElement("div");
-    sheetTitle.className="mk-sheet__title";
-    sheetTitle.textContent="🛒 Panier";
-
-    var sheetClose=document.createElement("button");
-    sheetClose.className="mk-sheet__close";
-    sheetClose.innerHTML="✕";
-    sheetClose.onclick=function(){_closeCartSheet();};
-    sheetTitleRow.appendChild(sheetTitle);
-    sheetTitleRow.appendChild(sheetClose);
-    sheetHeader.appendChild(sheetTitleRow);
-
-    var sheetSubtitle=document.createElement("div");
-    sheetSubtitle.className="mk-sheet__subtitle";
-    sheetSubtitle.id="mk-sheet-subtitle";
-    sheetSubtitle.textContent="0 article(s)";
-    sheetHeader.appendChild(sheetSubtitle);
+    sheetHeader.className="acim-sheet-header";
+    sheetHeader.innerHTML='<div class="acim-sheet-title">Panier<button class="acim-sheet-close" onclick="_closeCartSheet()">\u2715</button></div>';
     sheet.appendChild(sheetHeader);
 
     _posItems=document.createElement("div");
-    _posItems.className="mk-sheet__items";
+    _posItems.className="acim-sheet-items";
     _posItems.id="acim-pos-items";
     sheet.appendChild(_posItems);
 
     var sheetFooter=document.createElement("div");
-    sheetFooter.className="mk-sheet__footer";
-    sheetFooter.id="acim-sheet-footer";
+    sheetFooter.className="acim-sheet-footer";
 
     // Subtotal
     var subRow=document.createElement("div");
-    subRow.className="mk-sheet__row";
-    subRow.innerHTML='<span class="mk-sheet__row-label">Sous-total</span>';
+    subRow.className="acim-sheet-row";
+    subRow.innerHTML='<span class="acim-sheet-row-label">Sous-total</span>';
     _posSubtotal=document.createElement("span");
-    _posSubtotal.className="mk-sheet__row-value";
+    _posSubtotal.className="acim-sheet-row-value";
     _posSubtotal.textContent="0,00 \u20AC";
     subRow.appendChild(_posSubtotal);
     sheetFooter.appendChild(subRow);
 
     // Discount (hidden by default)
     var discRow=document.createElement("div");
-    discRow.className="mk-sheet__row mk-sheet__row--discount";
+    discRow.className="acim-sheet-row discount";
     discRow.id="acim-disc-row";
     discRow.style.display="none";
-    discRow.innerHTML='<span class="mk-sheet__row-label">Remise</span>';
+    discRow.innerHTML='<span class="acim-sheet-row-label">Remise</span>';
     _posDiscount=document.createElement("span");
-    _posDiscount.className="mk-sheet__row-value";
+    _posDiscount.className="acim-sheet-row-value";
     _posDiscount.textContent="-0,00 \u20AC";
     discRow.appendChild(_posDiscount);
     sheetFooter.appendChild(discRow);
@@ -1176,13 +1087,13 @@
 
     // Total
     var totalRow=document.createElement("div");
-    totalRow.className="mk-sheet__total";
+    totalRow.className="acim-sheet-total";
     var finalLabel=document.createElement("span");
-    finalLabel.className="mk-sheet__total-label";
+    finalLabel.className="acim-sheet-total-label";
     finalLabel.textContent="TOTAL";
     _posTotal=document.createElement("span");
     _posTotal.id="acim-pos-total";
-    _posTotal.className="mk-sheet__total-value";
+    _posTotal.className="acim-sheet-total-value";
     _posTotal.textContent="0,00 €";
     totalRow.appendChild(finalLabel);
     totalRow.appendChild(_posTotal);
@@ -1190,7 +1101,7 @@
 
     // Checkout
     _posCheckout=document.createElement("button");
-    _posCheckout.className="mk-sheet__checkout";
+    _posCheckout.className="acim-sheet-checkout";
     _posCheckout.id="acim-pos-checkout";
     _posCheckout.textContent="\uD83D\uDCB0 Encaisser";
     _posCheckout.onclick=function(){_startPayment();};
@@ -1201,30 +1112,30 @@
 
     // ── DESKTOP CART PANEL (hidden on mobile via CSS) ──
     var desktopCart=document.createElement("div");
-    desktopCart.className="mk-desktop-cart";
+    desktopCart.className="acim-desktop-cart";
     desktopCart.id="acim-desktop-cart";
 
     var dcHeader=document.createElement("div");
-    dcHeader.className="mk-desktop-cart__header";
-    dcHeader.innerHTML='<span>🛒 Ticket</span><span id="acim-pos-count">0 article</span>';
+    dcHeader.className="acim-desktop-cart-header";
+    dcHeader.innerHTML='<span>\uD83D\uDED2 Ticket</span><span id="acim-pos-count">0 article</span>';
     desktopCart.appendChild(dcHeader);
 
     var dcItems=document.createElement("div");
-    dcItems.className="mk-desktop-cart__items";
+    dcItems.className="acim-desktop-cart-items";
     dcItems.id="acim-desktop-cart-items";
     desktopCart.appendChild(dcItems);
 
     var dcFooter=document.createElement("div");
-    dcFooter.className="mk-desktop-cart__footer";
+    dcFooter.className="acim-desktop-cart-footer";
     dcFooter.id="acim-desktop-cart-footer";
     desktopCart.appendChild(dcFooter);
 
     // Wrap products + desktop cart in a flex row, insert before bottom nav
     var bodyRow=document.createElement("div");
-    bodyRow.style.cssText="flex:1 1 0%;display:flex;overflow:hidden;min-height:0;";
+    bodyRow.style.cssText="flex:1;display:flex;overflow:hidden;";
     bodyRow.appendChild(productsWrap);
     bodyRow.appendChild(desktopCart);
-    _pos.insertBefore(bodyRow,_pos.querySelector(".mk-nav"));
+    _pos.insertBefore(bodyRow,_pos.querySelector(".acim-bottom-nav"));
 
     _buildCategories();
     document.body.appendChild(_pos);
@@ -1236,15 +1147,15 @@
     _posCats.innerHTML="";
     // "Tous" category
     var allItem=document.createElement("div");
-    allItem.className="mk-category"+(_activeCat?"":" mk-category--active");
-    allItem.innerHTML='<div class="mk-category__icon">📦</div><div class="mk-category__label">Tous</div>';
+    allItem.className="acim-category-item"+(_activeCat?"":" active");
+    allItem.innerHTML='<div class="acim-category-icon">\uD83D\uDCE6</div><div class="acim-category-label">Tous</div>';
     allItem.onclick=function(){_activeCat="";_refreshCategories();_filterProducts();};
     _posCats.appendChild(allItem);
     // Other categories
     CATS.forEach(function(cat){
       var item=document.createElement("div");
-      item.className="mk-category"+(_activeCat===cat.id?" mk-category--active":"");
-      item.innerHTML='<div class="mk-category__icon">'+cat.ic+'</div><div class="mk-category__label">'+cat.id+'</div>';
+      item.className="acim-category-item"+(_activeCat===cat.id?" active":"");
+      item.innerHTML='<div class="acim-category-icon">'+cat.ic+'</div><div class="acim-category-label">'+cat.id+'</div>';
       item.onclick=function(){_activeCat=(_activeCat===cat.id)?"":cat.id;_refreshCategories();_filterProducts();};
       _posCats.appendChild(item);
     });
@@ -1287,41 +1198,13 @@
     var total=_cartTotal();
     if(count>0){
       fab.classList.remove("hidden");
-      var cEl=document.getElementById("acim-cart-fab-count");if(cEl)cEl.textContent=count;
-      var tEl=document.getElementById("acim-cart-fab-total");if(tEl)tEl.textContent=(total/100).toFixed(2).replace(".",",")+" \u20AC";
+      document.getElementById("acim-cart-fab-count").textContent=count;
+      document.getElementById("acim-cart-fab-total").textContent=(total/100).toFixed(2).replace(".",",")+" \u20AC";
     }else{
       fab.classList.add("hidden");
     }
   }
 
-  function _toggleSort(){
-    _sortMode=_sortMode==="smart"?"alpha":(_sortMode==="alpha"?"price":"smart");
-    _filterProducts();
-    var btn=document.querySelector(".mk-products__sort");
-    if(btn)btn.textContent=_sortMode==="smart"?"⇅ Trier":(_sortMode==="alpha"?"⇅ A→Z":"⇅ Prix");
-    _toast("Tri : "+(_sortMode==="smart"?"pertinence":(_sortMode==="alpha"?"alphabétique":"par prix")));
-  }
-
-  function _toggleVoiceSearch(){
-    var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-    if(!SR){_toast("Recherche vocale non supportée par ce navigateur");return;}
-    var vBtn=document.getElementById("mk-search-voice");
-    var rec=new SR();
-    rec.lang="fr-FR";
-    rec.interimResults=false;
-    rec.maxAlternatives=1;
-    rec.onstart=function(){if(vBtn)vBtn.classList.add("mk-search__voice--listening");};
-    rec.onend=function(){if(vBtn)vBtn.classList.remove("mk-search__voice--listening");};
-    rec.onresult=function(ev){
-      var txt="";
-      for(var i=0;i<ev.results.length;i++)txt+=ev.results[i][0].transcript;
-      if(txt){_posSearch.value=txt.trim();_filterProducts();_toast("🔊 "+txt.trim());}
-    };
-    rec.onerror=function(){if(vBtn)vBtn.classList.remove("mk-search__voice--listening");_toast("Micro indisponible");};
-    try{rec.start();_toast("🎤 Parlez...");}catch(e){if(vBtn)vBtn.classList.remove("mk-search__voice--listening");_toast("Micro indisponible");}
-  }
-
-  var _sortMode="smart";
   function _filterProducts(){
     var q=(_posSearch.value||"").toLowerCase();
     _filteredProducts=_allProducts.filter(function(p){
@@ -1330,8 +1213,6 @@
       return true;
     });
     _filteredProducts.sort(function(a,b){
-      if(_sortMode==="alpha")return(a.name||"").localeCompare(b.name||"");
-      if(_sortMode==="price")return((b.sale_price_cents||0)-(a.sale_price_cents||0))||(a.name||"").localeCompare(b.name||"");
       var aPriced=(a.sale_price_cents||0)>0?1:0;
       var bPriced=(b.sale_price_cents||0)>0?1:0;
       if(aPriced!==bPriced)return bPriced-aPriced;
@@ -1346,51 +1227,23 @@
     _dbGetAll().then(function(all){_allProducts=all||[];_filterProducts();});
   }
 
-  function _renderSkeletonGrid(count){
-    if(!_posGrid)return;
-    _posGrid.innerHTML="";
-    var n=count||24;
-    for(var i=0;i<n;i++){
-      var card=document.createElement("div");
-      card.className="mk-skeleton-card";
-      var img=document.createElement("div");
-      img.className="mk-skeleton-card__img";
-      card.appendChild(img);
-      var body=document.createElement("div");
-      body.className="mk-skeleton-card__body";
-      var name1=document.createElement("div");
-      name1.className="mk-skeleton-card__name";
-      body.appendChild(name1);
-      var name2=document.createElement("div");
-      name2.className="mk-skeleton-card__name-2";
-      body.appendChild(name2);
-      var price=document.createElement("div");
-      price.className="mk-skeleton-card__price";
-      body.appendChild(price);
-      card.appendChild(body);
-      _posGrid.appendChild(card);
-    }
-  }
-
   function _renderGrid(){
     _posGrid.innerHTML="";
-    var countEl=document.getElementById("mk-products-count");
-    if(countEl)countEl.textContent=_filteredProducts.length+" produit"+( _filteredProducts.length!==1?"s":"");
     if(_filteredProducts.length===0){
-      _posGrid.innerHTML='<div class="mk-empty"><div class="mk-empty__icon">🔍</div><div class="mk-empty__title">Aucun produit</div><div class="mk-empty__text">Aucun produit ne correspond à votre recherche</div></div>';
+      _posGrid.innerHTML='<div class="acim-empty"><div class="acim-empty-icon">\uD83D\uDD0D</div><div class="acim-empty-text">Aucun produit trouv\u00E9</div></div>';
       return;
     }
     _filteredProducts.forEach(function(p){
       var card=document.createElement("div");
-      card.className="mk-product"+(p.pricePerUnit>0&&p.unitType?" mk-product--weight":"");
+      card.className="acim-product-card";
       var hasPrice=p.sale_price_cents>0;
       var isWeighable=p.pricePerUnit>0&&p.unitType;
       var _cardP=p,_cardHP=hasPrice,_cardW=isWeighable;
 
       // Delete button
       var delBtn=document.createElement("button");
-      delBtn.className="mk-product__favorite";
-      delBtn.innerHTML="🗑️";
+      delBtn.className="acim-product-delete";
+      delBtn.innerHTML="\u2715";
       delBtn.title="Supprimer ce produit";
       delBtn.onclick=function(e){e.stopPropagation();_confirmDeleteProduct(_cardP);};
       card.appendChild(delBtn);
@@ -1399,12 +1252,13 @@
       var cat=(p.category||"autre").toLowerCase();
       var bg=_catBg[cat]||"#f5f5f5";
       var icImg=document.createElement("img");
-      icImg.className="mk-product__image";
+      icImg.className="acim-product-image";
       icImg.style.display="none";
       icImg.style.background=bg;
 
       var icPh=document.createElement("div");
-      icPh.className="mk-product__placeholder";
+      icPh.className="acim-product-placeholder";
+      icPh.style.background="linear-gradient(135deg,"+bg+" 0%,#e8e8e8 100%)";
       // Generate SVG product image
       var svgUrl=_generateProductSVG(p.name,cat,p.sale_price_cents);
       icPh.innerHTML='<img src="'+svgUrl+'" style="width:100%;height:100%;object-fit:cover;border-radius:12px 12px 0 0">';
@@ -1412,8 +1266,8 @@
 
       // Camera button for adding/changing photo
       var camBtn=document.createElement("button");
-      camBtn.className="mk-product__favorite";
-      camBtn.innerHTML="📷";
+      camBtn.className="acim-product-camera";
+      camBtn.innerHTML="\uD83D\uDCF7";
       camBtn.title="Ajouter / changer la photo";
       camBtn.onclick=function(e){
         e.stopPropagation();
@@ -1443,30 +1297,30 @@
 
       // Product info
       var infoDiv=document.createElement("div");
-      infoDiv.className="mk-product__content";
+      infoDiv.className="acim-product-info";
 
       var nm=document.createElement("div");
-      nm.className="mk-product__name";
+      nm.className="acim-product-name";
       nm.textContent=p.name||"?";
       infoDiv.appendChild(nm);
 
       if(isWeighable){
         var badge=document.createElement("div");
-        badge.className="mk-badge mk-badge--new";
-        badge.textContent="⚖ Au poids";
+        badge.style.cssText="display:inline-block;font-size:12px;color:#fff;background:#2196f3;border-radius:6px;padding:2px 8px;margin-top:6px;font-weight:600;";
+        badge.textContent="\u2696\uFE0F Au poids";
         infoDiv.appendChild(badge);
         var ppu=document.createElement("div");
-        ppu.className="mk-product__unit";
+        ppu.className="acim-product-price";
         ppu.textContent=_formatPricePerUnit(p.pricePerUnit,p.unitType);
         infoDiv.appendChild(ppu);
       }else if(hasPrice){
         var pr=document.createElement("div");
-        pr.className="mk-product__price";
+        pr.className="acim-product-price";
         pr.textContent=(p.sale_price_cents/100).toFixed(2)+"\u20AC";
         infoDiv.appendChild(pr);
       }else{
         var noPr=document.createElement("div");
-        noPr.style.cssText="font-size:14px;color:var(--mk-accent);margin-top:6px;font-weight:600;";
+        noPr.style.cssText="font-size:14px;color:var(--acim-orange);margin-top:6px;font-weight:600;";
         noPr.textContent="\u270F\uFE0F Sans prix";
         infoDiv.appendChild(noPr);
       }
@@ -1477,8 +1331,8 @@
         var isLow=p.stockQty<=threshold;
         var isExpired=p.expiry_date&&new Date(p.expiry_date)<new Date();
         var stBadge=document.createElement("div");
-        stBadge.className="mk-product__stock"+(isExpired?" mk-product__stock--expired":isLow?" mk-product__stock--low":"");
-        stBadge.textContent=(isExpired?"⚠️ Périmé !":isLow?"⚠️ Stock bas !":"Stock: ")+p.stockQty;
+        stBadge.className="acim-product-stock"+(isExpired?" expired":isLow?" low":"");
+        stBadge.textContent=(isExpired?"\u26A0\uFE0F P\u00E9rim\u00E9 !":isLow?"\u26A0\uFE0F Stock bas !":"Stock: ")+p.stockQty;
         if(isExpired&&p.expiry_date)stBadge.textContent+=" (DLC: "+p.expiry_date+")";
         infoDiv.appendChild(stBadge);
       }
@@ -1502,12 +1356,10 @@
     _posSubtotal.textContent=(subtotal/100).toFixed(2).replace(".",",")+" \u20AC";
     _posTotal.textContent=(total/100).toFixed(2).replace(".",",")+" \u20AC";
     var discRow=document.getElementById("acim-disc-row");
-    if(discRow&&_posDiscount){
-      if(_cartDiscountCents>0){
-        discRow.style.display="flex";
-        _posDiscount.textContent="-"+(_cartDiscountCents/100).toFixed(2).replace(".",",")+" \u20AC";
-      }else{discRow.style.display="none";}
-    }
+    if(_cartDiscountCents>0){
+      discRow.style.display="flex";
+      _posDiscount.textContent="-"+(_cartDiscountCents/100).toFixed(2).replace(".",",")+" \u20AC";
+    }else{discRow.style.display="none";}
 
     // Update cart FAB (mobile)
     _updateCartFAB();
@@ -1515,12 +1367,12 @@
     // Render into mobile sheet
     _posItems.innerHTML="";
     if(info.length===0){
-      _posItems.innerHTML='<div class="mk-sheet__empty"><div class="mk-sheet__empty-icon">🛒</div><div class="mk-sheet__empty-title">Panier vide</div></div>';
+      _posItems.innerHTML='<div class="acim-sheet-empty">\uD83D\uDED2 Panier vide</div>';
       _posCheckout.textContent="\uD83D\uDCB0 Encaisser (0,00 \u20AC)";
-      _posCheckout.disabled=true;
+      _posCheckout.style.opacity="0.5";
     }else{
       _posCheckout.textContent="\uD83D\uDCB0 Encaisser "+(total/100).toFixed(2).replace(".",",")+" \u20AC";
-      _posCheckout.disabled=false;
+      _posCheckout.style.opacity="1";
     }
 
     // Render into desktop cart
@@ -1529,7 +1381,7 @@
     if(dcItems){
       dcItems.innerHTML="";
       if(info.length===0){
-        dcItems.innerHTML='<div class="mk-sheet__empty"><div class="mk-sheet__empty-icon">🛒</div><div class="mk-sheet__empty-title">Panier vide</div></div>';
+        dcItems.innerHTML='<div class="acim-sheet-empty">\uD83D\uDED2 Panier vide</div>';
       }
     }
 
@@ -1539,12 +1391,12 @@
         var row=document.createElement("div");
         var isZero=it.price===0;
         var isWeighed=_isWeightProduct(it);
-        row.className="mk-sheet__item";
+        row.className="acim-sheet-item";
         row.onclick=function(){_inlineEdit(it.idx,50,50);};
 
         var icon=document.createElement("div");
-        icon.className="mk-sheet__item-image";
-        icon.style.cssText="width:56px;height:56px;border-radius:12px;overflow:hidden;flex-shrink:0;background:"+( _catBg[it.cat||"autre"]||"#f5f5f5");
+        icon.className="acim-sheet-item-icon";
+        icon.style.cssText="width:40px;height:40px;border-radius:8px;overflow:hidden;flex-shrink:0;background:"+( _catBg[it.cat||"autre"]||"#f5f5f5");
         // Try to show product image from cache or generate SVG
         var imgEl=document.createElement("img");
         imgEl.style.cssText="width:100%;height:100%;object-fit:cover;";
@@ -1565,132 +1417,76 @@
         row.appendChild(icon);
 
         var infoDiv=document.createElement("div");
-        infoDiv.className="mk-sheet__item-info";
+        infoDiv.className="acim-sheet-item-info";
         var nm=document.createElement("div");
-        nm.className="mk-sheet__item-name";
-        nm.style.color=isZero?"var(--mk-accent)":"";
+        nm.className="acim-sheet-item-name";
+        nm.style.color=isZero?"var(--acim-orange)":"";
         nm.textContent=isZero?"\u270F\uFE0F "+it.name:it.name;
         infoDiv.appendChild(nm);
-if(isWeighed&&it.weight!=null){
+
+        if(isWeighed&&it.weight!=null){
           var wLine=document.createElement("div");
-          wLine.className="mk-sheet__item-weight";
+          wLine.className="acim-sheet-item-weight";
           wLine.textContent=_formatWeight(it.weight,it.unitType)+" \u00D7 "+_formatPricePerUnit(it.pricePerUnit,it.unitType);
           infoDiv.appendChild(wLine);
         }
 
         if(it.price>0){
           var pr=document.createElement("div");
-          pr.className="mk-sheet__item-price";
+          pr.className="acim-sheet-item-price";
           pr.textContent=(it.price/100).toFixed(2).replace(".",",")+" \u20AC";
           infoDiv.appendChild(pr);
         }
         row.appendChild(infoDiv);
 
         var actions=document.createElement("div");
-        actions.className="mk-sheet__item-actions";
+        actions.className="acim-sheet-item-actions";
 
         var dupBtn=document.createElement("button");
-        dupBtn.className="mk-sheet__qty-btn";
+        dupBtn.className="acim-sheet-item-btn";
         dupBtn.innerHTML="\u27F3";
         dupBtn.title="Ajouter encore";
         dupBtn.onclick=function(e){e.stopPropagation();_addToCart(it.name,it.price,it.bc,it.cat,it.weight,it.unitType,it.pricePerUnit);};
         actions.appendChild(dupBtn);
 
-        var qtyWrap=document.createElement("div");
-        qtyWrap.className="mk-sheet__qty";
-
-        var decBtn=document.createElement("button");
-        decBtn.className="mk-sheet__qty-btn";
-        decBtn.innerHTML="\u2212";
-        decBtn.onclick=function(e){e.stopPropagation();_decrementCartItem(it.idx);};
-        qtyWrap.appendChild(decBtn);
-
-        var qtyVal=document.createElement("span");
-        qtyVal.className="mk-sheet__qty-value";
-        qtyVal.textContent=it.qty||1;
-        qtyWrap.appendChild(qtyVal);
-
-        var incBtn=document.createElement("button");
-        incBtn.className="mk-sheet__qty-btn";
-        incBtn.innerHTML="+";
-        incBtn.onclick=function(e){e.stopPropagation();_incrementCartItem(it.idx);};
-        qtyWrap.appendChild(incBtn);
-
-        actions.appendChild(qtyWrap);
-
         var delBtn=document.createElement("button");
-        delBtn.className="mk-sheet__remove";
-        delBtn.innerHTML="\uD83D\uDDD1\uFE0F";
-        delBtn.onclick=function(e){e.stopPropagation();_removeFromCart(it.idx);};
+        delBtn.className="acim-sheet-item-btn danger";
+        delBtn.innerHTML="\u2715";
+        delBtn.title="Supprimer";
+        delBtn.onclick=function(e){e.stopPropagation();_removeFromCart(it.idx);_toast("Supprim\u00E9");};
         actions.appendChild(delBtn);
 
         row.appendChild(actions);
-
         return row;
       }
 
-      // Mobile sheet
+      // Append to mobile sheet
       _posItems.appendChild(buildRow(item));
-
-      // Desktop cart
+      // Append to desktop cart
       if(dcItems){
         dcItems.appendChild(buildRow(item));
       }
     });
 
-    // Update subtitles
-    var subTitle=document.getElementById("mk-sheet-subtitle");
-    if(subTitle)subTitle.textContent=info.length+" article"+(info.length!==1?"s":"");
-    var dcHeader=document.querySelector(".mk-desktop-cart__header");
-    if(dcHeader){
-      var dcCount=document.getElementById("acim-pos-count");
-      if(dcCount)dcCount.textContent=info.length+" article"+(info.length!==1?"s":"");
-    }
-
-    // Update desktop footer
+    // Render desktop footer
     if(dcFooter){
       dcFooter.innerHTML='';
       var subR=document.createElement("div");
-      subR.className="mk-sheet__row";
-      subR.innerHTML='<span class="mk-sheet__row-label">Sous-total</span>';
-      var dcSubtotal=document.createElement("span");
-      dcSubtotal.className="mk-sheet__row-value";
-      dcSubtotal.textContent=(subtotal/100).toFixed(2).replace(".",",")+" \u20AC";
-      subR.appendChild(dcSubtotal);
+      subR.className="acim-sheet-row";
+      subR.innerHTML='<span class="acim-sheet-row-label">Sous-total</span><span class="acim-sheet-row-value">'+(subtotal/100).toFixed(2).replace(".",",")+" \u20AC</span>";
       dcFooter.appendChild(subR);
-
-      var dcDisc=document.createElement("div");
-      dcDisc.id="acim-disc-row";
-      dcDisc.className="mk-sheet__row mk-sheet__row--discount";
-      dcDisc.style.display="none";
-      dcDisc.innerHTML='<span class="mk-sheet__row-label">Remise</span>';
-      var dcDiscVal=document.createElement("span");
-      dcDiscVal.className="mk-sheet__row-value";
-      dcDiscVal.textContent="-0,00 \u20AC";
-      dcDisc.appendChild(dcDiscVal);
-      dcFooter.appendChild(dcDisc);
-
-      var dcDiscBtn=document.createElement("button");
-      dcDiscBtn.textContent="Appliquer une remise";
-      dcDiscBtn.style.cssText="margin-top:8px;width:100%;padding:10px;border:1px solid var(--mk-border);border-radius:8px;background:var(--mk-bg);font-size:14px;cursor:pointer;";
-      dcDiscBtn.onclick=function(){_applyTicketDiscount();};
-      dcFooter.appendChild(dcDiscBtn);
-
-      var dcTotal=document.createElement("div");
-      dcTotal.className="mk-sheet__total";
-      var dcLabel=document.createElement("span");
-      dcLabel.className="mk-sheet__total-label";
-      dcLabel.textContent="TOTAL";
-      var dcTotalVal=document.createElement("span");
-      dcTotalVal.className="mk-sheet__total-value";
-      dcTotalVal.textContent=(total/100).toFixed(2).replace(".",",")+" \u20AC";
-      dcTotal.appendChild(dcLabel);
-      dcTotal.appendChild(dcTotalVal);
-      dcFooter.appendChild(dcTotal);
-
+      if(_cartDiscountCents>0){
+        var discR=document.createElement("div");
+        discR.className="acim-sheet-row discount";
+        discR.innerHTML='<span class="acim-sheet-row-label">Remise</span><span class="acim-sheet-row-value">-'+(_cartDiscountCents/100).toFixed(2).replace(".",",")+" \u20AC</span>";
+        dcFooter.appendChild(discR);
+      }
+      var totR=document.createElement("div");
+      totR.className="acim-sheet-total";
+      totR.innerHTML='<span class="acim-sheet-total-label">TOTAL</span><span class="acim-sheet-total-value">'+(total/100).toFixed(2).replace(".",",")+" \u20AC</span>";
+      dcFooter.appendChild(totR);
       var dcCheckout=document.createElement("button");
-      dcCheckout.className="mk-btn mk-btn--primary";
-      dcCheckout.style.cssText="width:100%;margin-top:12px;";
+      dcCheckout.className="acim-sheet-checkout";
       dcCheckout.textContent="\uD83D\uDCB0 Encaisser "+(total/100).toFixed(2).replace(".",",")+" \u20AC";
       dcCheckout.onclick=function(){_startPayment();};
       dcFooter.appendChild(dcCheckout);
@@ -1724,15 +1520,6 @@ if(isWeighed&&it.weight!=null){
     _scanBuf="";
   }
   document.addEventListener("keydown",function(e){
-    // Scan terminator : Enter doit toujours commettre même si un input est focus
-    if(e.key==="Enter"&&_scanning&&_scanBuf.length>=4){
-      e.preventDefault();
-      _scanCommit();
-      return;
-    }
-    // Ne pas intercepter si un champ de saisie est focus (hors scan terminator)
-    var ae=document.activeElement;
-    if(ae&&(ae.tagName==="INPUT"||ae.tagName==="TEXTAREA"||ae.isContentEditable))return;
     // Scan toujours prioritaire, quel que soit le focus
     if(/^[0-9]$/.test(e.key)){
       var now=Date.now();
@@ -1751,6 +1538,12 @@ if(isWeighed&&it.weight!=null){
       }
       // Enter-terminator scanners commit immediately; else 80ms timeout.
       clearTimeout(_scanTimer);_scanTimer=setTimeout(_scanCommit,80);
+      return;
+    }
+    // Enter commits the scan buffer immediately (most USB/BT scanners send Enter after digits).
+    if(e.key==="Enter"&&_scanning&&_scanBuf.length>=4){
+      e.preventDefault();
+      _scanCommit();
       return;
     }
     if(/^[a-zA-ZÀ-ÿ]$/.test(e.key)){
@@ -1987,8 +1780,6 @@ if(isWeighed&&it.weight!=null){
     ov.appendChild(card);
     ov.onclick=function(e){if(e.target===ov)ov.remove();};
     document.body.appendChild(ov);
-    _trapFocus(ov);
-    ov.addEventListener("keydown",function(e){if(e.key==="Escape"){ov.remove();}});
     setTimeout(function(){if(selectedMode==="especes")cashInput.focus();},100);
   }
 
@@ -2035,15 +1826,6 @@ if(isWeighed&&it.weight!=null){
       //    risk invalidating the transaction context on some browsers).
       var decProbes=[];
       var i=0;
-      // Pre-compute total demand per barcode so insufficient-stock aborts the
-      // whole TX (all-or-nothing) instead of degrading stock line by line.
-      var demandMap={};
-      saleItems.forEach(function(it){
-        if(!it.bc)return;
-        var amt=(_isWeightProduct(it)&&it.weight!=null)?it.weight:(it.qty||1);
-        demandMap[it.bc]=(demandMap[it.bc]||0)+amt;
-      });
-      var seenBc={};
       function processItem(){
         if(i>=saleItems.length){ afterItems(); return; }
         var it=saleItems[i++];
@@ -2060,21 +1842,21 @@ if(isWeighed&&it.weight!=null){
           }
           var cur=(p.stockQty||0);
           var next=cur-amount;
-          var totalDemand=demandMap[it.bc]||0;
-          // Allow sale if stock is 0 (unmanaged/demo) — only block if stock > 0 and total demand exceeds it.
-          if(cur>0 && !seenBc[it.bc] && cur-totalDemand<0){
+          // Allow sale if stock is 0 (unmanaged/demo) — only block if stock > 0 and insufficient
+          if(cur>0 && next<0){
+            var unit=(p.unitType||"unit");
+            var isKg=(unit==="kg"||unit==="g"||unit==="L");
             try{tx.abort();}catch(_){}
-            _toast("⚠️ Stock insuffisant: "+it.name+" (reste "+cur+", demandé "+totalDemand+")");
+            _toast("⚠️ Stock insuffisant: "+it.name+" (reste "+cur+", demandé "+amount+")");
             return;
           }
-          seenBc[it.bc]=true;
           // If stock is 0, don't decrement (treat as unmanaged stock — sale allowed)
           if(cur>0){
             p.stockQty=next;
             p.last_updated=Date.now();
             sProd.put(p);
           }
-          // Audit STOCK_DECREMENT within the same TX (only when stock was actually decremented).
+          // Audit STOCK_DECREMENT within the same TX.
           try{
             window._acimAudit.logInTx(tx,{
               type:window._acimAudit.TYPE.STOCK_DECREMENT,
@@ -2083,7 +1865,7 @@ if(isWeighed&&it.weight!=null){
               action:"decrement",
               payload:{barcode:it.bc,amount:amount,reason:"sale"},
               previousState:{stockQty:cur},
-              newState:{stockQty:cur>0?next:cur}
+              newState:{stockQty:next}
             });
           }catch(e){
             _err("Audit STOCK_DECREMENT append failed — aborting TX:",e);
@@ -2445,11 +2227,6 @@ if(isWeighed&&it.weight!=null){
   }
 
   // ─── PR C — UI minimale (login + badge opérateur) ─────────────────
-  var _loginAttempts = 0;
-  var _loginLockoutUntil = 0;
-  var _LOGIN_MAX_ATTEMPTS = 5;
-  var _LOGIN_LOCKOUT_MS = 30000; // 30s lockout
-
   function _showLogin(){
     var old=document.getElementById("acim-login"); if(old) old.remove();
     var ov=document.createElement("div"); ov.id="acim-login";
@@ -2462,8 +2239,6 @@ if(isWeighed&&it.weight!=null){
     var inp=document.createElement("input"); inp.type="password"; inp.inputMode="numeric"; inp.pattern="[0-9]*";
     inp.placeholder="PIN"; inp.style.cssText="width:100%;font-size:22px;font-weight:700;padding:10px;border:3px solid #e0e0e0;border-radius:8px;outline:none;text-align:center;letter-spacing:8px;box-sizing:border-box;";
     card.appendChild(inp);
-    var hint=document.createElement("div"); hint.style.cssText="font-size:11px;color:#999;text-align:center;margin-top:6px;";
-    hint.textContent="PIN par défaut : 1234"; card.appendChild(hint);
     var br=document.createElement("div"); br.style.cssText="display:flex;gap:8px;margin-top:12px;";
     var bCancel=document.createElement("button"); bCancel.textContent="Annuler";
     bCancel.style.cssText="flex:1;padding:10px;border:2px solid #e0e0e0;border-radius:8px;background:#fff;font-size:15px;cursor:pointer;";
@@ -2471,32 +2246,13 @@ if(isWeighed&&it.weight!=null){
     var bOk=document.createElement("button"); bOk.textContent="✅ Connexion";
     bOk.style.cssText="flex:2;padding:10px;border:none;border-radius:8px;background:#2e7d32;color:#fff;font-size:15px;cursor:pointer;font-weight:700;";
     bOk.onclick=function(){
-      var now = Date.now();
-      if(now < _loginLockoutUntil){
-        var remaining = Math.ceil((_loginLockoutUntil - now) / 1000);
-        err.textContent = "Trop de tentatives. Réessayez dans " + remaining + "s";
-        return;
-      }
       var pin = inp.value.trim();
       if(!_PIN_REGEX.test(pin)){ err.textContent="PIN invalide (4-8 chiffres)"; return; }
       bOk.disabled = true; bOk.textContent = "…";
       _loginWithPin(pin).then(function(r){
         bOk.disabled = false; bOk.textContent = "✅ Connexion";
-        if(r.ok){
-          _loginAttempts = 0; _loginLockoutUntil = 0;
-          ov.remove(); _toast("👤 Bonjour "+r.actor.name); _refreshActorBadge();
-        } else {
-          _loginAttempts++;
-          if(_loginAttempts >= _LOGIN_MAX_ATTEMPTS){
-            _loginLockoutUntil = Date.now() + _LOGIN_LOCKOUT_MS;
-            _loginAttempts = 0;
-            err.textContent = "Trop de tentatives. Verrouillé 30 secondes.";
-          } else {
-            var remaining = _LOGIN_MAX_ATTEMPTS - _loginAttempts;
-            err.textContent = "PIN incorrect (" + remaining + " tentative" + (remaining>1?"s":"") + " restante" + (remaining>1?"s":"") + ")";
-          }
-          inp.value=""; inp.focus();
-        }
+        if(r.ok){ ov.remove(); _toast("👤 Bonjour "+r.actor.name); _refreshActorBadge(); }
+        else { err.textContent = "PIN incorrect"; inp.value=""; inp.focus(); }
       });
     };
     br.appendChild(bCancel); br.appendChild(bOk); card.appendChild(br);
@@ -5272,24 +5028,6 @@ idealItems.forEach(function(item, index){
     });
   }
 
-  // ─── FOCUS TRAP ──────────────────────────────────────
-  function _trapFocus(overlay){
-    if(!overlay)return;
-    var focusableSelectors='button:not([disabled]),[href],input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
-    overlay.addEventListener("keydown",function(e){
-      if(e.key!=="Tab")return;
-      var focusable=Array.prototype.slice.call(overlay.querySelectorAll(focusableSelectors));
-      if(focusable.length===0)return;
-      var first=focusable[0],last=focusable[focusable.length-1];
-      if(e.shiftKey){
-        if(document.activeElement===first){e.preventDefault();last.focus();}
-      }else{
-        if(document.activeElement===last){e.preventDefault();first.focus();}
-      }
-    });
-    setTimeout(function(){var first=overlay.querySelector(focusableSelectors);if(first)first.focus();},100);
-  }
-
   // ─── TOAST ────────────────────────────────────────────
   function _toast(msg){
     if(!msg)return;var old=document.getElementById("acim-toast");if(old)old.remove();
@@ -5647,12 +5385,6 @@ idealItems.forEach(function(item, index){
       if(e.ctrlKey&&e.key==="k"){e.preventDefault();if(_posSearch)_posSearch.focus();}
       if(e.ctrlKey&&e.key==="n"){e.preventDefault();_quickCreate("",0);}
     });
-    // Offline indicator
-    var offlineBanner=document.createElement("div");offlineBanner.className="mk-offline-banner";offlineBanner.id="acim-offline-banner";
-    offlineBanner.textContent="⚡ Mode hors-ligne — les données seront synchronisées";
-    document.body.appendChild(offlineBanner);
-    window.addEventListener("offline",function(){offlineBanner.classList.add("visible");});
-    window.addEventListener("online",function(){offlineBanner.classList.remove("visible");_toast("✅ Connexion rétablie");});
   }
 
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",init);else init();
@@ -5678,21 +5410,14 @@ idealItems.forEach(function(item, index){
       var matches=[];
       for(var i=0;i<all.length;i++){var p=all[i];
         var n=(p.name||"").toLowerCase();
-        if(!n)continue;
-        var score=0;
-        if(n===q)score=100;
-        else if(n.indexOf(q)>=0)score=60;
-        else if(q.indexOf(n)>=0)score=20;
-        if(score===0)continue;
-        matches.push({p:p,score:score});
+        if(n.indexOf(q)>=0||q.indexOf(n)>=0){matches.push(p);}
       }
-      matches.sort(function(a,b){return b.score-a.score;});
       if(matches.length===0){
         if(window._acimS3&&window._acimS3.speak)window._acimS3.speak("Produit introuvable: "+prodName);
         return;
       }
-      if(matches.length===1||(matches[0].score>=60&&matches[0].score>matches[1].score)){
-        var p=matches[0].p;
+      if(matches.length===1){
+        var p=matches[0];
         var promptTxt=(qty!=null?"Ajouter "+qty+" "+(unit||"unité")+" de ":"Ajouter ")+p.name+" à "+((p.sale_price_cents||0)/100).toFixed(2).replace(".",",")+" euros ?";
         if(window._acimS3&&window._acimS3.confirmVoice){
           window._acimS3.confirmVoice(promptTxt,function(){
@@ -5715,7 +5440,7 @@ idealItems.forEach(function(item, index){
         return;
       }
       // Multiple matches → flash list (max 3) — user can scan or click the right one
-      var top3=matches.slice(0,3).map(function(m){return m.p;});
+      var top3=matches.slice(0,3);
       var listTxt=top3.map(function(p){
         return p.name+" — "+((p.sale_price_cents||0)/100).toFixed(2).replace(".",",")+" euros";
       }).join(" / ");
