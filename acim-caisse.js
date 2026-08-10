@@ -964,27 +964,27 @@
 
     // ── HEADER ──
     var header=document.createElement("div");
-    header.className="mk-header acim-header";
+    header.className="acim-header";
 
     var headerTop=document.createElement("div");
-    headerTop.className="mk-header__top acim-header-top";
+    headerTop.className="acim-header-top";
 
     var headerBrand=document.createElement("div");
-    headerBrand.className="mk-header__brand";
+    headerBrand.className="";
 
     var headerLogo=document.createElement("div");
-    headerLogo.className="mk-header__logo";
+    headerLogo.className="";
     headerLogo.textContent="🏪";
 
     var headerTitle=document.createElement("div");
-    headerTitle.className="mk-header__title acim-header-title";
+    headerTitle.className="acim-header-title";
     headerTitle.textContent=_settings.storeName||"AcimCaisse";
     headerTitle.onclick=function(){_showMainMenu();};
     headerTitle.style.cursor="pointer";
 
     var headerSubtitle=document.createElement("div");
-    headerSubtitle.className="mk-header__subtitle";
-    headerSubtitle.textContent="Mode Makolette";
+    headerSubtitle.className="";
+    headerSubtitle.textContent="";
 
     headerBrand.appendChild(headerLogo);
     headerBrand.appendChild(headerTitle);
@@ -992,17 +992,17 @@
     headerTop.appendChild(headerBrand);
 
     var headerActions=document.createElement("div");
-    headerActions.className="mk-header__actions acim-header-actions";
+    headerActions.className="acim-header-actions";
 
     var newBtn=document.createElement("button");
-    newBtn.className="mk-icon-btn acim-header-btn";
+    newBtn.className="acim-header-btn";
     newBtn.innerHTML="+";
     newBtn.title="Nouveau produit (Ctrl+N)";
     newBtn.onclick=function(){_quickCreate("",0);};
     headerActions.appendChild(newBtn);
 
     var closeBtn=document.createElement("button");
-    closeBtn.className="mk-icon-btn acim-header-btn";
+    closeBtn.className="acim-header-btn";
     closeBtn.innerHTML="✕";
     closeBtn.title="Fermer la caisse";
     closeBtn.onclick=function(){_togglePOS(false);};
@@ -1013,16 +1013,16 @@
 
     // Search bar
     var searchWrap=document.createElement("div");
-    searchWrap.className="mk-search acim-search";
+    searchWrap.className="acim-search";
 
     var searchIcon=document.createElement("span");
-    searchIcon.className="mk-search__icon acim-search-icon";
+    searchIcon.className="acim-search-icon";
     searchIcon.innerHTML="🔍";
     searchWrap.appendChild(searchIcon);
 
     _posSearch=document.createElement("input");
     _posSearch.id="acim-pos-search";
-    _posSearch.className="mk-search__input acim-search-input";
+    _posSearch.className="acim-search-input";
     _posSearch.type="text";
     _posSearch.placeholder="Rechercher un produit ou scanner un code-barres...";
     var _searchDebounce=null;
@@ -1041,7 +1041,7 @@
     // Voice search button
     var voiceBtn=document.createElement("button");
     voiceBtn.id="mk-search-voice";
-    voiceBtn.className="mk-search__voice";
+    voiceBtn.className="acim-search-voice";
     voiceBtn.innerHTML="🎤";
     voiceBtn.title="Recherche vocale";
     voiceBtn.onclick=function(){_toggleVoiceSearch();};
@@ -1056,14 +1056,12 @@
 
     _pos.appendChild(header);
 
-    _pos.appendChild(header);
-
     // ── CATEGORIES (horizontal scroll icons) ──
     var catsWrap=document.createElement("div");
-    catsWrap.className="mk-categories acim-categories";
+    catsWrap.className="acim-categories";
 
     var catsScroll=document.createElement("div");
-    catsScroll.className="mk-categories__wrapper acim-categories-scroll";
+    catsScroll.className="acim-categories-scroll";
     catsScroll.id="acim-pos-cats";
     catsWrap.appendChild(catsScroll);
     _posCats=catsScroll;
@@ -1072,18 +1070,18 @@
 
     // ── PRODUCTS GRID ──
     var productsWrap=document.createElement("div");
-    productsWrap.className="mk-products";
+    productsWrap.className="acim-products";
 
     var productsHeader=document.createElement("div");
-    productsHeader.className="mk-products__header";
+    productsHeader.className="";
 
     var productsCount=document.createElement("span");
-    productsCount.className="mk-products__count";
+    productsCount.className="";
     productsCount.id="mk-products-count";
     productsHeader.appendChild(productsCount);
 
     var productsSort=document.createElement("button");
-    productsSort.className="mk-products__sort";
+    productsSort.className="";
     productsSort.innerHTML="⇅ Trier";
     productsSort.title="Trier les produits";
     productsSort.onclick=function(){_toggleSort();};
@@ -1093,20 +1091,20 @@
 
     _posGrid=document.createElement("div");
     _posGrid.id="acim-pos-grid";
-    _posGrid.className="mk-products__grid acim-products-grid";
+    _posGrid.className="acim-products-grid";
     _renderSkeletonGrid(24);
     productsWrap.appendChild(_posGrid);
     _pos.appendChild(productsWrap);
 
     // ── BOTTOM NAV ──
     var nav=document.createElement("div");
-    nav.className="mk-nav";
+    nav.className="acim-bottom-nav";
 
     var navItems=[
-      {icon:"\uD83C\uDFE0",label:"Accueil",active:true},
-      {icon:"\uD83D\uDED2",label:"Panier 200\u20AC",cart:true,fn:function(){_showIdealCart();}},
-      {icon:"\uD83D\uDCCB",label:"Historique",fn:function(){_showHistory();}},
-      {icon:"\u2699\uFE0F",label:"Menu",fn:function(){_showMainMenu();}}
+      {icon:"🏠",label:"Accueil",active:true},
+      {icon:"🛒",label:"Panier",cart:true,fn:function(){_showIdealCart();}},
+      {icon:"📋",label:"Historique",fn:function(){_showHistory();}},
+      {icon:"⚙️",label:"Menu",fn:function(){_showMainMenu();}}
     ];
     navItems.forEach(function(item){
       var btn=document.createElement("button");
@@ -1117,40 +1115,40 @@
     });
     _pos.appendChild(nav);
 
-    // ── CART FAB (mobile) ──
+// ── CART FAB (mobile) ──
     var fab=document.createElement("button");
-    fab.className="mk-cart-fab acim-cart-fab hidden";
+    fab.className="acim-cart-fab hidden";
     fab.id="acim-cart-fab";
-    fab.innerHTML='<span class="mk-cart-fab__icon acim-cart-fab__icon">🛒</span><span class="mk-cart-fab__label acim-cart-fab__label">Panier</span><span class="mk-cart-fab__count acim-cart-badge" id="acim-cart-fab-count">0</span><span class="mk-cart-fab__total" id="acim-cart-fab-total">0,00 \u20AC</span>';
+    fab.innerHTML='<span class="acim-cart-fab__icon">🛒</span><span class="acim-cart-fab__label">Panier</span><span class="acim-cart-badge" id="acim-cart-fab-count">0</span><span class="acim-cart-fab__total" id="acim-cart-fab-total">0,00 \u20AC</span>';
     fab.onclick=function(){_openCartSheet();};
     _pos.appendChild(fab);
 
     // ── CART BOTTOM SHEET ──
     var sheetOverlay=document.createElement("div");
-    sheetOverlay.className="mk-sheet-overlay acim-sheet-overlay";
+    sheetOverlay.className="acim-sheet-overlay";
     sheetOverlay.id="acim-sheet-overlay";
     sheetOverlay.onclick=function(){_closeCartSheet();};
     _pos.appendChild(sheetOverlay);
 
     var sheet=document.createElement("div");
-    sheet.className="mk-sheet acim-sheet";
+    sheet.className="acim-sheet";
     sheet.id="acim-sheet";
 
     var sheetHandle=document.createElement("div");
-    sheetHandle.className="mk-sheet__handle acim-sheet-handle";
+    sheetHandle.className="acim-sheet-handle";
 
     var sheetHeader=document.createElement("div");
-    sheetHeader.className="mk-sheet__header acim-sheet-header";
+    sheetHeader.className="acim-sheet-header";
 
     var sheetTitleRow=document.createElement("div");
-    sheetTitleRow.className="mk-sheet__title-row";
+    sheetTitleRow.className="acim-sheet-title-row";
 
     var sheetTitle=document.createElement("div");
-    sheetTitle.className="mk-sheet__title acim-sheet-title";
+    sheetTitle.className="acim-sheet-title";
     sheetTitle.textContent="🛒 Panier";
 
     var sheetClose=document.createElement("button");
-    sheetClose.className="mk-sheet__close acim-sheet-close";
+    sheetClose.className="acim-sheet-close";
     sheetClose.innerHTML="✕";
     sheetClose.onclick=function(){_closeCartSheet();};
     sheetTitleRow.appendChild(sheetTitle);
@@ -1158,39 +1156,39 @@
     sheetHeader.appendChild(sheetTitleRow);
 
     var sheetSubtitle=document.createElement("div");
-    sheetSubtitle.className="mk-sheet__subtitle";
+    sheetSubtitle.className="acim-sheet-subtitle";
     sheetSubtitle.id="mk-sheet-subtitle";
     sheetSubtitle.textContent="0 article(s)";
     sheetHeader.appendChild(sheetSubtitle);
-sheet.appendChild(sheetHeader);
+    sheet.appendChild(sheetHeader);
 
     _posItems=document.createElement("div");
-    _posItems.className="mk-sheet__items acim-sheet-items";
+    _posItems.className="acim-sheet-items";
     _posItems.id="acim-pos-items";
-    sheet.appendChild(_posItems);
+sheet.appendChild(_posItems);
 
     var sheetFooter=document.createElement("div");
-    sheetFooter.className="mk-sheet__footer acim-sheet-footer";
+    sheetFooter.className="acim-sheet-footer";
     sheetFooter.id="acim-sheet-footer";
 
     // Subtotal
     var subRow=document.createElement("div");
-    subRow.className="mk-sheet__row acim-sheet-row";
-    subRow.innerHTML='<span class="mk-sheet__row-label acim-sheet-row-label">Sous-total</span>';
+    subRow.className="acim-sheet-row";
+    subRow.innerHTML='<span class="acim-sheet-row-label">Sous-total</span>';
     _posSubtotal=document.createElement("span");
-    _posSubtotal.className="mk-sheet__row-value acim-sheet-row-value";
+    _posSubtotal.className="acim-sheet-row-value";
     _posSubtotal.textContent="0,00 \u20AC";
     subRow.appendChild(_posSubtotal);
     sheetFooter.appendChild(subRow);
 
     // Discount (hidden by default)
     var discRow=document.createElement("div");
-    discRow.className="mk-sheet__row mk-sheet__row--discount acim-sheet-row discount";
+    discRow.className="acim-sheet-row discount";
     discRow.id="acim-disc-row";
     discRow.style.display="none";
-    discRow.innerHTML='<span class="mk-sheet__row-label acim-sheet-row-label">Remise</span>';
+    discRow.innerHTML='<span class="acim-sheet-row-label">Remise</span>';
     _posDiscount=document.createElement("span");
-    _posDiscount.className="mk-sheet__row-value acim-sheet-row-value";
+    _posDiscount.className="acim-sheet-row-value";
     _posDiscount.textContent="-0,00 \u20AC";
     discRow.appendChild(_posDiscount);
     sheetFooter.appendChild(discRow);
@@ -1207,13 +1205,13 @@ sheet.appendChild(sheetHeader);
 
     // Total
     var totalRow=document.createElement("div");
-    totalRow.className="mk-sheet__total acim-sheet-total";
+    totalRow.className="acim-sheet-total";
     var finalLabel=document.createElement("span");
-    finalLabel.className="mk-sheet__total-label acim-sheet-total-label";
+    finalLabel.className="acim-sheet-total-label";
     finalLabel.textContent="TOTAL";
     _posTotal=document.createElement("span");
     _posTotal.id="acim-pos-total";
-    _posTotal.className="mk-sheet__total-value acim-sheet-total-value";
+    _posTotal.className="acim-sheet-total-value";
     _posTotal.textContent="0,00 \u20AC";
     totalRow.appendChild(finalLabel);
     totalRow.appendChild(_posTotal);
@@ -1221,7 +1219,7 @@ sheet.appendChild(sheetHeader);
 
     // Checkout
     _posCheckout=document.createElement("button");
-    _posCheckout.className="mk-sheet__checkout acim-sheet-checkout";
+    _posCheckout.className="acim-sheet-checkout";
     _posCheckout.id="acim-pos-checkout";
     _posCheckout.textContent="💰 Encaisser";
     _posCheckout.onclick=function(){_startPayment();};
@@ -1232,21 +1230,21 @@ sheet.appendChild(sheetHeader);
 
     // ── DESKTOP CART PANEL (hidden on mobile via CSS) ──
     var desktopCart=document.createElement("div");
-    desktopCart.className="mk-desktop-cart acim-desktop-cart";
+    desktopCart.className="acim-desktop-cart";
     desktopCart.id="acim-desktop-cart";
 
     var dcHeader=document.createElement("div");
-    dcHeader.className="mk-desktop-cart__header acim-desktop-cart-header";
+    dcHeader.className="acim-desktop-cart-header";
     dcHeader.innerHTML='<span>🛒 Ticket</span><span id="acim-pos-count">0 article</span>';
     desktopCart.appendChild(dcHeader);
 
     var dcItems=document.createElement("div");
-    dcItems.className="mk-desktop-cart__items acim-desktop-cart-items";
+    dcItems.className="acim-desktop-cart-items";
     dcItems.id="acim-desktop-cart-items";
     desktopCart.appendChild(dcItems);
 
     var dcFooter=document.createElement("div");
-    dcFooter.className="mk-desktop-cart__footer acim-desktop-cart-footer";
+    dcFooter.className="acim-desktop-cart-footer";
     dcFooter.id="acim-desktop-cart-footer";
     desktopCart.appendChild(dcFooter);
 
@@ -1255,7 +1253,7 @@ sheet.appendChild(sheetHeader);
     bodyRow.style.cssText="flex:1 1 0%;display:flex;overflow:hidden;min-height:0;";
     bodyRow.appendChild(productsWrap);
     bodyRow.appendChild(desktopCart);
-    _pos.insertBefore(bodyRow,_pos.querySelector(".mk-nav"));
+    _pos.insertBefore(bodyRow,_pos.querySelector(".acim-bottom-nav"));
 
     _buildCategories();
     document.body.appendChild(_pos);
@@ -1267,15 +1265,15 @@ sheet.appendChild(sheetHeader);
     _posCats.innerHTML="";
     // "Tous" category
     var allItem=document.createElement("div");
-    allItem.className="mk-category acim-category-item"+(_activeCat?"":" active");
-    allItem.innerHTML='<div class="mk-category__icon acim-category-icon">📦</div><div class="mk-category__label acim-category-label">Tous</div>';
+    allItem.className="acim-category-item"+(_activeCat?"":" active");
+    allItem.innerHTML='<div class="acim-category-icon">📦</div><div class="acim-category-label">Tous</div>';
     allItem.onclick=function(){_activeCat="";_refreshCategories();_filterProducts();};
     _posCats.appendChild(allItem);
     // Other categories
     CATS.forEach(function(cat){
       var item=document.createElement("div");
-      item.className="mk-category acim-category-item"+(_activeCat===cat.id?" active":"");
-      item.innerHTML='<div class="mk-category__icon acim-category-icon">'+cat.ic+'</div><div class="mk-category__label acim-category-label">'+cat.id+'</div>';
+      item.className="acim-category-item"+(_activeCat===cat.id?" active":"");
+      item.innerHTML='<div class="acim-category-icon">'+cat.ic+'</div><div class="acim-category-label">'+cat.id+'</div>';
       item.onclick=function(){_activeCat=(_activeCat===cat.id)?"":cat.id;_refreshCategories();_filterProducts();};
       _posCats.appendChild(item);
     });
@@ -1284,7 +1282,7 @@ sheet.appendChild(sheetHeader);
     var items=_posCats.querySelectorAll(".acim-category-item");
     items.forEach(function(item,i){
       var catId=i===0?"":CATS[i-1].id;
-      item.className="mk-category acim-category-item"+(_activeCat===catId?" active":"");
+      item.className="acim-category-item"+(_activeCat===catId?" active":"");
     });
   }
 
@@ -1311,7 +1309,7 @@ sheet.appendChild(sheetHeader);
   }
 
   // ── UPDATE CART FAB (mobile) ──
-  function _updateCartFAB(){
+function _updateCartFAB(){
     var fab=document.getElementById("acim-cart-fab");
     if(!fab)return;
     var count=_myCart.length;
@@ -1319,16 +1317,16 @@ sheet.appendChild(sheetHeader);
     if(count>0){
       fab.classList.remove("hidden");
       var cEl=document.getElementById("acim-cart-fab-count");if(cEl)cEl.textContent=count;
-      var tEl=document.getElementById("acim-cart-fab-total");if(tEl)tEl.textContent=(total/100).toFixed(2).replace(".",",")+" \u20AC";
+      var tEl=document.getElementById("acim-cart-fab-total");if(tEl)tEl.textContent=_fmtEur(total);
     }else{
       fab.classList.add("hidden");
-    }
+}
   }
 
   function _toggleSort(){
     _sortMode=_sortMode==="smart"?"alpha":(_sortMode==="alpha"?"price":"smart");
     _filterProducts();
-    var btn=document.querySelector(".mk-products__sort");
+    var btn=document.querySelector(".acim-products__sort");
     if(btn)btn.textContent=_sortMode==="smart"?"⇅ Trier":(_sortMode==="alpha"?"⇅ A→Z":"⇅ Prix");
     _toast("Tri : "+(_sortMode==="smart"?"pertinence":(_sortMode==="alpha"?"alphabétique":"par prix")));
   }
@@ -1341,8 +1339,8 @@ sheet.appendChild(sheetHeader);
     rec.lang="fr-FR";
     rec.interimResults=false;
     rec.maxAlternatives=1;
-    rec.onstart=function(){if(vBtn)vBtn.classList.add("mk-search__voice--listening");};
-    rec.onend=function(){if(vBtn)vBtn.classList.remove("mk-search__voice--listening");};
+    rec.onstart=function(){if(vBtn)vBtn.classList.add("acim-search-voice--listening");};
+    rec.onend=function(){if(vBtn)vBtn.classList.remove("acim-search-voice--listening");};
     rec.onresult=function(ev){
       var txt="";
       for(var i=0;i<ev.results.length;i++)txt+=ev.results[i][0].transcript;
@@ -1383,20 +1381,20 @@ sheet.appendChild(sheetHeader);
     var n=count||24;
     for(var i=0;i<n;i++){
       var card=document.createElement("div");
-      card.className="mk-skeleton-card";
+      card.className="acim-product-card acim-skeleton-card";
       var img=document.createElement("div");
-      img.className="mk-skeleton-card__img";
+      img.className="acim-skeleton-card__img";
       card.appendChild(img);
       var body=document.createElement("div");
-      body.className="mk-skeleton-card__body";
+      body.className="acim-skeleton-card__body";
       var name1=document.createElement("div");
-      name1.className="mk-skeleton-card__name";
+      name1.className="acim-skeleton-card__name";
       body.appendChild(name1);
       var name2=document.createElement("div");
-      name2.className="mk-skeleton-card__name-2";
+      name2.className="acim-skeleton-card__name-2";
       body.appendChild(name2);
       var price=document.createElement("div");
-      price.className="mk-skeleton-card__price";
+      price.className="acim-skeleton-card__price";
       body.appendChild(price);
       card.appendChild(body);
       _posGrid.appendChild(card);
@@ -1408,19 +1406,19 @@ sheet.appendChild(sheetHeader);
     var countEl=document.getElementById("mk-products-count");
     if(countEl)countEl.textContent=_filteredProducts.length+" produit"+( _filteredProducts.length!==1?"s":"");
     if(_filteredProducts.length===0){
-      _posGrid.innerHTML='<div class="mk-empty"><div class="mk-empty__icon">🔍</div><div class="mk-empty__title">Aucun produit</div><div class="mk-empty__text">Aucun produit ne correspond à votre recherche</div></div>';
+      _posGrid.innerHTML='<div class="acim-empty"><div class="acim-empty-icon">🔍</div><div class="acim-empty-text">Aucun produit ne correspond à votre recherche</div></div>';
       return;
     }
     _filteredProducts.forEach(function(p){
       var card=document.createElement("div");
-      card.className="mk-product acim-product-card"+(p.pricePerUnit>0&&p.unitType?" mk-product--weight":"");
+      card.className="acim-product-card"+(p.pricePerUnit>0&&p.unitType?" acim-product--weight":"");
       var hasPrice=p.sale_price_cents>0;
       var isWeighable=p.pricePerUnit>0&&p.unitType;
       var _cardP=p,_cardHP=hasPrice,_cardW=isWeighable;
 
       // Delete button
       var delBtn=document.createElement("button");
-      delBtn.className="mk-product__favorite acim-product-delete";
+      delBtn.className="acim-product-delete";
       delBtn.innerHTML="🗑️";
       delBtn.title="Supprimer ce produit";
       delBtn.onclick=function(e){e.stopPropagation();_confirmDeleteProduct(_cardP);};
@@ -1430,12 +1428,12 @@ sheet.appendChild(sheetHeader);
       var cat=(p.category||"autre").toLowerCase();
       var bg=_catBg[cat]||"#f5f5f5";
       var icImg=document.createElement("img");
-      icImg.className="mk-product__image acim-product-image";
+      icImg.className="acim-product-image";
       icImg.style.display="none";
       icImg.style.background=bg;
 
       var icPh=document.createElement("div");
-      icPh.className="mk-product__placeholder acim-product-placeholder";
+      icPh.className="acim-product-placeholder";
       // Generate SVG product image
       var svgUrl=_generateProductSVG(p.name,cat,p.sale_price_cents);
       icPh.innerHTML='<img src="'+svgUrl+'" style="width:100%;height:100%;object-fit:cover;border-radius:12px 12px 0 0">';
@@ -1443,7 +1441,7 @@ sheet.appendChild(sheetHeader);
 
       // Camera button for adding/changing photo
       var camBtn=document.createElement("button");
-      camBtn.className="mk-product__favorite acim-product-camera";
+      camBtn.className="acim-product-camera";
       camBtn.innerHTML="📷";
       camBtn.title="Ajouter / changer la photo";
       camBtn.onclick=function(e){
@@ -1474,38 +1472,38 @@ sheet.appendChild(sheetHeader);
 
       // Product info
       var infoDiv=document.createElement("div");
-      infoDiv.className="mk-product__content acim-product-info";
+      infoDiv.className="acim-product-info";
 
       var nm=document.createElement("div");
-      nm.className="mk-product__name acim-product-name";
+      nm.className="acim-product-name";
       nm.textContent=_cleanName(p.name)||"?";
       infoDiv.appendChild(nm);
 
       if(isWeighable){
         var badge=document.createElement("div");
-        badge.className="mk-badge mk-badge--new";
+        badge.className="acim-product-badge";
         badge.textContent="⚖ Au poids";
         infoDiv.appendChild(badge);
         var ppu=document.createElement("div");
-        ppu.className="mk-product__unit";
+        ppu.className="acim-product-price";
         ppu.textContent=_formatPricePerUnit(p.pricePerUnit,p.unitType);
         infoDiv.appendChild(ppu);
       }else if(hasPrice){
         var pr=document.createElement("div");
-        pr.className="mk-product__price acim-product-price";
+        pr.className="acim-product-price";
         pr.textContent=_fmtEur(p.sale_price_cents);
         infoDiv.appendChild(pr);
         // Show unit for non-weight products
         if(p.unit==="unit"||!p.unit){
           var u=document.createElement("div");
-          u.className="mk-product__unit acim-product-unit";
+          u.className="acim-product-unit";
           u.textContent="pièce";
-          u.style.cssText="font-size:12px;color:var(--mk-text-secondary);margin-top:2px;";
+          u.style.cssText="font-size:12px;color:var(--acim-text-secondary);margin-top:2px;";
           infoDiv.appendChild(u);
         }
       }else{
         var noPr=document.createElement("div");
-        noPr.style.cssText="font-size:14px;color:var(--mk-accent);margin-top:6px;font-weight:600;";
+        noPr.style.cssText="font-size:14px;color:var(--acim-orange);margin-top:6px;font-weight:600;";
         noPr.textContent="✏️ Sans prix";
         infoDiv.appendChild(noPr);
       }
@@ -1516,7 +1514,7 @@ sheet.appendChild(sheetHeader);
         var isLow=p.stockQty<=threshold;
         var isExpired=p.expiry_date&&new Date(p.expiry_date)<new Date();
         var stBadge=document.createElement("div");
-        stBadge.className="mk-product__stock acim-product-stock"+(isExpired?" mk-product__stock--expired":isLow?" mk-product__stock--low":"");
+        stBadge.className="acim-product-stock"+(isExpired?" acim-product-stock--expired":isLow?" acim-product-stock--low":"");
         stBadge.textContent=(isExpired?"⚠️ Périmé !":isLow?"⚠️ Stock bas !":"Stock: ")+p.stockQty;
         if(isExpired&&p.expiry_date)stBadge.textContent+=" (DLC: "+p.expiry_date+")";
         infoDiv.appendChild(stBadge);
@@ -1526,8 +1524,8 @@ sheet.appendChild(sheetHeader);
 
       card.onclick=function(){
         if(isWeighable){_weighProduct(p);}
-        else if(hasPrice){_addToCart(p.name,p.sale_price_cents,p.barcode,p.category);_toast("\u2705 "+p.name);}
-        else{_addToCart(p.name,0,p.barcode,p.category);_toast("\u270F\uFE0F "+p.name+" \u2014 cliquez dans le ticket pour le prix");}
+        else if(hasPrice){_addToCart(p.name,p.sale_price_cents,p.barcode,p.category);_toast("✅ "+p.name);}
+        else{_addToCart(p.name,0,p.barcode,p.category);_toast("✏️ "+p.name+" — cliquez dans le ticket pour le prix");}
       };
       _posGrid.appendChild(card);
     });
@@ -1543,7 +1541,7 @@ sheet.appendChild(sheetHeader);
     var discRow=document.getElementById("acim-disc-row");
     if(discRow&&_posDiscount){
       if(_cartDiscountCents>0){
-        discRow.style.display="flex";
+discRow.style.display="flex";
         _posDiscount.textContent="-"+_fmtEur(_cartDiscountCents);
       }else{discRow.style.display="none";}
     }
@@ -1554,7 +1552,7 @@ sheet.appendChild(sheetHeader);
     // Render into mobile sheet
     _posItems.innerHTML="";
     if(info.length===0){
-      _posItems.innerHTML='<div class="mk-sheet__empty"><div class="mk-sheet__empty-icon">🛒</div><div class="mk-sheet__empty-title">Panier vide</div></div>';
+      _posItems.innerHTML='<div class="acim-sheet-empty"><div class="acim-sheet-empty-icon">🛒</div><div class="acim-sheet-empty-title">Panier vide</div></div>';
       _posCheckout.textContent="💰 Encaisser ("+_fmtEur(0)+")";
       _posCheckout.disabled=true;
     }else{
@@ -1568,7 +1566,7 @@ sheet.appendChild(sheetHeader);
     if(dcItems){
       dcItems.innerHTML="";
       if(info.length===0){
-        dcItems.innerHTML='<div class="mk-sheet__empty"><div class="mk-sheet__empty-icon">🛒</div><div class="mk-sheet__empty-title">Panier vide</div></div>';
+        dcItems.innerHTML='<div class="acim-sheet-empty"><div class="acim-sheet-empty-icon">🛒</div><div class="acim-sheet-empty-title">Panier vide</div></div>';
       }
     }
 
@@ -1577,12 +1575,12 @@ sheet.appendChild(sheetHeader);
       function buildRow(it){
         var row=document.createElement("div");
         var isZero=it.price===0;
-var isWeighed=_isWeightProduct(it);
-        row.className="mk-sheet__item acim-sheet-item";
+        var isWeighed=_isWeightProduct(it);
+        row.className="acim-sheet-item";
         row.onclick=function(){_inlineEdit(it.idx,50,50);};
 
         var icon=document.createElement("div");
-        icon.className="mk-sheet__item-image acim-sheet-item-icon";
+        icon.className="acim-sheet-item-icon";
         icon.style.cssText="width:56px;height:56px;border-radius:12px;overflow:hidden;flex-shrink:0;background:"+( _catBg[it.cat||"autre"]||"#f5f5f5");
         // Try to show product image from cache or generate SVG
         var imgEl=document.createElement("img");
@@ -1604,53 +1602,53 @@ var isWeighed=_isWeightProduct(it);
         row.appendChild(icon);
 
         var infoDiv=document.createElement("div");
-        infoDiv.className="mk-sheet__item-info acim-sheet-item-info";
+        infoDiv.className="acim-sheet-item-info";
         var nm=document.createElement("div");
-        nm.className="mk-sheet__item-name acim-sheet-item-name";
-        nm.style.color=isZero?"var(--mk-accent)":"";
+        nm.className="acim-sheet-item-name";
+        nm.style.color=isZero?"var(--acim-orange)":"";
         nm.textContent=isZero?"✏️ "+it.name:it.name;
         infoDiv.appendChild(nm);
         if(isWeighed&&it.weight!=null){
           var wLine=document.createElement("div");
-          wLine.className="mk-sheet__item-weight acim-sheet-item-weight";
+          wLine.className="acim-sheet-item-weight";
           wLine.textContent=_formatWeight(it.weight,it.unitType)+" \u00D7 "+_formatPricePerUnit(it.pricePerUnit,it.unitType);
           infoDiv.appendChild(wLine);
         }
 
         if(it.price>0){
           var pr=document.createElement("div");
-          pr.className="mk-sheet__item-price acim-sheet-item-price";
+          pr.className="acim-sheet-item-price";
           pr.textContent=_fmtEur(it.price);
           infoDiv.appendChild(pr);
         }
-        row.appendChild(infoDiv);
+row.appendChild(infoDiv);
 
         var actions=document.createElement("div");
-        actions.className="mk-sheet__item-actions acim-sheet-item-actions";
+        actions.className="acim-sheet-item-actions";
 
         var dupBtn=document.createElement("button");
-        dupBtn.className="mk-sheet__qty-btn acim-sheet-item-btn";
+        dupBtn.className="acim-sheet-item-btn";
         dupBtn.innerHTML="⟳";
         dupBtn.title="Ajouter encore";
         dupBtn.onclick=function(e){e.stopPropagation();_addToCart(it.name,it.price,it.bc,it.cat,it.weight,it.unitType,it.pricePerUnit);};
         actions.appendChild(dupBtn);
 
         var qtyWrap=document.createElement("div");
-        qtyWrap.className="mk-sheet__qty";
+        qtyWrap.className="acim-sheet-qty";
 
         var decBtn=document.createElement("button");
-        decBtn.className="mk-sheet__qty-btn acim-sheet-item-btn";
+        decBtn.className="acim-sheet-item-btn";
         decBtn.innerHTML="−";
         decBtn.onclick=function(e){e.stopPropagation();_decrementCartItem(it.idx);};
         qtyWrap.appendChild(decBtn);
 
         var qtyVal=document.createElement("span");
-        qtyVal.className="mk-sheet__qty-value";
+        qtyVal.className="acim-sheet-qty-value";
         qtyVal.textContent=it.qty||1;
         qtyWrap.appendChild(qtyVal);
 
         var incBtn=document.createElement("button");
-        incBtn.className="mk-sheet__qty-btn acim-sheet-item-btn";
+        incBtn.className="acim-sheet-item-btn";
         incBtn.innerHTML="+";
         incBtn.onclick=function(e){e.stopPropagation();_incrementCartItem(it.idx);};
         qtyWrap.appendChild(incBtn);
@@ -1658,7 +1656,7 @@ var isWeighed=_isWeightProduct(it);
         actions.appendChild(qtyWrap);
 
         var delBtn=document.createElement("button");
-        delBtn.className="mk-sheet__remove acim-sheet-item-btn danger";
+        delBtn.className="acim-sheet-item-btn danger";
         delBtn.innerHTML="🗑️";
         delBtn.onclick=function(e){e.stopPropagation();_removeFromCart(it.idx);};
         actions.appendChild(delBtn);
@@ -1686,51 +1684,51 @@ var isWeighed=_isWeightProduct(it);
       if(dcCount)dcCount.textContent=info.length+" article"+(info.length!==1?"s":"");
     }
 
-    // Update desktop footer
+// Update desktop footer
     if(dcFooter){
       dcFooter.innerHTML='';
       var subR=document.createElement("div");
-      subR.className="mk-sheet__row";
-      subR.innerHTML='<span class="mk-sheet__row-label">Sous-total</span>';
+      subR.className="acim-sheet-row";
+      subR.innerHTML='<span class="acim-sheet-row-label">Sous-total</span>';
       var dcSubtotal=document.createElement("span");
-      dcSubtotal.className="mk-sheet__row-value";
-      dcSubtotal.textContent=(subtotal/100).toFixed(2).replace(".",",")+" \u20AC";
+      dcSubtotal.className="acim-sheet-row-value";
+      dcSubtotal.textContent=_fmtEur(subtotal);
       subR.appendChild(dcSubtotal);
       dcFooter.appendChild(subR);
 
       var dcDisc=document.createElement("div");
       dcDisc.id="acim-disc-row";
-      dcDisc.className="mk-sheet__row mk-sheet__row--discount";
+      dcDisc.className="acim-sheet-row discount";
       dcDisc.style.display="none";
-      dcDisc.innerHTML='<span class="mk-sheet__row-label">Remise</span>';
+      dcDisc.innerHTML='<span class="acim-sheet-row-label">Remise</span>';
       var dcDiscVal=document.createElement("span");
-      dcDiscVal.className="mk-sheet__row-value";
+      dcDiscVal.className="acim-sheet-row-value";
       dcDiscVal.textContent="-0,00 \u20AC";
       dcDisc.appendChild(dcDiscVal);
       dcFooter.appendChild(dcDisc);
 
       var dcDiscBtn=document.createElement("button");
       dcDiscBtn.textContent="Appliquer une remise";
-      dcDiscBtn.style.cssText="margin-top:8px;width:100%;padding:10px;border:1px solid var(--mk-border);border-radius:8px;background:var(--mk-bg);font-size:14px;cursor:pointer;";
+      dcDiscBtn.style.cssText="margin-top:8px;width:100%;padding:10px;border:1px solid var(--acim-border);border-radius:8px;background:var(--acim-card);font-size:14px;cursor:pointer;";
       dcDiscBtn.onclick=function(){_applyTicketDiscount();};
       dcFooter.appendChild(dcDiscBtn);
 
       var dcTotal=document.createElement("div");
-      dcTotal.className="mk-sheet__total";
+      dcTotal.className="acim-sheet-total";
       var dcLabel=document.createElement("span");
-      dcLabel.className="mk-sheet__total-label";
+      dcLabel.className="acim-sheet-total-label";
       dcLabel.textContent="TOTAL";
       var dcTotalVal=document.createElement("span");
-      dcTotalVal.className="mk-sheet__total-value";
-      dcTotalVal.textContent=(total/100).toFixed(2).replace(".",",")+" \u20AC";
+      dcTotalVal.className="acim-sheet-total-value";
+      dcTotalVal.textContent=_fmtEur(total);
       dcTotal.appendChild(dcLabel);
       dcTotal.appendChild(dcTotalVal);
       dcFooter.appendChild(dcTotal);
 
       var dcCheckout=document.createElement("button");
-      dcCheckout.className="mk-btn mk-btn--primary";
+      dcCheckout.className="acim-sheet-checkout";
       dcCheckout.style.cssText="width:100%;margin-top:12px;";
-      dcCheckout.textContent="\uD83D\uDCB0 Encaisser "+(total/100).toFixed(2).replace(".",",")+" \u20AC";
+      dcCheckout.textContent="💰 Encaisser "+_fmtEur(total);
       dcCheckout.onclick=function(){_startPayment();};
       dcFooter.appendChild(dcCheckout);
     }
@@ -5687,7 +5685,7 @@ idealItems.forEach(function(item, index){
       if(e.ctrlKey&&e.key==="n"){e.preventDefault();_quickCreate("",0);}
     });
     // Offline indicator
-    var offlineBanner=document.createElement("div");offlineBanner.className="mk-offline-banner";offlineBanner.id="acim-offline-banner";
+    var offlineBanner=document.createElement("div");offlineBanner.className="acim-offline-banner";offlineBanner.id="acim-offline-banner";
     offlineBanner.textContent="⚡ Mode hors-ligne — les données seront synchronisées";
     document.body.appendChild(offlineBanner);
     window.addEventListener("offline",function(){offlineBanner.classList.add("visible");});
