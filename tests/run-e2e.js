@@ -104,11 +104,14 @@ async function assertOk(name, cond, detail) {
   }
 
   // ============================================================
-  // 4. Quick-create modal via the first button (header)
+  // 4. Quick-create modal (click header "+" button)
   // ============================================================
   log('TEST 4: quick-create modal');
   try {
-    await page.locator('button').first().click();
+    // Close any open dialog first (_quickCreate no-ops if _dialogOpen())
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(200);
+    await page.locator('.acim-header-btn').first().click();
     await page.waitForTimeout(700);
     await shot(page, '04-quick-create');
     const quickVisible = await page.locator('#acim-quick').isVisible().catch(() => false);
