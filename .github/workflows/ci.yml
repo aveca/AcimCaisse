@@ -13,12 +13,42 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
       - name: Syntax check acim-caisse.js
         run: node -c acim-caisse.js
       - name: Start serve.js
-        run: node serve.js &
-      - name: Run E2E tests
+        run: |
+          node tests/serve.js &
+          echo $! > serve.pid
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8765/pos.html >/dev/null; then
+              echo "serve.js ready"
+              break
+            fi
+            sleep 0.5
+          done
+      - name: Run E2E tests (desktop)
         run: node tests/run-e2e.js
+      - name: Run mobile UI tests
+        run: node tests/run-mobile.js
+      - name: Stop serve.js
+        if: always()
+        run: |
+          if [ -f serve.pid ]; then
+            kill "$(cat serve.pid)" 2>/dev/null || true
+          fi
+      - name: Upload screenshots artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: tests/screenshots/
+          if-no-files-found: warn
+          retention-days: 7
 
   deploy:
     needs: ci
