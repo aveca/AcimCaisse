@@ -1024,6 +1024,10 @@
     _posSearch.id="acim-pos-search";
     _posSearch.className="acim-search-input";
     _posSearch.type="text";
+    _posSearch.inputMode="text";
+    _posSearch.autocomplete="off";
+    _posSearch.setAttribute("autocapitalize","none");
+    _posSearch.setAttribute("spellcheck","false");
     _posSearch.placeholder="Rechercher un produit ou scanner un code-barres...";
     var _searchDebounce=null;
     _posSearch.addEventListener("input",function(){
@@ -1429,6 +1433,7 @@ function _updateCartFAB(){
       var bg=_catBg[cat]||"#f5f5f5";
       var icImg=document.createElement("img");
       icImg.className="acim-product-image";
+      icImg.alt=""; /* placeholder décoratif — le nom du produit est affiché en texte dans la carte */
       icImg.style.display="none";
       icImg.style.background=bg;
 
@@ -1436,7 +1441,7 @@ function _updateCartFAB(){
       icPh.className="acim-product-placeholder";
       // Generate SVG product image
       var svgUrl=_generateProductSVG(p.name,cat,p.sale_price_cents);
-      icPh.innerHTML='<img src="'+svgUrl+'" style="width:100%;height:100%;object-fit:cover;border-radius:12px 12px 0 0">';
+      icPh.innerHTML='<img src="'+svgUrl+'" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:12px 12px 0 0">';
       card.appendChild(icPh);
 
       // Camera button for adding/changing photo
@@ -1584,6 +1589,7 @@ discRow.style.display="flex";
         icon.style.cssText="width:56px;height:56px;border-radius:12px;overflow:hidden;flex-shrink:0;background:"+( _catBg[it.cat||"autre"]||"#f5f5f5");
         // Try to show product image from cache or generate SVG
         var imgEl=document.createElement("img");
+        imgEl.alt=""; /* placeholder décoratif — le nom du produit est déjà dans infoDiv */
         imgEl.style.cssText="width:100%;height:100%;object-fit:cover;";
         var svgUrl=_generateProductSVG(it.name,it.cat,it.price);
         imgEl.src=svgUrl;

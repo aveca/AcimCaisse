@@ -8,5 +8,6 @@ Thumbs.db
 desktop.ini
 tests/screenshots/
 tests/screenshots-poststudio/
+artifacts/
 post-studio/node_modules/
 post-studio/dist/
