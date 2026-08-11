@@ -2,6 +2,7 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ACIM Caisse — Dashboard métier</title>
 <style>
   * { box-sizing: border-box; }
@@ -44,6 +45,19 @@
     .no-print { display: none; }
     .card { box-shadow: none; }
     body { background: #fff; }
+  }
+  @media (max-width: 600px) {
+    header { padding: 20px 14px; }
+    header h1 { font-size: 22px; }
+    .container { padding: 12px; }
+    .card { padding: 14px; }
+    .card .metric { font-size: 22px; }
+    table { font-size: 12px; }
+    th, td { padding: 6px 8px; }
+    .bar-row .date { width: 70px; font-size: 11px; }
+    /* .bar-label.outside uses right:-75px which overflows on mobile — keep inside */
+    .bar-row .bar-label.outside { right: 4px; color: #1e3c72; background: rgba(255,255,255,0.9); padding: 1px 4px; border-radius: 3px; }
+    .bar-row .bar-bg { min-height: 24px; }
   }
 </style>
 </head>

@@ -137,11 +137,8 @@ const PROFILES = [
       const checkoutVisible = await page.locator('#acim-pos-checkout').isVisible().catch(() => false);
       await assertOk(prof.label + ': checkout button visible', checkoutVisible);
       if (checkoutVisible) {
-        // .acim-bottom-nav intercepte pointer events — on invoque onclick directement
-        await page.evaluate(() => {
-          var btn = document.getElementById('acim-pos-checkout');
-          if (btn && btn.onclick) btn.onclick();
-        });
+        // Le fix z-index (acim-sheet z=10000020 > bottom-nav z=10000010) permet le tap direct
+        await page.locator('#acim-pos-checkout').tap();
         await page.waitForTimeout(1000);
         await shot(page, 'm-' + prof.label + '-04-payment-modal');
         const paymentVisible = await page.locator('#acim-payment').isVisible().catch(() => false);
